@@ -19,6 +19,12 @@ describe("loadEnv", () => {
     expect(() => loadEnv({ TELEGRAM_ALLOWED_CHAT_IDS: "123,@christian" })).toThrow(/Chat-ID/);
   });
 
+  it("nutzt AVELIO_ANTHROPIC_API_KEY, wenn ANTHROPIC_API_KEY fehlt oder leer ist", () => {
+    expect(loadEnv({ AVELIO_ANTHROPIC_API_KEY: "a" }).ANTHROPIC_API_KEY).toBe("a");
+    expect(loadEnv({ ANTHROPIC_API_KEY: "", AVELIO_ANTHROPIC_API_KEY: "a" }).ANTHROPIC_API_KEY).toBe("a");
+    expect(loadEnv({ ANTHROPIC_API_KEY: "b", AVELIO_ANTHROPIC_API_KEY: "a" }).ANTHROPIC_API_KEY).toBe("b");
+  });
+
   it("lehnt unbekannte NODE_ENV-Werte ab", () => {
     expect(() => loadEnv({ NODE_ENV: "staging" })).toThrow(/NODE_ENV/);
   });

@@ -43,8 +43,17 @@ export const SECRET_KEYS = [
 
 export type SecretKey = (typeof SECRET_KEYS)[number];
 
+/**
+ * Ausweichname für den Anthropic-Key: In Claude-Code-Cloud-Sessions wird ANTHROPIC_API_KEY von der
+ * Umgebung selbst belegt bzw. herausgefiltert. Dort den Key als AVELIO_ANTHROPIC_API_KEY setzen.
+ */
+const ANTHROPIC_KEY_FALLBACK = "AVELIO_ANTHROPIC_API_KEY";
+
 export function loadEnv(source: NodeJS.ProcessEnv = process.env): Env {
-  const result = envSchema.safeParse(source);
+  const result = envSchema.safeParse({
+    ...source,
+    ANTHROPIC_API_KEY: source.ANTHROPIC_API_KEY?.trim() || source[ANTHROPIC_KEY_FALLBACK],
+  });
   if (!result.success) {
     throw new Error(`Ungültige Umgebungsvariablen:\n${z.prettifyError(result.error)}`);
   }
