@@ -5,6 +5,8 @@ Avelio Lead Score bewerten und über Telegram berichten.
 
 Plan: [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md). Stand: Schritt 3 (Recherche: Places-Suche mit Orts-Kachelung, Gate, Prefilter) umgesetzt.
 
+Datenbank im Betrieb: Supabase, Einrichtung in [docs/SUPABASE.md](docs/SUPABASE.md).
+
 ## Lokal starten
 
 ```sh
@@ -13,6 +15,7 @@ npm install
 cp .env.example .env  # Keys eintragen
 docker compose up -d db
 npm run migrate       # Schema anlegen bzw. aktualisieren
+npm run db-status     # Tabellen und Zugriffsschutz prüfen
 npm run check-env     # prüft Keys und Datenbank live
 npm run verify        # Format, Lint, Typecheck, Tests (DB-Tests brauchen TEST_DATABASE_URL)
 ```

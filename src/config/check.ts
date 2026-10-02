@@ -1,4 +1,6 @@
+import { TLSSocket } from "node:tls";
 import pg from "pg";
+import { tlsFor } from "../db/client.js";
 import type { Env } from "./env.js";
 
 export type CheckStatus = "ok" | "missing" | "error";
@@ -86,7 +88,12 @@ export async function checkKeys(env: Env, fetchFn: Fetch = fetch): Promise<Check
 }
 
 export async function checkDatabase(url: string): Promise<string> {
-  const client = new pg.Client({ connectionString: url, connectionTimeoutMillis: TIMEOUT_MS });
+  const ssl = tlsFor(url);
+  const client = new pg.Client({
+    connectionString: url,
+    connectionTimeoutMillis: TIMEOUT_MS,
+    ...(ssl ? { ssl } : {}),
+  });
   try {
     await client.connect();
     const { rows } = await client.query<{ version: string; has_migrations: boolean }>(
@@ -98,7 +105,14 @@ export async function checkDatabase(url: string): Promise<string> {
     const migrations = r.has_migrations
       ? (await client.query<{ n: number }>("select count(*)::int as n from schema_migrations")).rows[0]!.n
       : 0;
-    return `Postgres ${r.version}, ${migrations} Migration(en) angewendet`;
+    const stream = (client as unknown as { connection?: { stream?: unknown } }).connection?.stream;
+    const tls =
+      stream instanceof TLSSocket
+        ? stream.authorized
+          ? "TLS, Zertifikat geprüft"
+          : "TLS ohne Zertifikatsprüfung"
+        : "unverschlüsselt";
+    return `Postgres ${r.version}, ${migrations} Migration(en) angewendet (${tls})`;
   } catch (err) {
     // Fehlermeldungen von pg enthalten keine Passwörter, die Host-Angabe ist zur Diagnose nützlich.
     throw new Error(`${new URL(url).host}: ${err instanceof Error ? err.message : String(err)}`, {

@@ -2,6 +2,7 @@ import { checkKeys } from "./config/check.js";
 import { loadEnv, requireKeys } from "./config/env.js";
 import { createDb } from "./db/client.js";
 import { migrate } from "./db/migrate.js";
+import { dbStatus } from "./db/status.js";
 import { loadModelsConfig } from "./llm/config.js";
 import { createAnthropicMessages, createLlmGateway } from "./llm/gateway.js";
 import { loadBranches } from "./pipeline/research/branches.js";
@@ -97,9 +98,36 @@ async function research(args: string[]): Promise<number> {
   }
 }
 
+async function showDbStatus(): Promise<number> {
+  const { DATABASE_URL } = requireKeys(loadEnv(), ["DATABASE_URL"]);
+  const db = createDb(DATABASE_URL, { max: 1 });
+  try {
+    const status = await dbStatus(db);
+    console.log(`Schema ${status.schema}`);
+    console.log(
+      `Migrationen: ${status.migrations.map((m) => m.version).join(", ") || "keine – erst npm run migrate"}`,
+    );
+    let unprotected = 0;
+    for (const t of status.tables) {
+      const open = !t.rls || t.anonCanRead === true;
+      if (open) unprotected++;
+      const access =
+        t.anonCanRead === null ? "" : t.anonCanRead ? " · Data API: OFFEN" : " · Data API: gesperrt";
+      console.log(
+        `  ${open ? "✘" : "✔"} ${t.name.padEnd(20)} ${String(t.rows).padStart(7)} Zeilen · RLS ${t.rls ? "an" : "AUS"}${access}`,
+      );
+    }
+    if (unprotected > 0) console.log(`\n${unprotected} Tabelle(n) ungeschützt – npm run migrate ausführen.`);
+    return unprotected > 0 || status.migrations.length === 0 ? 1 : 0;
+  } finally {
+    await db.end();
+  }
+}
+
 const commands: Record<string, (args: string[]) => Promise<number>> = {
   "check-env": checkEnv,
   migrate: runMigrations,
+  "db-status": showDbStatus,
   research,
 };
 

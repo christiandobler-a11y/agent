@@ -10,6 +10,7 @@ ausprobieren kann. Nach Schritt 6 ist ein Abstimmungstermin (Kalibrierung) vorge
 - `npm test` / `npm run test:watch`: Vitest
 - `npm run check-env`: prüft gesetzte Keys und die Datenbank mit je einem Live-Aufruf (gibt keine Werte aus)
 - `npm run migrate`: wendet neue SQL-Migrationen aus `migrations/` an
+- `npm run db-status`: Migrationen, Tabellen, Zeilen, RLS/Data-API-Schutz der Datenbank aus `DATABASE_URL`
 - `npm run cli -- <befehl>`: einzelne Pipeline-Schritte ausführen (Debugging), z. B.
   `npm run cli -- research "Fahrradladen" rosenheim -n 5`
 - `docker compose up -d db`: lokales Postgres 16
@@ -37,6 +38,10 @@ ausprobieren kann. Nach Schritt 6 ist ein Abstimmungstermin (Kalibrierung) vorge
 
 - Schemaänderungen nur als neue Datei `migrations/NNN_name.sql`. Angewendete Migrationen nie ändern
   (Prüfsumme). SQL ohne `public.`-Präfix, damit Tests in eigenen Schemas laufen.
+- Produktion: Supabase (Session Pooler), siehe [docs/SUPABASE.md](docs/SUPABASE.md). Cloud-Sessions erreichen
+  Port 5432 nicht; Supabase-Befehle (`migrate`, `db-status`) laufen auf Christians Rechner bzw. dem Server.
+- **Jede neue Tabelle** braucht `alter table … enable row level security;` in ihrer Migration (Supabase
+  veröffentlicht `public` sonst über die Data API). TLS zu Supabase erzwingt `tlsFor()` in `src/db/client.ts`.
 - Firmenidentität und Dubletten: `src/pipeline/research/identity.ts` (rein) und `src/db/companies.ts`.
 - Lokal ohne Docker: Postgres 16 mit `initdb`/`pg_ctl` starten und `TEST_DATABASE_URL` darauf setzen.
 - DB-Tests nutzen `describeDb`/`useTestDb` aus `tests/helpers/db.ts` und brauchen `TEST_DATABASE_URL`.
