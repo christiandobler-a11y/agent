@@ -1,0 +1,88 @@
+import type { Env } from "./env.js";
+
+export type CheckStatus = "ok" | "missing" | "error";
+
+export interface CheckResult {
+  name: string;
+  status: CheckStatus;
+  detail: string;
+}
+
+type Fetch = typeof fetch;
+
+const TIMEOUT_MS = 30_000;
+
+async function probe(
+  name: string,
+  value: string | undefined,
+  run: (value: string) => Promise<string>,
+): Promise<CheckResult> {
+  if (!value) return { name, status: "missing", detail: "nicht gesetzt" };
+  try {
+    return { name, status: "ok", detail: await run(value) };
+  } catch (err) {
+    return { name, status: "error", detail: err instanceof Error ? err.message : String(err) };
+  }
+}
+
+async function expectOk(res: Response, service: string): Promise<unknown> {
+  if (!res.ok) {
+    const body = (await res.text()).slice(0, 200);
+    throw new Error(`${service}: HTTP ${res.status} ${body}`);
+  }
+  return res.json();
+}
+
+/** Prüft die gesetzten Keys mit je einem günstigen Live-Aufruf. Gibt nie Secret-Werte aus. */
+export async function checkKeys(env: Env, fetchFn: Fetch = fetch): Promise<CheckResult[]> {
+  const signal = () => AbortSignal.timeout(TIMEOUT_MS);
+
+  return Promise.all([
+    probe("TELEGRAM_BOT_TOKEN", env.TELEGRAM_BOT_TOKEN, async (token) => {
+      const res = await fetchFn(`https://api.telegram.org/bot${token}/getMe`, { signal: signal() });
+      const data = (await expectOk(res, "Telegram")) as { result?: { username?: string } };
+      return `Bot @${data.result?.username ?? "?"}`;
+    }),
+    probe("TELEGRAM_ALLOWED_CHAT_IDS", env.TELEGRAM_ALLOWED_CHAT_IDS.join(",") || undefined, (ids) =>
+      Promise.resolve(`${ids.split(",").length} Chat-ID(s)`),
+    ),
+    probe("GOOGLE_API_KEY (Places)", env.GOOGLE_API_KEY, async (key) => {
+      const res = await fetchFn("https://places.googleapis.com/v1/places:searchText", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          "X-Goog-Api-Key": key,
+          "X-Goog-FieldMask": "places.id",
+        },
+        body: JSON.stringify({ textQuery: "Fahrradladen Rosenheim", pageSize: 1 }),
+        signal: signal(),
+      });
+      const data = (await expectOk(res, "Places")) as { places?: unknown[] };
+      return `${data.places?.length ?? 0} Treffer`;
+    }),
+    probe("GOOGLE_API_KEY (PageSpeed)", env.GOOGLE_API_KEY, async (key) => {
+      const url = new URL("https://www.googleapis.com/pagespeedonline/v5/runPagespeed");
+      url.search = new URLSearchParams({
+        url: "https://example.com",
+        strategy: "mobile",
+        category: "performance",
+        key,
+      }).toString();
+      const res = await fetchFn(url, { signal: AbortSignal.timeout(90_000) });
+      await expectOk(res, "PageSpeed");
+      return "Antwort erhalten";
+    }),
+    probe("ANTHROPIC_API_KEY", env.ANTHROPIC_API_KEY, async (key) => {
+      const res = await fetchFn("https://api.anthropic.com/v1/models?limit=1", {
+        headers: { "x-api-key": key, "anthropic-version": "2023-06-01" },
+        signal: signal(),
+      });
+      await expectOk(res, "Anthropic");
+      return "Key gültig";
+    }),
+    probe("DATABASE_URL", env.DATABASE_URL, (url) =>
+      // Verbindungstest folgt mit dem DB-Modul in Schritt 2.
+      Promise.resolve(`gesetzt (${new URL(url).host})`),
+    ),
+  ]);
+}

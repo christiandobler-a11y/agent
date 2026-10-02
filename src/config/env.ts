@@ -1,0 +1,64 @@
+import { z } from "zod";
+
+const optionalSecret = z
+  .string()
+  .trim()
+  .transform((v) => (v === "" ? undefined : v))
+  .optional();
+
+const chatIdList = z
+  .string()
+  .trim()
+  .optional()
+  .transform((v, ctx) => {
+    if (!v) return [];
+    const ids = v.split(",").map((s) => s.trim());
+    for (const id of ids) {
+      if (!/^-?\d+$/.test(id)) {
+        ctx.addIssue({ code: "custom", message: `Ungültige Chat-ID: "${id}"` });
+        return z.NEVER;
+      }
+    }
+    return ids.map(Number);
+  });
+
+const envSchema = z.object({
+  NODE_ENV: z.enum(["development", "test", "production"]).default("development"),
+  LOG_LEVEL: z.enum(["debug", "info", "warn", "error"]).default("info"),
+  DATABASE_URL: optionalSecret,
+  ANTHROPIC_API_KEY: optionalSecret,
+  GOOGLE_API_KEY: optionalSecret,
+  TELEGRAM_BOT_TOKEN: optionalSecret,
+  TELEGRAM_ALLOWED_CHAT_IDS: chatIdList,
+});
+
+export type Env = z.infer<typeof envSchema>;
+
+export const SECRET_KEYS = [
+  "DATABASE_URL",
+  "ANTHROPIC_API_KEY",
+  "GOOGLE_API_KEY",
+  "TELEGRAM_BOT_TOKEN",
+] as const satisfies readonly (keyof Env)[];
+
+export type SecretKey = (typeof SECRET_KEYS)[number];
+
+export function loadEnv(source: NodeJS.ProcessEnv = process.env): Env {
+  const result = envSchema.safeParse(source);
+  if (!result.success) {
+    throw new Error(`Ungültige Umgebungsvariablen:\n${z.prettifyError(result.error)}`);
+  }
+  return result.data;
+}
+
+/**
+ * Jedes Modul fordert nur die Secrets an, die es selbst braucht (ARCHITECTURE.md 12.1).
+ * Fehlt eines, bricht der Start mit einer klaren Meldung ab.
+ */
+export function requireKeys<K extends SecretKey>(env: Env, keys: readonly K[]): Record<K, string> {
+  const missing = keys.filter((k) => !env[k]);
+  if (missing.length > 0) {
+    throw new Error(`Fehlende Umgebungsvariablen: ${missing.join(", ")}`);
+  }
+  return Object.fromEntries(keys.map((k) => [k, env[k]])) as Record<K, string>;
+}
