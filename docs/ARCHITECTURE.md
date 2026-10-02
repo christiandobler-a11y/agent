@@ -197,6 +197,8 @@ dich trotzdem als Rollen: Der Manager berichtet „Research hat 42 Firmen gefund
 5. **prefilter (Haiku):** Kette/Franchise? Passt die Branche? Geschäftlich aktiv? → sonst `SKIPPED` mit Grund.
 6. **gate (Code, kostenlos):** Objektive Mindestwerte (z. B. Bewertung ≥ 4,0 und ≥ 15 Bewertungen, Status
    OPERATIONAL). **Spart die meisten LLM-Kosten**, weil schwache Firmen nie auditiert werden.
+   *Umsetzung (Schritt 3):* Das Gate läuft **vor** dem Prefilter, weil es nichts kostet und sonst jede schwache
+   Firma einen Haiku-Aufruf verbraucht. Es prüft zusätzlich die Ketten-Namensliste aus `config/branches.yaml`.
 7. **crawl:** Startseite und bis zu 3 Unterseiten (Leistungen, Kontakt, Impressum). Screenshots desktop und mobil,
    Fakten extrahieren, PageSpeed mobil. Impressum parsen (Inhaber, E-Mail, Telefon).
 8. **audit (Sonnet, mit Bildern):** Konkrete Probleme mit Belegen und Rubrik-Bewertungen als striktes JSON.

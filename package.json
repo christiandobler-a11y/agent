@@ -23,6 +23,7 @@
     "verify": "npm run format:check && npm run lint && npm run typecheck && npm test"
   },
   "dependencies": {
+    "@anthropic-ai/sdk": "^0.131.0",
     "pg": "^8.23.1",
     "yaml": "^2.9.1",
     "zod": "^4.6.5"

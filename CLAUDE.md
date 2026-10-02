@@ -10,7 +10,8 @@ ausprobieren kann. Nach Schritt 6 ist ein Abstimmungstermin (Kalibrierung) vorge
 - `npm test` / `npm run test:watch`: Vitest
 - `npm run check-env`: prüft gesetzte Keys und die Datenbank mit je einem Live-Aufruf (gibt keine Werte aus)
 - `npm run migrate`: wendet neue SQL-Migrationen aus `migrations/` an
-- `npm run cli -- <befehl>`: einzelne Pipeline-Schritte ausführen (Debugging)
+- `npm run cli -- <befehl>`: einzelne Pipeline-Schritte ausführen (Debugging), z. B.
+  `npm run cli -- research "Fahrradladen" rosenheim -n 5`
 - `docker compose up -d db`: lokales Postgres 16
 
 ## Grundsätze
@@ -24,13 +25,20 @@ ausprobieren kann. Nach Schritt 6 ist ein Abstimmungstermin (Kalibrierung) vorge
   `requireKeys()` aus `src/config/env.ts` und nur die, die sie brauchen. In Cloud-Sessions kommt der
   Anthropic-Key als `AVELIO_ANTHROPIC_API_KEY` an (`ANTHROPIC_API_KEY` wird dort gefiltert).
 - **Ein Job = eine Firma × ein Schritt.** Jobs sind idempotent (Upsert über Firmen-ID).
-- Konfiguration (Gewichte, Modelle, Branchen, Regionen) liegt in `config/`, Prompts versioniert in `prompts/`.
+- Konfiguration (Gewichte, Modelle, Branchen, Regionen) liegt in `config/`, Prompts versioniert in `prompts/`
+  (`<rolle>.v<N>.md`; geänderter Prompt = neue Version, die alte bleibt).
+- LLM nur über `createLlmGateway` (`src/llm/gateway.ts`): Rolle → Modell aus `config/models.yaml`, festes
+  Zod-Ausgabeschema, jeder Aufruf landet in `agent_runs`. Fremde Inhalte nur in die Nutzernachricht, nie in den
+  System-Prompt.
+- Recherche-Reihenfolge: Places → Dubletten → **Gate (Code) → Prefilter (LLM)**. Das Gate läuft zuerst, weil es
+  nichts kostet. Skip-Gründe entsprechen den Schlüsseln in `config/recheck.yaml`.
 
 ## Datenbank
 
 - Schemaänderungen nur als neue Datei `migrations/NNN_name.sql`. Angewendete Migrationen nie ändern
   (Prüfsumme). SQL ohne `public.`-Präfix, damit Tests in eigenen Schemas laufen.
 - Firmenidentität und Dubletten: `src/pipeline/research/identity.ts` (rein) und `src/db/companies.ts`.
+- Lokal ohne Docker: Postgres 16 mit `initdb`/`pg_ctl` starten und `TEST_DATABASE_URL` darauf setzen.
 - DB-Tests nutzen `describeDb`/`useTestDb` aus `tests/helpers/db.ts` und brauchen `TEST_DATABASE_URL`.
   In der CI ist sie gesetzt; lokal werden DB-Tests ohne sie übersprungen.
 

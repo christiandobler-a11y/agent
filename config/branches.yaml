@@ -1,0 +1,62 @@
+# Branchen-Taxonomie (ARCHITECTURE.md 7.3 C). Der Schlüssel landet in companies.branch_key.
+# aliases: Suchbegriffe, die auf diese Branche zeigen (Kleinschreibung egal).
+# places_types: typische Google-Places-Typen (Hinweis für den Prefilter, kein harter Filter).
+# value: wirtschaftliches Potenzial 1–5 (Startwert, wird in Schritt 6 kalibriert).
+# chains: bekannte Ketten/Filialisten (Teilstring im normalisierten Namen) → Gate überspringt sie.
+
+fahrrad:
+  label: Fahrradhandel und -werkstatt
+  aliases: [Fahrradladen, Fahrradhändler, Fahrradgeschäft, Fahrradwerkstatt, Radladen, E-Bike, E-Bike-Händler]
+  places_types: [bicycle_store]
+  value: 4
+  chains:
+    [fahrrad xxl, zweirad stadler, lucky bike, little john bikes, boc, decathlon, intersport, rose bikes]
+
+sanitaer:
+  label: Sanitär, Heizung, Bad
+  aliases: [Sanitär, Installateur, Heizungsbauer, Badsanierung, SHK]
+  places_types: [plumber]
+  value: 5
+  chains: []
+
+schreiner:
+  label: Schreinerei und Tischlerei
+  aliases: [Schreiner, Schreinerei, Tischler, Tischlerei]
+  places_types: [furniture_store, general_contractor]
+  value: 4
+  chains: []
+
+maler:
+  label: Maler und Lackierer
+  aliases: [Maler, Malerbetrieb, Lackierer]
+  places_types: [painter]
+  value: 3
+  chains: []
+
+elektriker:
+  label: Elektroinstallation
+  aliases: [Elektriker, Elektroinstallateur, Elektrobetrieb]
+  places_types: [electrician]
+  value: 4
+  chains: []
+
+kfz:
+  label: Kfz-Werkstatt
+  aliases: [Autowerkstatt, Kfz-Werkstatt, Werkstatt]
+  places_types: [car_repair]
+  value: 3
+  chains: [atu, a.t.u, pitstop, euromaster, vergölst, bosch car service, point s]
+
+friseur:
+  label: Friseur
+  aliases: [Friseur, Frisör, Friseursalon]
+  places_types: [hair_care, hair_salon]
+  value: 2
+  chains: [klier, essanelle, cut & color, super cut]
+
+physiotherapie:
+  label: Physiotherapie
+  aliases: [Physiotherapie, Physiotherapeut, Krankengymnastik]
+  places_types: [physiotherapist]
+  value: 3
+  chains: []

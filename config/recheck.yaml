@@ -11,3 +11,4 @@ skipped:
   closed: 365 # laut Google geschlossen
   chain: null # Kette/Franchise ändert sich nicht
   blocklist: null
+  off_target: 30 # laut Prefilter falsche Branche bzw. kein Betrieb; andere Suchen können sie später finden

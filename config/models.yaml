@@ -1,0 +1,10 @@
+# Modell je Rolle (ARCHITECTURE.md 10) und Preise in $ je 1 Mio. Tokens.
+roles:
+  prefilter:
+    model: claude-haiku-4-5
+    max_tokens: 400
+
+pricing:
+  claude-haiku-4-5: { input: 1.0, output: 5.0, cache_read: 0.1 }
+  claude-sonnet-5-5: { input: 2.0, output: 10.0, cache_read: 0.2 }
+  claude-opus-5-5: { input: 4.0, output: 20.0, cache_read: 0.2 }

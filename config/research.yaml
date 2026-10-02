@@ -1,0 +1,9 @@
+# Recherche-Lauf (ARCHITECTURE.md 5.2 Schritt 3).
+# Gesucht wird, bis ziel × oversearch_factor Firmen Gate und Prefilter bestanden haben
+# (Crawl und Audit sortieren danach noch aus) oder alle Kacheln abgearbeitet sind.
+oversearch_factor: 3
+# Kostenbremse: höchstens so viele Places-Anfragen je Lauf (eine Kachel = 1–3 Anfragen à 20 Treffer).
+max_places_requests: 40
+# Text Search mit Website/Bewertungen = Enterprise-SKU; Schätzwert für die Lauf-Statistik.
+places_cost_per_request_usd: 0.035
+prefilter_concurrency: 4

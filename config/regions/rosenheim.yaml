@@ -1,0 +1,39 @@
+# Orts-Kachelung für Google Places (ARCHITECTURE.md 5.2): eine Text-Suche je Ort, mit Standort-Bias.
+# Reihenfolge = Suchreihenfolge (größere Orte zuerst). Koordinaten = Ortsmitte (gerundet).
+#
+# Zugehörigkeit eines Treffers zur Region:
+#   1. Google-Adressbestandteil "administrative_area_level_3" (Landkreis) steht in admin_areas, sonst
+#   2. Entfernung zur nächsten Ortsmitte ≤ fallback_max_km (falls Google keinen Landkreis liefert).
+name: Landkreis Rosenheim
+admin_areas: [Rosenheim, Kreisfreie Stadt Rosenheim] # Landkreis bzw. Stadt, wie Google sie schreibt
+search_radius_km: 5
+fallback_max_km: 8
+tiles:
+  - { name: Rosenheim, lat: 47.8561, lng: 12.1289 }
+  - { name: Bad Aibling, lat: 47.8638, lng: 12.01 }
+  - { name: Kolbermoor, lat: 47.8494, lng: 12.0669 }
+  - { name: Wasserburg am Inn, lat: 48.0606, lng: 12.2331 }
+  - { name: Prien am Chiemsee, lat: 47.8558, lng: 12.3458 }
+  - { name: Bruckmühl, lat: 47.8786, lng: 11.9156 }
+  - { name: Raubling, lat: 47.79, lng: 12.11 }
+  - { name: Stephanskirchen, lat: 47.8536, lng: 12.1844 }
+  - { name: Bad Endorf, lat: 47.9064, lng: 12.2967 }
+  - { name: Brannenburg, lat: 47.7397, lng: 12.0939 }
+  - { name: Feldkirchen-Westerham, lat: 47.9069, lng: 11.8417 }
+  - { name: Großkarolinenfeld, lat: 47.8906, lng: 12.0806 }
+  - { name: Bad Feilnbach, lat: 47.7733, lng: 11.9997 }
+  - { name: Haag in Oberbayern, lat: 48.1617, lng: 12.1786 }
+  - { name: Oberaudorf, lat: 47.6486, lng: 12.1736 }
+  - { name: Kiefersfelden, lat: 47.6131, lng: 12.1903 }
+  - { name: Aschau im Chiemgau, lat: 47.7764, lng: 12.3231 }
+  - { name: Bernau am Chiemsee, lat: 47.8114, lng: 12.3753 }
+  - { name: Rohrdorf, lat: 47.7972, lng: 12.17 }
+  - { name: Neubeuern, lat: 47.7744, lng: 12.14 }
+  - { name: Tuntenhausen, lat: 47.9333, lng: 12.0167 }
+  - { name: Rott am Inn, lat: 47.9917, lng: 12.1278 }
+  - { name: Edling, lat: 48.0667, lng: 12.1667 }
+  - { name: Amerang, lat: 48.0, lng: 12.3 }
+  - { name: Eggstätt, lat: 47.9258, lng: 12.3797 }
+  - { name: Riedering, lat: 47.8361, lng: 12.2083 }
+  - { name: Vogtareuth, lat: 47.9475, lng: 12.1833 }
+  - { name: Babensham, lat: 48.0833, lng: 12.2667 }

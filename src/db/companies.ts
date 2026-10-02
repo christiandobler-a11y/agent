@@ -31,11 +31,13 @@ export interface Company {
   city: string | null;
   region: string | null;
   category: string | null;
+  branch_key: string | null;
   phone: string | null;
   website_url: string | null;
   segment: "WEBSITE" | "NO_WEBSITE" | null;
   status: CompanyStatus;
   skip_reason: string | null;
+  skip_detail: string | null;
   recheck_after: Date | null;
   first_seen_at: Date;
   last_seen_at: Date;
@@ -208,4 +210,42 @@ export async function upsertCompany(db: Db, candidate: CompanyCandidate): Promis
       throw err;
     }
   }
+}
+
+export type ResearchOutcome =
+  | { status: "RESEARCHED"; branchKey: string | null }
+  | { status: "SKIPPED"; skipReason: string; skipDetail: string; branchKey?: string | null };
+
+/**
+ * Ergebnis von Gate/Prefilter festhalten. `recheckAfter` kommt aus den Recheck-Regeln.
+ * Ein vorhandener Branchen-Schlüssel wird nur durch einen neuen, bekannten Schlüssel ersetzt.
+ */
+export async function setResearchOutcome(
+  db: DbClient,
+  companyId: string,
+  outcome: ResearchOutcome,
+  recheckAfter: Date | null,
+): Promise<Company> {
+  const skipped = outcome.status === "SKIPPED";
+  const { rows } = await db.query<Company>(
+    `update companies set
+       status = $2,
+       skip_reason = $3,
+       skip_detail = $4,
+       branch_key = coalesce($5, branch_key),
+       recheck_after = $6,
+       updated_at = now()
+     where id = $1
+     returning *`,
+    [
+      companyId,
+      outcome.status,
+      skipped ? outcome.skipReason : null,
+      skipped ? outcome.skipDetail : null,
+      outcome.branchKey ?? null,
+      recheckAfter,
+    ],
+  );
+  if (!rows[0]) throw new Error(`Firma ${companyId} nicht gefunden`);
+  return rows[0];
 }
