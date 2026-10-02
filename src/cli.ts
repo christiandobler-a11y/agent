@@ -1,5 +1,7 @@
 import { checkKeys } from "./config/check.js";
-import { loadEnv } from "./config/env.js";
+import { loadEnv, requireKeys } from "./config/env.js";
+import { createDb } from "./db/client.js";
+import { migrate } from "./db/migrate.js";
 
 const ICONS = { ok: "✔", missing: "–", error: "✘" } as const;
 
@@ -11,8 +13,23 @@ async function checkEnv(): Promise<number> {
   return results.some((r) => r.status === "error") ? 1 : 0;
 }
 
+async function runMigrations(): Promise<number> {
+  const { DATABASE_URL } = requireKeys(loadEnv(), ["DATABASE_URL"]);
+  const db = createDb(DATABASE_URL, { max: 2 });
+  try {
+    const applied = await migrate(db);
+    console.log(
+      applied.length > 0 ? `Angewendet: ${applied.join(", ")}` : "Datenbank ist auf dem neuesten Stand.",
+    );
+    return 0;
+  } finally {
+    await db.end();
+  }
+}
+
 const commands: Record<string, () => Promise<number>> = {
   "check-env": checkEnv,
+  migrate: runMigrations,
 };
 
 async function main(argv: string[]): Promise<number> {

@@ -8,7 +8,8 @@ ausprobieren kann. Nach Schritt 6 ist ein Abstimmungstermin (Kalibrierung) vorge
 
 - `npm run verify`: Format, Lint, Typecheck, Tests. Muss vor jedem Commit grün sein.
 - `npm test` / `npm run test:watch`: Vitest
-- `npm run check-env`: prüft gesetzte Keys mit je einem Live-Aufruf (gibt keine Werte aus)
+- `npm run check-env`: prüft gesetzte Keys und die Datenbank mit je einem Live-Aufruf (gibt keine Werte aus)
+- `npm run migrate`: wendet neue SQL-Migrationen aus `migrations/` an
 - `npm run cli -- <befehl>`: einzelne Pipeline-Schritte ausführen (Debugging)
 - `docker compose up -d db`: lokales Postgres 16
 
@@ -24,6 +25,14 @@ ausprobieren kann. Nach Schritt 6 ist ein Abstimmungstermin (Kalibrierung) vorge
   Anthropic-Key als `AVELIO_ANTHROPIC_API_KEY` an (`ANTHROPIC_API_KEY` wird dort gefiltert).
 - **Ein Job = eine Firma × ein Schritt.** Jobs sind idempotent (Upsert über Firmen-ID).
 - Konfiguration (Gewichte, Modelle, Branchen, Regionen) liegt in `config/`, Prompts versioniert in `prompts/`.
+
+## Datenbank
+
+- Schemaänderungen nur als neue Datei `migrations/NNN_name.sql`. Angewendete Migrationen nie ändern
+  (Prüfsumme). SQL ohne `public.`-Präfix, damit Tests in eigenen Schemas laufen.
+- Firmenidentität und Dubletten: `src/pipeline/research/identity.ts` (rein) und `src/db/companies.ts`.
+- DB-Tests nutzen `describeDb`/`useTestDb` aus `tests/helpers/db.ts` und brauchen `TEST_DATABASE_URL`.
+  In der CI ist sie gesetzt; lokal werden DB-Tests ohne sie übersprungen.
 
 ## Code-Stil
 

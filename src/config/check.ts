@@ -1,3 +1,4 @@
+import pg from "pg";
 import type { Env } from "./env.js";
 
 export type CheckStatus = "ok" | "missing" | "error";
@@ -80,9 +81,27 @@ export async function checkKeys(env: Env, fetchFn: Fetch = fetch): Promise<Check
       await expectOk(res, "Anthropic");
       return "Key gültig";
     }),
-    probe("DATABASE_URL", env.DATABASE_URL, (url) =>
-      // Verbindungstest folgt mit dem DB-Modul in Schritt 2.
-      Promise.resolve(`gesetzt (${new URL(url).host})`),
-    ),
+    probe("DATABASE_URL", env.DATABASE_URL, checkDatabase),
   ]);
+}
+
+async function checkDatabase(url: string): Promise<string> {
+  const client = new pg.Client({ connectionString: url, connectionTimeoutMillis: TIMEOUT_MS });
+  try {
+    await client.connect();
+    const { rows } = await client.query<{ version: string; migrations: number | null }>(
+      `select current_setting('server_version') as version,
+              (select count(*)::int from schema_migrations
+                where to_regclass('schema_migrations') is not null) as migrations`,
+    );
+    const r = rows[0]!;
+    return `Postgres ${r.version}, ${r.migrations ?? 0} Migration(en) angewendet`;
+  } catch (err) {
+    // Fehlermeldungen von pg enthalten keine Passwörter, die Host-Angabe ist zur Diagnose nützlich.
+    throw new Error(`${new URL(url).host}: ${err instanceof Error ? err.message : String(err)}`, {
+      cause: err,
+    });
+  } finally {
+    await client.end().catch(() => undefined);
+  }
 }

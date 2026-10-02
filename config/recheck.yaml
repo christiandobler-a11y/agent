@@ -1,0 +1,13 @@
+# Wann eine bekannte Firma erneut recherchiert und auditiert werden darf (ARCHITECTURE.md Abschnitt 8).
+# Angaben in Tagen ab dem Statuswechsel. null = nie automatisch.
+
+qualified: 90
+failed: 7
+
+skipped:
+  default: 180
+  website_good: 180 # Website bereits modern und technisch gut
+  reputation: 365 # Bewertung zu schlecht oder zu wenige Bewertungen
+  closed: 365 # laut Google geschlossen
+  chain: null # Kette/Franchise ändert sich nicht
+  blocklist: null
