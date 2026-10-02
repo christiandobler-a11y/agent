@@ -62,3 +62,26 @@ export async function withTransaction<T>(db: Db, fn: (client: pg.PoolClient) => 
     client.release();
   }
 }
+
+const LOCAL_HOSTS = new Set(["localhost", "127.0.0.1", "::1", "[::1]"]);
+
+/**
+ * Verständliche Fehlermeldung für Verbindungsfehler, ohne Passwort. `pg` liefert z. B. bei ECONNREFUSED
+ * einen AggregateError mit leerer Meldung.
+ */
+export function describeDbError(err: unknown, connectionString: string | undefined): string {
+  const e = err as { message?: string; code?: string };
+  const message = e.message?.trim() || e.code || String(err);
+  if (!connectionString) return message;
+  let host: string;
+  try {
+    host = new URL(connectionString).hostname;
+  } catch {
+    return `${message} (DATABASE_URL ist keine gültige URL)`;
+  }
+  const hint =
+    LOCAL_HOSTS.has(host) && e.code === "ECONNREFUSED"
+      ? " – DATABASE_URL zeigt auf localhost. Für Supabase die Session-Pooler-URL in .env eintragen (Zeile ohne # am Anfang)."
+      : "";
+  return `${host}: ${message}${hint}`;
+}

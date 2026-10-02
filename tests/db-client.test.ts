@@ -1,5 +1,5 @@
 import { expect, it, describe } from "vitest";
-import { createDb, tlsFor } from "../src/db/client.js";
+import { createDb, describeDbError, tlsFor } from "../src/db/client.js";
 import { describeDb, TEST_DATABASE_URL } from "./helpers/db.js";
 
 const SUPABASE = "postgresql://postgres.abc:pw@aws-1-eu-central-1.pooler.supabase.com:5432/postgres";
@@ -25,5 +25,20 @@ describeDb("createDb mit TLS", () => {
     const db = createDb(TEST_DATABASE_URL!, { max: 1, ssl: tlsFor(SUPABASE)! });
     await expect(db.query("select 1")).rejects.toThrow(/SSL/i);
     await db.end();
+  });
+});
+
+describe("describeDbError", () => {
+  it("erklärt ECONNREFUSED auf localhost und verrät kein Passwort", () => {
+    const err = Object.assign(new AggregateError([], ""), { code: "ECONNREFUSED" });
+    const msg = describeDbError(err, "postgres://avelio:geheim@localhost:5432/avelio");
+    expect(msg).toMatch(/^localhost: ECONNREFUSED – DATABASE_URL zeigt auf localhost/);
+    expect(msg).not.toContain("geheim");
+  });
+
+  it("nennt Host und Meldung bei anderen Fehlern", () => {
+    const msg = describeDbError(new Error("password authentication failed"), SUPABASE);
+    expect(msg).toBe("aws-1-eu-central-1.pooler.supabase.com: password authentication failed");
+    expect(describeDbError(new Error("x"), "kein-url")).toContain("keine gültige URL");
   });
 });

@@ -1,6 +1,6 @@
 import { checkKeys } from "./config/check.js";
 import { loadDotEnv, loadEnv, requireKeys } from "./config/env.js";
-import { createDb } from "./db/client.js";
+import { createDb, describeDbError } from "./db/client.js";
 import { migrate } from "./db/migrate.js";
 import { dbStatus } from "./db/status.js";
 import { loadModelsConfig } from "./llm/config.js";
@@ -142,4 +142,11 @@ async function main(argv: string[]): Promise<number> {
 }
 
 loadDotEnv();
-process.exitCode = await main(process.argv.slice(2));
+try {
+  process.exitCode = await main(process.argv.slice(2));
+} catch (err) {
+  // Kurze Meldung statt Stacktrace; Details mit DEBUG=1.
+  console.error(`Fehler: ${describeDbError(err, process.env.DATABASE_URL)}`);
+  if (process.env.DEBUG) console.error(err);
+  process.exitCode = 1;
+}

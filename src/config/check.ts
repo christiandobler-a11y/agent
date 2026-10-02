@@ -1,6 +1,6 @@
 import { TLSSocket } from "node:tls";
 import pg from "pg";
-import { tlsFor } from "../db/client.js";
+import { describeDbError, tlsFor } from "../db/client.js";
 import type { Env } from "./env.js";
 
 export type CheckStatus = "ok" | "missing" | "error";
@@ -115,9 +115,7 @@ export async function checkDatabase(url: string): Promise<string> {
     return `Postgres ${r.version}, ${migrations} Migration(en) angewendet (${tls})`;
   } catch (err) {
     // Fehlermeldungen von pg enthalten keine Passwörter, die Host-Angabe ist zur Diagnose nützlich.
-    throw new Error(`${new URL(url).host}: ${err instanceof Error ? err.message : String(err)}`, {
-      cause: err,
-    });
+    throw new Error(describeDbError(err, url), { cause: err });
   } finally {
     await client.end().catch(() => undefined);
   }
