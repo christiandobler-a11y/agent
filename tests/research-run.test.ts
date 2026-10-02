@@ -1,6 +1,7 @@
 import { expect, it, vi } from "vitest";
 import type { Company } from "../src/db/companies.js";
 import type { SearchRun } from "../src/db/searchRuns.js";
+import { BudgetExceededError, NO_BUDGET, type BudgetGuard } from "../src/llm/budget.js";
 import { LlmError } from "../src/llm/gateway.js";
 import { loadBranches } from "../src/pipeline/research/branches.js";
 import type { Place, PlacesClient, PlacesPage } from "../src/pipeline/research/places.js";
@@ -105,6 +106,7 @@ describeDb("runResearch", () => {
       places_cost_per_request_usd: 0.035,
       prefilter_concurrency: 3,
     },
+    budget: NO_BUDGET,
     now: () => T0,
     ...over,
   });
@@ -163,6 +165,12 @@ describeDb("runResearch", () => {
     expect(byId.d!.recheck_after).toBeNull();
     expect(byId.f!.recheck_after).toEqual(new Date(T0.getTime() + 30 * DAY));
     expect(await count("places_snapshots")).toBe(7);
+    // Jede Places-Anfrage zählt mit ihren Kosten für den Budget-Wächter.
+    const usage = await db().query<{ n: number; cost: string }>(
+      "select count(*)::int as n, sum(cost_usd) as cost from api_usage where search_run_id = $1 and service = 'places'",
+      [result.run.id],
+    );
+    expect(usage.rows[0]).toEqual({ n: 3, cost: "0.10500" });
 
     const run = (await db().query<SearchRun>("select * from search_runs where id = $1", [result.run.id]))
       .rows[0]!;
@@ -249,5 +257,44 @@ describeDb("runResearch", () => {
       "select status, stats from search_runs order by created_at desc limit 1",
     );
     expect(rows[0]).toMatchObject({ status: "FAILED", stats: { error: "Places: HTTP 403" } });
+  });
+  it("hält bei erschöpftem Budget sauber an; offene Firmen bleiben NEW", async () => {
+    await db().query("truncate companies, search_runs, api_usage cascade");
+    // Budget reicht für genau eine Places-Anfrage; der Prefilter scheitert danach am Budget.
+    let checks = 0;
+    const budget: BudgetGuard = {
+      limits: { daily_usd: 1, monthly_usd: 1 },
+      assertAvailable: () =>
+        ++checks <= 1 ? Promise.resolve() : Promise.reject(new BudgetExceededError("Tag", 1, 1)),
+    };
+    const prefilter = vi.fn(() => Promise.reject(new BudgetExceededError("Tag", 1, 1)));
+    const places = fakePlaces();
+
+    const result = await runResearch(deps({ places: places.client, prefilter, budget }), request);
+
+    expect(places.searchText).toHaveBeenCalledTimes(1);
+    expect(result.stats).toMatchObject({
+      places_requests: 1,
+      passed: 0,
+      stopped_because: "budget_exceeded",
+      error: "Budget für heute erreicht: 1.00 $ von 1.00 $ (config/models.yaml → budget)",
+    });
+    const run = (await db().query<SearchRun>("select * from search_runs where id = $1", [result.run.id]))
+      .rows[0]!;
+    expect(run.status).toBe("COMPLETED");
+    // a und f haben das Gate bestanden, sind aber noch nicht geprüft → bleiben NEW für den nächsten Lauf.
+    const open = (await companies()).filter((c) => c.status === "NEW").map((c) => c.place_id);
+    expect(open.sort()).toEqual(["a", "f"]);
+  });
+
+  it("prüft das Budget vor jeder Places-Anfrage", async () => {
+    const places = fakePlaces();
+    const budget: BudgetGuard = {
+      limits: { daily_usd: 1, monthly_usd: 1 },
+      assertAvailable: () => Promise.reject(new BudgetExceededError("Monat", 1, 1)),
+    };
+    const result = await runResearch(deps({ places: places.client, budget }), request);
+    expect(places.searchText).not.toHaveBeenCalled();
+    expect(result.stats).toMatchObject({ places_requests: 0, stopped_because: "budget_exceeded" });
   });
 });

@@ -15,6 +15,7 @@
     "check-env": "tsx src/cli.ts check-env",
     "migrate": "tsx src/cli.ts migrate",
     "db-status": "tsx src/cli.ts db-status",
+    "costs": "tsx src/cli.ts costs",
     "typecheck": "tsc --noEmit",
     "lint": "eslint .",
     "format": "prettier --write .",

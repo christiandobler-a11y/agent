@@ -44,7 +44,9 @@ describeDb("Migration 002 sperrt die Supabase-Data-API", () => {
   it("alle Tabellen haben RLS, anon darf nichts lesen", async () => {
     const status = await dbStatus(db);
     expect(status.schema).toBe(schema);
-    expect(status.migrations.map((m) => m.version)).toEqual(["001_init", "002_lock_down_data_api"]);
+    expect(status.migrations.map((m) => m.version)).toEqual(
+      expect.arrayContaining(["001_init", "002_lock_down_data_api", "003_api_usage_and_costs"]),
+    );
     expect(status.tables.map((t) => t.name)).toEqual(
       expect.arrayContaining([
         "companies",
@@ -57,6 +59,13 @@ describeDb("Migration 002 sperrt die Supabase-Data-API", () => {
     for (const t of status.tables) {
       expect(t, t.name).toMatchObject({ rls: true, anonCanRead: false, rows: expect.any(Number) as number });
     }
+  });
+
+  it("auch die Kostenansicht ist für anon gesperrt", async () => {
+    const { rows } = await db.query<{ ok: boolean }>(
+      "select has_table_privilege('anon', 'v_costs_daily', 'select') as ok",
+    );
+    expect(rows[0]!.ok).toBe(false);
   });
 
   it("auch später angelegte Tabellen sind für anon gesperrt", async () => {

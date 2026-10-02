@@ -14,6 +14,7 @@ export const modelsConfigSchema = z.object({
     z.object({ model: z.string().min(1), max_tokens: z.number().int().positive() }),
   ),
   pricing: z.record(z.string(), price),
+  budget: z.object({ daily_usd: z.number().positive(), monthly_usd: z.number().positive() }),
 });
 
 export type ModelsConfig = z.infer<typeof modelsConfigSchema>;

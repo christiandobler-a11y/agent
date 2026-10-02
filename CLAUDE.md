@@ -10,6 +10,7 @@ ausprobieren kann. Nach Schritt 6 ist ein Abstimmungstermin (Kalibrierung) vorge
 - `npm test` / `npm run test:watch`: Vitest
 - `npm run check-env`: prüft gesetzte Keys und die Datenbank mit je einem Live-Aufruf (gibt keine Werte aus)
 - `npm run migrate`: wendet neue SQL-Migrationen aus `migrations/` an
+- `npm run costs`: Ausgaben heute/Monat gegen das Budget, letzte 7 Tage je Rolle bzw. Dienst
 - `npm run db-status`: Migrationen, Tabellen, Zeilen, RLS/Data-API-Schutz der Datenbank aus `DATABASE_URL`
 - `npm run cli -- <befehl>`: einzelne Pipeline-Schritte ausführen (Debugging), z. B.
   `npm run cli -- research "Fahrradladen" rosenheim -n 5`
@@ -31,6 +32,9 @@ ausprobieren kann. Nach Schritt 6 ist ein Abstimmungstermin (Kalibrierung) vorge
 - LLM nur über `createLlmGateway` (`src/llm/gateway.ts`): Rolle → Modell aus `config/models.yaml`, festes
   Zod-Ausgabeschema, jeder Aufruf landet in `agent_runs`. Fremde Inhalte nur in die Nutzernachricht, nie in den
   System-Prompt.
+- **Kosten:** Jeder LLM-Versuch steht in `agent_runs`, jeder bezahlte API-Aufruf (Places) in `api_usage`
+  (`recordApiUsage`). Vor jedem kostenpflichtigen Aufruf `budget.assertAvailable()` (Limits in
+  `config/models.yaml → budget`); `BudgetExceededError` hält Läufe sauber an, statt sie scheitern zu lassen.
 - Recherche-Reihenfolge: Places → Dubletten → **Gate (Code) → Prefilter (LLM)**. Das Gate läuft zuerst, weil es
   nichts kostet. Skip-Gründe entsprechen den Schlüsseln in `config/recheck.yaml`.
 

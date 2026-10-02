@@ -14,6 +14,7 @@ describeDb("migrate", () => {
     );
     expect(rows.map((r) => r.table_name)).toEqual([
       "agent_runs",
+      "api_usage",
       "audits",
       "companies",
       "contacts",
@@ -22,6 +23,7 @@ describeDb("migrate", () => {
       "places_snapshots",
       "schema_migrations",
       "search_runs",
+      "v_costs_daily",
       "website_snapshots",
     ]);
   });

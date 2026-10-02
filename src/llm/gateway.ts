@@ -2,12 +2,13 @@ import Anthropic from "@anthropic-ai/sdk";
 import { zodOutputFormat } from "@anthropic-ai/sdk/helpers/zod";
 import type { z } from "zod";
 import type { Db } from "../db/client.js";
+import type { BudgetGuard } from "./budget.js";
 import { costUsd, type ModelsConfig, type TokenUsage } from "./config.js";
 
 /**
  * LLM-Gateway (ARCHITECTURE.md 6/10): der einzige Ort mit Anthropic-Aufrufen. Wählt das Modell je Rolle
- * aus config/models.yaml, erzwingt ein Ausgabe-Schema und schreibt jeden Aufruf mit Tokens und Kosten
- * in `agent_runs`. Budget-Wächter und Job-Retries folgen in Schritt 4.
+ * aus config/models.yaml, erzwingt ein Ausgabe-Schema, prüft vor jedem Aufruf das Budget und schreibt jeden
+ * Versuch mit Tokens und Kosten in `agent_runs`.
  */
 
 /** Der Teil des SDK-Clients, den das Gateway nutzt (in Tests ersetzbar). */
@@ -69,9 +70,39 @@ export interface LlmGatewayDeps {
   db: Db;
   messages: MessagesApi;
   models: ModelsConfig;
+  budget: BudgetGuard;
 }
 
-export function createLlmGateway({ db, messages, models }: LlmGatewayDeps) {
+/**
+ * Unbrauchbare Antwort (Schema verletzt, kein JSON, abgeschnitten): einmal wiederholen (ARCHITECTURE.md 11.2).
+ * API-Fehler (429/5xx, Netz) wiederholt bereits das SDK; Ablehnungen (refusal) werden nicht wiederholt.
+ */
+class BadOutputError extends Error {}
+
+export const MAX_ATTEMPTS = 2;
+
+function parseOutput<S extends z.ZodType>(
+  response: Anthropic.Message,
+  schema: S,
+): { text: string; data: z.output<S> } {
+  if (response.stop_reason === "refusal") throw new Error("Anfrage vom Modell abgelehnt (refusal)");
+  if (response.stop_reason !== "end_turn") {
+    throw new BadOutputError(`Antwort unvollständig (stop_reason: ${response.stop_reason})`);
+  }
+  const text = response.content.find((b): b is Anthropic.TextBlock => b.type === "text")?.text;
+  if (!text) throw new BadOutputError("Antwort ohne Text");
+  let json: unknown;
+  try {
+    json = JSON.parse(text);
+  } catch {
+    throw new BadOutputError("Antwort ist kein gültiges JSON");
+  }
+  const parsed = schema.safeParse(json);
+  if (!parsed.success) throw new BadOutputError(`Antwort verletzt das Schema: ${parsed.error.message}`);
+  return { text, data: parsed.data };
+}
+
+export function createLlmGateway({ db, messages, models, budget }: LlmGatewayDeps) {
   async function finishRun(
     id: string,
     status: "OK" | "ERROR",
@@ -102,51 +133,62 @@ export function createLlmGateway({ db, messages, models }: LlmGatewayDeps) {
     return cost;
   }
 
+  async function startRun(
+    req: StructuredRequest<z.ZodType>,
+    model: string,
+    attempt: number,
+  ): Promise<string> {
+    const summary = req.inputSummary
+      ? `${req.inputSummary}${attempt > 1 ? ` (Versuch ${attempt})` : ""}`
+      : null;
+    const { rows } = await db.query<{ id: string }>(
+      `insert into agent_runs (role, company_id, search_run_id, model, prompt_version, input_summary, status)
+       values ($1, $2, $3, $4, $5, $6, 'RUNNING') returning id`,
+      [
+        req.role,
+        req.companyId ?? null,
+        req.searchRunId ?? null,
+        model,
+        req.promptVersion,
+        summary ? clip(summary) : null,
+      ],
+    );
+    return rows[0]!.id;
+  }
+
   return {
-    /** Ein Aufruf ohne Tools mit erzwungenem JSON-Schema. Wirft `LlmError`; der Lauf steht dann als ERROR in agent_runs. */
+    /**
+     * Ein Aufruf ohne Tools mit erzwungenem JSON-Schema. Jeder Versuch steht mit Kosten in agent_runs.
+     * Wirft `BudgetExceededError` (vor dem Aufruf, nichts wird ausgegeben) oder `LlmError`.
+     */
     async structured<S extends z.ZodType>(req: StructuredRequest<S>): Promise<StructuredResult<z.output<S>>> {
       const roleConfig = models.roles[req.role];
       if (!roleConfig)
         throw new Error(`Keine Modell-Konfiguration für Rolle "${req.role}" (config/models.yaml)`);
       const model = roleConfig.model;
+      let totalCost = 0;
 
-      const { rows } = await db.query<{ id: string }>(
-        `insert into agent_runs (role, company_id, search_run_id, model, prompt_version, input_summary, status)
-         values ($1, $2, $3, $4, $5, $6, 'RUNNING') returning id`,
-        [
-          req.role,
-          req.companyId ?? null,
-          req.searchRunId ?? null,
-          model,
-          req.promptVersion,
-          req.inputSummary ? clip(req.inputSummary) : null,
-        ],
-      );
-      const runId = rows[0]!.id;
-
-      let response: Anthropic.Message | undefined;
-      try {
-        response = await messages.create({
-          model,
-          max_tokens: roleConfig.max_tokens,
-          system: req.system,
-          messages: [{ role: "user", content: req.input }],
-          output_config: { format: zodOutputFormat(req.schema) },
-        });
-        if (response.stop_reason !== "end_turn") {
-          throw new Error(`Antwort unvollständig (stop_reason: ${response.stop_reason})`);
+      for (let attempt = 1; ; attempt++) {
+        await budget.assertAvailable();
+        const runId = await startRun(req, model, attempt);
+        let response: Anthropic.Message | undefined;
+        try {
+          response = await messages.create({
+            model,
+            max_tokens: roleConfig.max_tokens,
+            system: req.system,
+            messages: [{ role: "user", content: req.input }],
+            output_config: { format: zodOutputFormat(req.schema) },
+          });
+          const { text, data } = parseOutput(response, req.schema);
+          totalCost += await finishRun(runId, "OK", model, usageOf(response), clip(text), null);
+          return { output: data, agentRunId: runId, costUsd: totalCost, model };
+        } catch (err) {
+          const message = err instanceof Error ? err.message : String(err);
+          totalCost += await finishRun(runId, "ERROR", model, usageOf(response), null, clip(message));
+          if (err instanceof BadOutputError && attempt < MAX_ATTEMPTS) continue;
+          throw new LlmError(`${req.role}: ${message}`, runId, { cause: err });
         }
-        const text = response.content.find((b): b is Anthropic.TextBlock => b.type === "text")?.text;
-        if (!text) throw new Error("Antwort ohne Text");
-        const parsed = req.schema.safeParse(JSON.parse(text));
-        if (!parsed.success) throw new Error(`Antwort verletzt das Schema: ${parsed.error.message}`);
-
-        const cost = await finishRun(runId, "OK", model, usageOf(response), clip(text), null);
-        return { output: parsed.data, agentRunId: runId, costUsd: cost, model };
-      } catch (err) {
-        const message = err instanceof Error ? err.message : String(err);
-        await finishRun(runId, "ERROR", model, usageOf(response), null, clip(message));
-        throw new LlmError(`${req.role}: ${message}`, runId, { cause: err });
       }
     },
   };

@@ -3,6 +3,8 @@ import { loadDotEnv, loadEnv, requireKeys } from "./config/env.js";
 import { createDb, describeDbError } from "./db/client.js";
 import { migrate } from "./db/migrate.js";
 import { dbStatus } from "./db/status.js";
+import { costReport } from "./db/costs.js";
+import { createBudgetGuard } from "./llm/budget.js";
 import { loadModelsConfig } from "./llm/config.js";
 import { createAnthropicMessages, createLlmGateway } from "./llm/gateway.js";
 import { loadBranches } from "./pipeline/research/branches.js";
@@ -44,6 +46,13 @@ const counts = (c: Record<string, number>) =>
     .map(([k, v]) => `${k} ${v}`)
     .join(", ") || "–";
 
+const STOP_LABELS: Record<NonNullable<ResearchStats["stopped_because"]>, string> = {
+  goal_reached: "Ziel erreicht",
+  tiles_exhausted: "alle Orte abgesucht",
+  request_limit: "Limit für Places-Anfragen erreicht (config/research.yaml)",
+  budget_exceeded: "Budget erreicht",
+};
+
 function printStats(s: ResearchStats) {
   console.log(`
 Kacheln:        ${s.tiles_searched}/${s.tiles_total} · Places-Anfragen ${s.places_requests} (~${usd(s.places_cost_usd)})
@@ -51,7 +60,12 @@ Treffer:        ${s.results} · außerhalb der Region ${s.out_of_region} · dopp
 Firmen:         neu ${s.new_companies} · bekannt ${s.known_companies} (davon noch nicht fällig ${s.known_not_due})
 Gate:           ${counts(s.gate_skipped)}
 Prefilter:      ${counts(s.prefilter_skipped)} · Fehler ${s.prefilter_errors} · LLM ${usd(s.llm_cost_usd)}
-Bestanden:      ${s.passed} (Ziel ${s.goal}) · Ende: ${s.stopped_because ?? s.error ?? "?"}`);
+Bestanden:      ${s.passed} (Ziel ${s.goal}) · Ende: ${s.stopped_because ? STOP_LABELS[s.stopped_because] : (s.error ?? "?")}`);
+  if (s.stopped_because === "budget_exceeded" && s.error) {
+    console.log(
+      `\n${s.error}\nNoch nicht geprüfte Firmen bleiben NEW und werden beim nächsten Lauf fertig geprüft.`,
+    );
+  }
 }
 
 async function research(args: string[]): Promise<number> {
@@ -67,10 +81,13 @@ async function research(args: string[]): Promise<number> {
   const region = loadRegion(parsed.region);
   const db = createDb(keys.DATABASE_URL, { max: 6 });
   try {
+    const models = loadModelsConfig();
+    const budget = createBudgetGuard(db, models.budget);
     const llm = createLlmGateway({
       db,
       messages: createAnthropicMessages(keys.ANTHROPIC_API_KEY),
-      models: loadModelsConfig(),
+      models,
+      budget,
     });
     console.log(`Suche "${parsed.term}" in ${region.name}, Ziel ${parsed.target} …`);
     const result = await runResearch(
@@ -82,6 +99,7 @@ async function research(args: string[]): Promise<number> {
         gate: loadGateRules(),
         recheck: loadRecheckRules(),
         config: loadResearchConfig(),
+        budget,
         onProgress: (m) => console.log(`  ${m}`),
       },
       { term: parsed.term, region, target: parsed.target, requestedBy: "cli" },
@@ -124,7 +142,32 @@ async function showDbStatus(): Promise<number> {
   }
 }
 
+async function showCosts(): Promise<number> {
+  const { DATABASE_URL } = requireKeys(loadEnv(), ["DATABASE_URL"]);
+  const { budget } = loadModelsConfig();
+  const db = createDb(DATABASE_URL, { max: 1 });
+  try {
+    const report = await costReport(db);
+    const line = (label: string, spent: number, limit: number) =>
+      `${label.padEnd(8)} ${usd(spent).padStart(10)} von ${usd(limit)} (${Math.round((spent / limit) * 100)} %)`;
+    console.log(line("Heute", report.today, budget.daily_usd));
+    console.log(line("Monat", report.month, budget.monthly_usd));
+    console.log("\nLetzte 7 Tage nach Rolle bzw. Dienst:");
+    if (report.rows.length === 0) console.log("  noch keine Kosten");
+    for (const r of report.rows) {
+      const errors = r.errors > 0 ? ` · ${r.errors} Fehler` : "";
+      console.log(
+        `  ${r.day}  ${`${r.source}/${r.name}`.padEnd(16)} ${String(r.calls).padStart(5)} Aufrufe ${usd(r.cost_usd).padStart(10)}${errors}`,
+      );
+    }
+    return 0;
+  } finally {
+    await db.end();
+  }
+}
+
 const commands: Record<string, (args: string[]) => Promise<number>> = {
+  costs: showCosts,
   "check-env": checkEnv,
   migrate: runMigrations,
   "db-status": showDbStatus,

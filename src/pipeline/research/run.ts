@@ -9,6 +9,8 @@ import {
   updateSearchRunStats,
   type SearchRun,
 } from "../../db/searchRuns.js";
+import { recordApiUsage } from "../../db/apiUsage.js";
+import { BudgetExceededError, type BudgetGuard } from "../../llm/budget.js";
 import { LlmError } from "../../llm/gateway.js";
 import type { Branches } from "./branches.js";
 import { chainNames, resolveBranch } from "./branches.js";
@@ -48,6 +50,8 @@ export interface ResearchDeps {
   gate: GateRules;
   recheck: RecheckRules;
   config: ResearchConfig;
+  /** Wird vor jeder Places-Anfrage geprüft; der Prefilter prüft über das LLM-Gateway selbst. */
+  budget: BudgetGuard;
   now?: () => Date;
   onProgress?: (message: string) => void;
 }
@@ -60,7 +64,7 @@ export interface ResearchRequest {
   requestedBy: string;
 }
 
-export type StopReason = "goal_reached" | "tiles_exhausted" | "request_limit";
+export type StopReason = "goal_reached" | "tiles_exhausted" | "request_limit" | "budget_exceeded";
 
 export interface ResearchStats {
   goal: number;
@@ -97,6 +101,7 @@ type PlaceOutcome =
   | { kind: "gate_skipped"; reason: string }
   | { kind: "prefilter_skipped"; reason: string; costUsd: number }
   | { kind: "prefilter_error" }
+  | { kind: "budget_exceeded"; error: BudgetExceededError }
   | { kind: "passed"; company: Company; costUsd: number };
 
 /** Verarbeitet Elemente mit begrenzter Parallelität, Ergebnisse in Eingabe-Reihenfolge. */
@@ -216,6 +221,7 @@ export async function runResearch(deps: ResearchDeps, req: ResearchRequest): Pro
     } catch (err) {
       // Firma bleibt NEW und wird beim nächsten Lauf erneut geprüft; der Fehler steht in agent_runs.
       if (err instanceof LlmError) return { kind: "prefilter_error" };
+      if (err instanceof BudgetExceededError) return { kind: "budget_exceeded", error: err };
       throw err;
     }
     if (!decision.pass) {
@@ -259,6 +265,10 @@ export async function runResearch(deps: ResearchDeps, req: ResearchRequest): Pro
       case "prefilter_error":
         stats.prefilter_errors++;
         break;
+      case "budget_exceeded":
+        // Firma bleibt NEW und wird beim nächsten Lauf fertig geprüft.
+        halt.budget = outcome.error;
+        break;
       case "passed":
         stats.passed++;
         stats.llm_cost_usd = roundUsd(stats.llm_cost_usd + outcome.costUsd);
@@ -266,6 +276,9 @@ export async function runResearch(deps: ResearchDeps, req: ResearchRequest): Pro
         break;
     }
   }
+
+  // Objekt statt let: wird in record() gesetzt, TypeScript würde eine Variable hier fälschlich auf null festlegen.
+  const halt: { budget: BudgetExceededError | null } = { budget: null };
 
   try {
     tiles: for (const query of queries) {
@@ -276,9 +289,16 @@ export async function runResearch(deps: ResearchDeps, req: ResearchRequest): Pro
           stats.stopped_because = "request_limit";
           break tiles;
         }
+        await deps.budget.assertAvailable();
+        const result = await deps.places.searchText(query, pageToken);
         stats.places_requests++;
         stats.places_cost_usd = roundUsd(stats.places_requests * config.places_cost_per_request_usd);
-        const result = await deps.places.searchText(query, pageToken);
+        await recordApiUsage(db, {
+          service: "places",
+          operation: "searchText",
+          costUsd: config.places_cost_per_request_usd,
+          searchRunId: run.id,
+        });
         stats.results += result.places.length;
         stats.invalid_results += result.invalid;
 
@@ -302,6 +322,7 @@ export async function runResearch(deps: ResearchDeps, req: ResearchRequest): Pro
             `${stats.passed}/${goal} bestanden`,
         );
 
+        if (halt.budget) throw halt.budget;
         if (stats.passed >= goal) {
           stats.stopped_because = "goal_reached";
           break tiles;
@@ -313,6 +334,13 @@ export async function runResearch(deps: ResearchDeps, req: ResearchRequest): Pro
     stats.stopped_because ??= "tiles_exhausted";
     await finishSearchRun(db, run.id, "COMPLETED", stats);
   } catch (err) {
+    if (err instanceof BudgetExceededError) {
+      // Kein Fehler des Laufs: sauber anhalten, Ergebnisse bis hierhin bleiben gültig.
+      stats.stopped_because = "budget_exceeded";
+      stats.error = err.message;
+      await finishSearchRun(db, run.id, "COMPLETED", stats);
+      return { run: { ...run, status: "COMPLETED", stats: { ...stats } }, stats, passed };
+    }
     stats.error = err instanceof Error ? err.message : String(err);
     await finishSearchRun(db, run.id, "FAILED", stats);
     throw err;
