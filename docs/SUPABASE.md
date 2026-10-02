@@ -45,8 +45,8 @@ Die Ergebnisse siehst du im Dashboard unter **Table Editor** (`companies`, `sear
 
 | Einstellung | Wo | Wert | Warum |
 |---|---|---|---|
-| SSL erzwingen | Database → Settings → SSL Configuration | **Enforce SSL** an | Verbindungen ohne TLS werden abgelehnt. Erst einschalten, wenn `check-env` „TLS, Zertifikat geprüft“ meldet. |
-| Data API | Project Settings → Data API | **ausschalten** (oder `public` aus „Exposed schemas“ entfernen) | Wir nutzen sie nicht. Migration 002 sperrt sie schon per RLS und Rechte; das ist die zweite Absicherung. |
+| SSL erzwingen | Database → Settings, Abschnitt „SSL Configuration“ (`supabase.com/dashboard/project/_/database/settings`) | **Enforce SSL on incoming connections** an (Datenbank startet kurz neu) | Verbindungen ohne TLS werden abgelehnt. Erst einschalten, wenn `check-env` „TLS, Zertifikat geprüft“ meldet. |
+| Data API | Integrations → Data API → Overview (`supabase.com/dashboard/project/_/integrations/data_api/overview`) | **Enable Data API** aus | Wir nutzen sie nicht. Migration 002 sperrt sie schon per RLS und Rechte; das ist die zweite Absicherung. |
 | Security Advisor | Advisors → Security | keine Fehler | Prüft u. a., dass alle Tabellen RLS haben. Warnung „Extension in public“ (pg_trgm) ist bekannt und unkritisch. |
 | Netzwerk-Beschränkung | Database → Settings → Network Restrictions | ab Schritt 9: nur Server-IP + deine IP | Datenbank nur von bekannten Adressen erreichbar. |
 
