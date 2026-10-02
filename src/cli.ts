@@ -1,5 +1,5 @@
 import { checkKeys } from "./config/check.js";
-import { loadEnv, requireKeys } from "./config/env.js";
+import { loadDotEnv, loadEnv, requireKeys } from "./config/env.js";
 import { createDb } from "./db/client.js";
 import { migrate } from "./db/migrate.js";
 import { dbStatus } from "./db/status.js";
@@ -141,4 +141,5 @@ async function main(argv: string[]): Promise<number> {
   return command(rest);
 }
 
+loadDotEnv();
 process.exitCode = await main(process.argv.slice(2));

@@ -71,3 +71,17 @@ export function requireKeys<K extends SecretKey>(env: Env, keys: readonly K[]): 
   }
   return Object.fromEntries(keys.map((k) => [k, env[k]])) as Record<K, string>;
 }
+
+/**
+ * Lädt `.env` aus dem Arbeitsverzeichnis, falls vorhanden. Bereits gesetzte Umgebungsvariablen haben Vorrang
+ * (Server, CI, Cloud-Session setzen sie direkt). Gibt zurück, ob eine Datei geladen wurde.
+ */
+export function loadDotEnv(path = ".env"): boolean {
+  try {
+    process.loadEnvFile(path);
+    return true;
+  } catch (err) {
+    if ((err as NodeJS.ErrnoException).code === "ENOENT") return false;
+    throw err;
+  }
+}

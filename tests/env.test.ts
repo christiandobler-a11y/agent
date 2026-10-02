@@ -1,5 +1,8 @@
-import { describe, expect, it } from "vitest";
-import { loadEnv, requireKeys } from "../src/config/env.js";
+import { mkdtempSync, writeFileSync } from "node:fs";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
+import { afterEach, describe, expect, it } from "vitest";
+import { loadDotEnv, loadEnv, requireKeys } from "../src/config/env.js";
 
 describe("loadEnv", () => {
   it("setzt Standardwerte und behandelt leere Secrets als nicht gesetzt", () => {
@@ -41,5 +44,27 @@ describe("requireKeys", () => {
     expect(() => requireKeys(env, ["GOOGLE_API_KEY", "ANTHROPIC_API_KEY", "DATABASE_URL"])).toThrow(
       "Fehlende Umgebungsvariablen: ANTHROPIC_API_KEY, DATABASE_URL",
     );
+  });
+});
+
+describe("loadDotEnv", () => {
+  const dir = mkdtempSync(join(tmpdir(), "avelio-env-"));
+  const file = join(dir, ".env");
+
+  afterEach(() => {
+    delete process.env.AVELIO_TEST_FROM_FILE;
+    delete process.env.AVELIO_TEST_PRESET;
+  });
+
+  it("lädt Werte aus der Datei, gesetzte Variablen haben Vorrang", () => {
+    writeFileSync(file, "AVELIO_TEST_FROM_FILE=aus-datei\nAVELIO_TEST_PRESET=aus-datei\n");
+    process.env.AVELIO_TEST_PRESET = "gesetzt";
+    expect(loadDotEnv(file)).toBe(true);
+    expect(process.env.AVELIO_TEST_FROM_FILE).toBe("aus-datei");
+    expect(process.env.AVELIO_TEST_PRESET).toBe("gesetzt");
+  });
+
+  it("ohne Datei passiert nichts", () => {
+    expect(loadDotEnv(join(dir, "fehlt.env"))).toBe(false);
   });
 });
