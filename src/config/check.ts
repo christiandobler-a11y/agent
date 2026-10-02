@@ -85,17 +85,20 @@ export async function checkKeys(env: Env, fetchFn: Fetch = fetch): Promise<Check
   ]);
 }
 
-async function checkDatabase(url: string): Promise<string> {
+export async function checkDatabase(url: string): Promise<string> {
   const client = new pg.Client({ connectionString: url, connectionTimeoutMillis: TIMEOUT_MS });
   try {
     await client.connect();
-    const { rows } = await client.query<{ version: string; migrations: number | null }>(
+    const { rows } = await client.query<{ version: string; has_migrations: boolean }>(
       `select current_setting('server_version') as version,
-              (select count(*)::int from schema_migrations
-                where to_regclass('schema_migrations') is not null) as migrations`,
+              to_regclass('schema_migrations') is not null as has_migrations`,
     );
     const r = rows[0]!;
-    return `Postgres ${r.version}, ${r.migrations ?? 0} Migration(en) angewendet`;
+    // Eigene Abfrage: Auf einer frischen Datenbank gibt es die Tabelle vor dem ersten `migrate` noch nicht.
+    const migrations = r.has_migrations
+      ? (await client.query<{ n: number }>("select count(*)::int as n from schema_migrations")).rows[0]!.n
+      : 0;
+    return `Postgres ${r.version}, ${migrations} Migration(en) angewendet`;
   } catch (err) {
     // Fehlermeldungen von pg enthalten keine Passwörter, die Host-Angabe ist zur Diagnose nützlich.
     throw new Error(`${new URL(url).host}: ${err instanceof Error ? err.message : String(err)}`, {
