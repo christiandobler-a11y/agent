@@ -12,6 +12,8 @@ ausprobieren kann. Nach Schritt 6 ist ein Abstimmungstermin (Kalibrierung) vorge
 - `npm run migrate`: wendet neue SQL-Migrationen aus `migrations/` an
 - `npm run cli -- crawl --pending -n 10` bzw. `crawl <id|domain>`: Websites rendern, Screenshots, Fakten,
   Impressum, PageSpeed (Screenshots unter `data/screenshots/`, nicht im Repo)
+- `npm run cli -- audit --pending -n 10` / `audit <firma>`, `explain <firma> [--full]`, `score --all`: Audit
+  (Sonnet), Score (Code), Pitch (Opus ab 80 Punkten); `score` rechnet ohne LLM neu
 - `npm run costs`: Ausgaben heute/Monat gegen das Budget, letzte 7 Tage je Rolle bzw. Dienst
 - `npm run db-status`: Migrationen, Tabellen, Zeilen, RLS/Data-API-Schutz der Datenbank aus `DATABASE_URL`
 - `npm run cli -- <befehl>`: einzelne Pipeline-Schritte ausführen (Debugging), z. B.
@@ -22,7 +24,9 @@ ausprobieren kann. Nach Schritt 6 ist ein Abstimmungstermin (Kalibrierung) vorge
 
 - **Deterministischer Code zuerst.** LLM-Aufrufe nur an den dokumentierten Stellen (Prefilter, Audit, Pitch,
   Manager), alle über das LLM-Gateway (`src/llm/`). Keine verstreuten API-Calls.
-- **Der Score kommt aus Code**, nie direkt vom LLM. Scoring bleibt rein und voll unit-getestet.
+- **Der Score kommt aus Code**, nie direkt vom LLM. Scoring bleibt rein und voll unit-getestet
+  (`src/pipeline/scoring/score.ts`, Gewichte in `config/scoring.v1.yaml`). Das Audit liefert nur Rubrik 1–5 mit
+  Beleg; neue Gewichte = neue Version der Datei bzw. `version` hochzählen.
 - **Audit-LLM ohne Tools.** Gecrawlter Inhalt ist nicht vertrauenswürdig und geht nur mit festem Ausgabe-Schema
   an das Modell. Der Manager sieht nie rohes HTML.
 - **Secrets nur aus Umgebungsvariablen**, nie im Repo, nie in Logs. Module holen sich ihre Keys über

@@ -20,6 +20,7 @@ describeDb("migrate", () => {
       "contacts",
       "lead_scores",
       "messages",
+      "pitches",
       "places_snapshots",
       "schema_migrations",
       "search_runs",

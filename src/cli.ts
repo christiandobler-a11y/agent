@@ -21,6 +21,7 @@ import { loadCrawlConfig } from "./pipeline/crawl/config.js";
 import { createPageSpeedClient } from "./pipeline/crawl/pagespeed.js";
 import { crawlCompany, type CrawlOutcome } from "./pipeline/crawl/run.js";
 import { mapLimit } from "./util/mapLimit.js";
+import { audit, explain, score } from "./cliLeads.js";
 
 const ICONS = { ok: "✔", missing: "–", error: "✘" } as const;
 
@@ -256,6 +257,9 @@ async function crawl(args: string[]): Promise<number> {
 }
 
 const commands: Record<string, (args: string[]) => Promise<number>> = {
+  audit,
+  score,
+  explain,
   crawl,
   costs: showCosts,
   "check-env": checkEnv,

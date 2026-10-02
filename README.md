@@ -3,7 +3,7 @@
 Internes System für Avelio: lokale Unternehmen finden, Websites auditieren, Leads mit dem
 Avelio Lead Score bewerten und über Telegram berichten.
 
-Plan: [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md). Stand: Schritt 5 (Crawl: Screenshots, Fakten, Impressum, PageSpeed) umgesetzt.
+Plan: [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md). Stand: Schritt 6 (Audit, Avelio Lead Score, Erklärung, Pitch) umgesetzt.
 
 Datenbank im Betrieb: Supabase, Einrichtung in [docs/SUPABASE.md](docs/SUPABASE.md).
 
@@ -84,3 +84,19 @@ für den Text und PageSpeed mobil (kostenlos). Ergebnis in `website_snapshots`, 
 Fehler (nicht erreichbar, Timeout, HTTP-Fehler, Bot-Schutz, leere Seite, ungültiges Zertifikat) werden mit
 Fehlerart gespeichert; die Firma steht dann auf `FAILED` und wird nach 7 Tagen erneut versucht. Ist die „Website“
 nur ein Facebook- oder Instagram-Profil, gilt die Firma als „ohne Website“.
+
+## Bewerten und erklären (Schritt 6)
+
+```sh
+npm run cli -- audit --pending -n 10    # gecrawlte Firmen auditieren, bewerten, Top-Leads mit Pitch
+npm run cli -- audit radlmeier.com      # eine Firma
+npm run cli -- explain radlmeier.com    # "Warum 72 Punkte?" (mit --full: jede Position)
+npm run cli -- score --all              # alle neu bewerten nach Gewichtsänderung (ohne LLM, kostenlos)
+```
+
+- **Audit (Sonnet, ohne Tools):** drei Screenshot-Ausschnitte, gemessene Fakten und Seitentext → Befunde mit Belegen
+  und eine Rubrik 1–5 für Design, Mobil, Handlungsaufforderung, Leistungen, Vertrauen und ersten Bildschirm. Ca.
+  4 Cent je Firma. Unveränderte Websites werden nicht erneut auditiert (Inhalts-Hash).
+- **Score (Code):** fünf Dimensionen (Business 25, Website-Chance 30, Potenzial 20, Lücke 15, Erreichbarkeit 10)
+  und Knock-outs; alle Gewichte in `config/scoring.v1.yaml`. Ab 60 Punkten `QUALIFIED`, sonst `SKIPPED` mit Grund.
+- **Pitch (Opus):** ab 80 Punkten Hauptchance, drei Argumente und ein Einstiegssatz für das Gespräch (ca. 3 Cent).

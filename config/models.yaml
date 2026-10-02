@@ -3,13 +3,16 @@ roles:
   prefilter:
     model: claude-haiku-4-5
     max_tokens: 400
-  # Folgen in Schritt 6 und 8, Modelle laut ARCHITECTURE.md 10:
+  # Modelle laut ARCHITECTURE.md 10:
   audit:
     model: claude-sonnet-5-5
-    max_tokens: 4000
+    max_tokens: 8000 # inkl. Denkphase
+    effort: low # ARCHITECTURE.md 10: Sonnet mit niedrigem Aufwand
+    cache_system: true
   pitch:
     model: claude-opus-5-5
-    max_tokens: 2000
+    max_tokens: 4000
+    effort: low
   manager:
     model: claude-sonnet-5-5
     max_tokens: 2000

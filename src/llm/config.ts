@@ -11,7 +11,14 @@ const price = z.object({
 export const modelsConfigSchema = z.object({
   roles: z.record(
     z.string(),
-    z.object({ model: z.string().min(1), max_tokens: z.number().int().positive() }),
+    z.object({
+      model: z.string().min(1),
+      max_tokens: z.number().int().positive(),
+      /** Denkaufwand (nicht bei Haiku 4.5). Niedrig = günstiger und schneller. */
+      effort: z.enum(["low", "medium", "high", "xhigh", "max"]).optional(),
+      /** System-Prompt cachen (lohnt ab ~1.000 Tokens und vielen gleichen Aufrufen). */
+      cache_system: z.boolean().default(false),
+    }),
   ),
   pricing: z.record(z.string(), price),
   budget: z.object({ daily_usd: z.number().positive(), monthly_usd: z.number().positive() }),

@@ -29,18 +29,28 @@ const CRAWL_USAGE =
 export type CrawlArgs = { mode: "one"; ref: string } | { mode: "pending"; limit: number };
 
 export function parseCrawlArgs(args: string[]): CrawlArgs {
+  return parseTargetArgs(args, CRAWL_USAGE);
+}
+
+/** Eine Firma (ID, Place-ID, Domain) oder `--pending [-n N]` bzw. `--all` (gleiche Form wie crawl). */
+export function parseTargetArgs(args: string[], usage: string, allowAll = false): CrawlArgs {
+  if (allowAll && args[0] === "--all" && args.length === 1) return { mode: "pending", limit: 100_000 };
   if (args[0] === "--pending") {
     let limit = 10;
     if (args[1] === "-n") {
       limit = Number(args[2]);
       if (!Number.isInteger(limit) || limit < 1 || limit > 500)
         throw new Error("-n erwartet eine Zahl von 1 bis 500");
-      if (args.length > 3) throw new Error(CRAWL_USAGE);
+      if (args.length > 3) throw new Error(usage);
     } else if (args.length > 1) {
-      throw new Error(CRAWL_USAGE);
+      throw new Error(usage);
     }
     return { mode: "pending", limit };
   }
-  if (args.length !== 1 || !args[0] || args[0].startsWith("-")) throw new Error(CRAWL_USAGE);
+  if (args.length !== 1 || !args[0] || args[0].startsWith("-")) throw new Error(usage);
   return { mode: "one", ref: args[0] };
 }
+
+export const AUDIT_USAGE =
+  "Verwendung: avelio audit <Firmen-ID|Place-ID|Domain> | avelio audit --pending [-n <Anzahl>]";
+export const SCORE_USAGE = "Verwendung: avelio score <Firmen-ID|Place-ID|Domain> | avelio score --all";

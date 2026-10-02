@@ -38,6 +38,8 @@ export interface Company {
   status: CompanyStatus;
   skip_reason: string | null;
   skip_detail: string | null;
+  current_score: number | null;
+  current_score_id: string | null;
   recheck_after: Date | null;
   first_seen_at: Date;
   last_seen_at: Date;
@@ -307,4 +309,26 @@ export async function clearCrawlFailure(db: DbClient, companyId: string): Promis
       where id = $1 and status = 'FAILED'`,
     [companyId],
   );
+}
+
+/** Firmen, die gecrawlt (oder ohne Website) und noch nicht bewertet sind. */
+export async function companiesToAudit(db: DbClient, limit: number): Promise<Company[]> {
+  const { rows } = await db.query<Company>(
+    `select c.* from companies c
+      where c.status in ('RESEARCHED', 'AUDITED')
+        and (c.segment = 'NO_WEBSITE'
+             or exists (select 1 from website_snapshots w where w.company_id = c.id and w.error is null))
+      order by c.first_seen_at
+      limit $1`,
+    [limit],
+  );
+  return rows;
+}
+
+/** Alle Firmen mit gespeichertem Score (für erneutes Scoren nach Gewichtsänderung). */
+export async function companiesWithScore(db: DbClient): Promise<Company[]> {
+  const { rows } = await db.query<Company>(
+    "select * from companies where current_score_id is not null order by current_score desc nulls last",
+  );
+  return rows;
 }

@@ -45,7 +45,12 @@ describeDb("Migration 002 sperrt die Supabase-Data-API", () => {
     const status = await dbStatus(db);
     expect(status.schema).toBe(schema);
     expect(status.migrations.map((m) => m.version)).toEqual(
-      expect.arrayContaining(["001_init", "002_lock_down_data_api", "003_api_usage_and_costs"]),
+      expect.arrayContaining([
+        "001_init",
+        "002_lock_down_data_api",
+        "003_api_usage_and_costs",
+        "005_pitches",
+      ]),
     );
     expect(status.tables.map((t) => t.name)).toEqual(
       expect.arrayContaining([

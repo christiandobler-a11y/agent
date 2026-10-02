@@ -1,0 +1,59 @@
+# Avelio Lead Score v1 (ARCHITECTURE.md Abschnitt 7). Alle Gewichte und Schwellen stehen hier, nicht im Code.
+# Startwerte aus dem Plan; Feinjustierung beim Kalibrier-Termin am Golden Set (7.4).
+version: v1
+
+# Ab dieser Punktzahl QUALIFIED, darunter SKIPPED (low_score).
+qualify_min_total: 60
+# Pitch (Opus) nur für Top-Leads.
+pitch_min_total: 80
+
+knockouts:
+  # Bewertung zu schwach bei genügend Bewertungen, oder insgesamt zu wenige Bewertungen.
+  min_rating_with_reviews: { rating: 3.5, reviews: 10 }
+  min_reviews: 5
+  # Website bereits modern und technisch gut: Website-Chance (B) unter diesem Wert.
+  min_website_chance: 8
+
+dimensions:
+  business: # A: Business-Gesundheit (objektiv)
+    max: 25
+    rating: { max: 12, from: 4.0, full: 4.7 } # linear von "from" bis "full"
+    reviews: { max: 10, full: 150 } # log-skaliert, ab "full" volle Punkte
+    photos: { max: 3, full: 10 }
+
+  website: # B: Website-Chance (12 objektiv + 18 Rubrik)
+    max: 30
+    objective_max: 12
+    objective:
+      psi_performance_below_50: 4
+      psi_performance_below_30: 2 # zusätzlich
+      no_https: 3
+      invalid_certificate: 3
+      no_viewport: 3
+      mobile_too_wide: 2
+      no_tel_link: 1
+      no_contact_form: 1
+      copyright_older_than_years: { years: 4, points: 2 }
+      layout_tables: 1
+      outdated_builder: 2 # siehe outdated_builders
+    outdated_builders: [IONOS MyWebsite, Strato Homepage-Baukasten, Weebly, Webnode, Jimdo]
+    rubric_max: 18 # 6 Kriterien × 3 Punkte; Rubrik 1 (sehr schwach) = volle Punkte, 5 (sehr gut) = 0
+    no_website_points: 30 # Segment NO_WEBSITE: maximale Chance
+
+  potential: # C: Wirtschaftliches Potenzial
+    max: 20
+    branch_value: 10 # value 1–5 aus config/branches.yaml → 2–10 Punkte; unbekannte Branche = 3
+    high_value_services: { per_service: 2.5, max: 5 }
+    team_size: { solo: 1, small: 3, medium: 5, large: 5, unknown: 2 }
+
+  gap: # D: Reputations-Website-Lücke
+    max: 15
+    gap_max: 11 # min(A/25, B/30) × 11
+    explainable: { min_findings: 3, points: 4, partial_findings: 2, partial_points: 2 }
+
+  reach: # E: Erreichbarkeit
+    max: 10
+    owner_named: 4
+    email: 3
+    phone: 2
+    contact_form: 1

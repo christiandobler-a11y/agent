@@ -12,3 +12,4 @@ skipped:
   chain: null # Kette/Franchise ändert sich nicht
   blocklist: null
   off_target: 30 # laut Prefilter falsche Branche bzw. kein Betrieb; andere Suchen können sie später finden
+  low_score: 180 # Score unter der Schwelle für QUALIFIED

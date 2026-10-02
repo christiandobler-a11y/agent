@@ -7,7 +7,10 @@ import { createLlmGateway, LlmError, type MessagesApi } from "../src/llm/gateway
 import { describeDb, useTestDb } from "./helpers/db.js";
 
 const models = {
-  roles: { prefilter: { model: "claude-haiku-4-5", max_tokens: 400 } },
+  roles: {
+    prefilter: { model: "claude-haiku-4-5", max_tokens: 400, cache_system: false },
+    audit: { model: "claude-haiku-4-5", max_tokens: 4000, effort: "low" as const, cache_system: true },
+  },
   pricing: { "claude-haiku-4-5": { input: 1, output: 5, cache_read: 0.1 } },
   budget: { daily_usd: 5, monthly_usd: 50 },
 };
@@ -170,7 +173,33 @@ describeDb("LLM-Gateway", () => {
   it("unbekannte Rolle ist ein Konfigurationsfehler", async () => {
     const llm = createLlmGateway({ db: db(), messages: { create: vi.fn() }, models, budget: NO_BUDGET });
     await expect(
-      llm.structured({ role: "audit", promptVersion: "v1", system: "S", input: "I", schema }),
-    ).rejects.toThrow(/Rolle "audit"/);
+      llm.structured({ role: "pitch", promptVersion: "v1", system: "S", input: "I", schema }),
+    ).rejects.toThrow(/Rolle "pitch"/);
+  });
+
+  it("Rollen-Optionen: effort, gecachter System-Prompt, Bilder in der Eingabe, Job-ID", async () => {
+    const create = vi.fn<MessagesApi["create"]>(() => Promise.resolve(message('{"ok":true}')));
+    const llm = createLlmGateway({ db: db(), messages: { create }, models, budget: NO_BUDGET });
+    const input: Anthropic.ContentBlockParam[] = [
+      { type: "image", source: { type: "base64", media_type: "image/jpeg", data: "AAAA" } },
+      { type: "text", text: "Fakten" },
+    ];
+    const result = await llm.structured({
+      role: "audit",
+      promptVersion: "v1",
+      system: "S",
+      input,
+      schema,
+      jobId: "job-7",
+    });
+    const params = create.mock.calls[0]![0];
+    expect(params.output_config?.effort).toBe("low");
+    expect(params.system).toEqual([{ type: "text", text: "S", cache_control: { type: "ephemeral" } }]);
+    expect(params.messages[0]!.content).toEqual(input);
+    expect(await run(result.agentRunId)).toMatchObject({ job_id: "job-7" });
+
+    await llm.structured({ role: "prefilter", promptVersion: "v1", system: "S", input: "x", schema });
+    expect(create.mock.calls[1]![0].output_config?.effort).toBeUndefined();
+    expect(create.mock.calls[1]![0].system).toBe("S");
   });
 });

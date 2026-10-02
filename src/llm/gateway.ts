@@ -18,7 +18,8 @@ export interface MessagesApi {
 
 export function createAnthropicMessages(apiKey: string): MessagesApi {
   // Das SDK wiederholt 408/409/429/5xx und Verbindungsfehler selbst.
-  const client = new Anthropic({ apiKey, maxRetries: 3, timeout: 60_000 });
+  // Audits mit Bildern und Denkphase brauchen länger als einfache Klassifikationen.
+  const client = new Anthropic({ apiKey, maxRetries: 3, timeout: 180_000 });
   return { create: (params) => client.messages.create(params) };
 }
 
@@ -26,11 +27,12 @@ export interface StructuredRequest<S extends z.ZodType> {
   role: string;
   promptVersion: string;
   system: string;
-  /** Nutzereingabe. Fremde Inhalte (Places, Websites) nur hier, nie im System-Prompt. */
-  input: string;
+  /** Nutzereingabe (Text oder Text + Bilder). Fremde Inhalte (Places, Websites) nur hier, nie im System-Prompt. */
+  input: string | Anthropic.ContentBlockParam[];
   schema: S;
   companyId?: string | null;
   searchRunId?: string | null;
+  jobId?: string | null;
   /** Kurzbeschreibung für `agent_runs.input_summary` (keine personenbezogenen Daten). */
   inputSummary?: string;
 }
@@ -142,12 +144,13 @@ export function createLlmGateway({ db, messages, models, budget }: LlmGatewayDep
       ? `${req.inputSummary}${attempt > 1 ? ` (Versuch ${attempt})` : ""}`
       : null;
     const { rows } = await db.query<{ id: string }>(
-      `insert into agent_runs (role, company_id, search_run_id, model, prompt_version, input_summary, status)
-       values ($1, $2, $3, $4, $5, $6, 'RUNNING') returning id`,
+      `insert into agent_runs (role, company_id, search_run_id, job_id, model, prompt_version, input_summary, status)
+       values ($1, $2, $3, $4, $5, $6, $7, 'RUNNING') returning id`,
       [
         req.role,
         req.companyId ?? null,
         req.searchRunId ?? null,
+        req.jobId ?? null,
         model,
         req.promptVersion,
         summary ? clip(summary) : null,
@@ -176,9 +179,14 @@ export function createLlmGateway({ db, messages, models, budget }: LlmGatewayDep
           response = await messages.create({
             model,
             max_tokens: roleConfig.max_tokens,
-            system: req.system,
+            system: roleConfig.cache_system
+              ? [{ type: "text", text: req.system, cache_control: { type: "ephemeral" } }]
+              : req.system,
             messages: [{ role: "user", content: req.input }],
-            output_config: { format: zodOutputFormat(req.schema) },
+            output_config: {
+              format: zodOutputFormat(req.schema),
+              ...(roleConfig.effort ? { effort: roleConfig.effort } : {}),
+            },
           });
           const { text, data } = parseOutput(response, req.schema);
           totalCost += await finishRun(runId, "OK", model, usageOf(response), clip(text), null);
