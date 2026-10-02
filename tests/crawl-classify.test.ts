@@ -18,6 +18,7 @@ describe("Crawl-Fehler klassifizieren", () => {
     expect(classifyNavigationError("page.goto: Timeout 30000ms exceeded.")).toBe("timeout");
     expect(classifyNavigationError("net::ERR_CERT_DATE_INVALID")).toBe("tls_error");
     expect(classifyNavigationError("net::ERR_SSL_PROTOCOL_ERROR")).toBe("tls_error");
+    expect(classifyNavigationError("page.goto: Download is starting")).toBe("not_html");
   });
 
   it("Bot-Schutz und leere Seiten erkennen", () => {

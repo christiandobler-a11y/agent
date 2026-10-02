@@ -29,6 +29,8 @@ export function classifyNavigationError(message: string): CrawlErrorKind {
   if (/timeout|ERR_TIMED_OUT/i.test(message)) return "timeout";
   if (/ERR_CERT_|ERR_SSL_|SSL_PROTOCOL|certificate/i.test(message)) return "tls_error";
   if (/ERR_INVALID_URL|invalid url/i.test(message)) return "invalid_url";
+  // Neuere Chromium-Versionen laden PDFs & Co. herunter statt sie anzuzeigen.
+  if (/download is starting|ERR_ABORTED.*download/i.test(message)) return "not_html";
   return "unreachable";
 }
 
