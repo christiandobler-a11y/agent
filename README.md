@@ -3,7 +3,7 @@
 Internes System für Avelio: lokale Unternehmen finden, Websites auditieren, Leads mit dem
 Avelio Lead Score bewerten und über Telegram berichten.
 
-Plan: [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md). Stand: Schritt 4 (LLM-Gateway mit Budget-Wächter, Wiederholungen, Kostenübersicht) umgesetzt.
+Plan: [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md). Stand: Schritt 5 (Crawl: Screenshots, Fakten, Impressum, PageSpeed) umgesetzt.
 
 Datenbank im Betrieb: Supabase, Einrichtung in [docs/SUPABASE.md](docs/SUPABASE.md).
 
@@ -59,3 +59,28 @@ kostenpflichtiger Aufruf mehr: Ein Recherche-Lauf hält mit „Budget erreicht�
 
 Unbrauchbare LLM-Antworten (Schema verletzt, abgeschnitten) werden einmal wiederholt; Netz- und Überlastungsfehler
 wiederholt das Anthropic-SDK selbst (bis zu 3-mal). Jeder Versuch steht mit Kosten in `agent_runs`.
+
+## Websites crawlen (Schritt 5)
+
+Einmalig den Browser installieren:
+
+```sh
+npx playwright install chromium
+```
+
+Dann:
+
+```sh
+npm run cli -- crawl --pending -n 10     # 10 recherchierte Firmen, die noch nicht gecrawlt wurden
+npm run cli -- crawl radlmeier.com       # eine Firma (ID, Place-ID oder Domain)
+```
+
+Pro Firma: Startseite in Chromium rendern, Screenshot desktop (1440 px) und mobil (390 px) bis drei
+Bildschirmhöhen, Fakten (CMS/Baukasten, Copyright-Jahr, Viewport, `tel:`-Links, CTAs, Formulare, Bilder ohne
+Alt-Text …), Impressum (Inhaber/Geschäftsführung, E-Mail, Telefon → Tabelle `contacts`), eine Leistungen-Seite
+für den Text und PageSpeed mobil (kostenlos). Ergebnis in `website_snapshots`, Screenshots unter
+`data/screenshots/<firma>/`. Die Konfiguration steht in `config/crawl.yaml`.
+
+Fehler (nicht erreichbar, Timeout, HTTP-Fehler, Bot-Schutz, leere Seite, ungültiges Zertifikat) werden mit
+Fehlerart gespeichert; die Firma steht dann auf `FAILED` und wird nach 7 Tagen erneut versucht. Ist die „Website“
+nur ein Facebook- oder Instagram-Profil, gilt die Firma als „ohne Website“.

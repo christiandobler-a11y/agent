@@ -1,0 +1,18 @@
+# Crawl (ARCHITECTURE.md 5.2 Schritt 7): Startseite rendern, Screenshots, Fakten, Impressum, PageSpeed.
+navigation_timeout_s: 30
+# Nach dem Laden warten, damit JS-Baukästen (Wix, Jimdo) und Animationen fertig sind.
+settle_ms: 1500
+concurrency: 2
+desktop: { width: 1440, height: 900, scale: 1 }
+mobile: { width: 390, height: 844, scale: 2 }
+# Screenshots bis zu so vielen Bildschirmhöhen (statt ganzer, oft sehr langer Seiten).
+screenshot_screens: 3
+jpeg_quality: 70
+# Relativ zum Arbeitsverzeichnis; auf dem Server ein Volume.
+screenshot_dir: data/screenshots
+# Bereinigter Seitentext für das Audit (Startseite + Leistungen), ARCHITECTURE.md 11.1.
+text_max_words: 1500
+# Linktexte/URL-Teile, über die Unterseiten gefunden werden (Kleinschreibung).
+subpages:
+  impressum: [impressum, imprint, anbieterkennzeichnung, rechtliche hinweise]
+  services: [leistungen, leistung, angebot, service, produkte, sortiment, werkstatt]

@@ -14,7 +14,13 @@ import { createPrefilter } from "./pipeline/research/prefilter.js";
 import { loadRecheckRules } from "./pipeline/research/recheck.js";
 import { loadResearchConfig, runResearch, type ResearchStats } from "./pipeline/research/run.js";
 import { loadRegion } from "./pipeline/research/tiling.js";
-import { parseResearchArgs } from "./cli-args.js";
+import { parseCrawlArgs, parseResearchArgs } from "./cli-args.js";
+import { companiesToCrawl, findCompany, type Company } from "./db/companies.js";
+import { createBrowserCrawler } from "./pipeline/crawl/browser.js";
+import { loadCrawlConfig } from "./pipeline/crawl/config.js";
+import { createPageSpeedClient } from "./pipeline/crawl/pagespeed.js";
+import { crawlCompany, type CrawlOutcome } from "./pipeline/crawl/run.js";
+import { mapLimit } from "./util/mapLimit.js";
 
 const ICONS = { ok: "✔", missing: "–", error: "✘" } as const;
 
@@ -166,7 +172,91 @@ async function showCosts(): Promise<number> {
   }
 }
 
+function printCrawl(company: Company, outcome: CrawlOutcome) {
+  const head = `${company.name} (${company.city ?? "?"})`;
+  switch (outcome.kind) {
+    case "no_website":
+      console.log(`– ${head}: keine Website hinterlegt`);
+      return;
+    case "social_only":
+      console.log(
+        `– ${head}: nur Social-Media-Profil (${outcome.snapshot.url}) → als „ohne Website“ markiert`,
+      );
+      return;
+    case "failed":
+      console.log(`✘ ${head}: ${outcome.errorKind} – ${outcome.error.slice(0, 160)}`);
+      return;
+    case "ok": {
+      const f = outcome.facts;
+      const p = outcome.psi;
+      const imp = f.impressum;
+      const yes = (b: boolean) => (b ? "ja" : "nein");
+      console.log(`✔ ${head}
+    URL:        ${outcome.snapshot.final_url}${f.https ? "" : "  (ohne HTTPS)"}${f.tls_valid ? "" : "  (Zertifikat ungültig!)"}
+    PageSpeed:  ${p ? `Performance ${p.performance ?? "?"} · SEO ${p.seo ?? "?"} · Best Practices ${p.best_practices ?? "?"} · Barrierefreiheit ${p.accessibility ?? "?"}` : `– (${outcome.psiError ?? "nicht abgefragt"})`}
+    Technik:    ${f.cms ?? "CMS unbekannt"} · © ${f.copyright_year ?? "?"} · Viewport ${yes(f.has_viewport_meta)} · mobil zu breit ${f.mobile_too_wide ? `ja (+${f.mobile_overflow_px} px)` : "nein"}
+    Kontakt:    tel-Link ${yes(f.tel_links.length > 0)} · Formular ${yes(f.has_contact_form)} · CTAs: ${f.cta_texts.slice(0, 3).join(", ") || "keine"}
+    Impressum:  ${imp ? `${imp.person ? `${imp.person} (${imp.role})` : "keine Person erkannt"} · ${imp.emails[0] ?? "keine E-Mail"} · ${imp.phones[0] ?? "kein Telefon"}` : "nicht gefunden"}
+    Screenshots: ${outcome.snapshot.screenshot_desktop}
+                 ${outcome.snapshot.screenshot_mobile}`);
+    }
+  }
+}
+
+async function crawl(args: string[]): Promise<number> {
+  let parsed;
+  try {
+    parsed = parseCrawlArgs(args);
+  } catch (err) {
+    console.error(err instanceof Error ? err.message : String(err));
+    return 2;
+  }
+  const env = loadEnv();
+  const { DATABASE_URL } = requireKeys(env, ["DATABASE_URL"]);
+  const config = loadCrawlConfig();
+  const db = createDb(DATABASE_URL, { max: config.concurrency + 2 });
+  try {
+    const companies =
+      parsed.mode === "one"
+        ? [await findCompany(db, parsed.ref)].filter((c): c is Company => c !== null)
+        : await companiesToCrawl(db, parsed.limit);
+    if (companies.length === 0) {
+      console.log(parsed.mode === "one" ? `Keine Firma gefunden für "${parsed.ref}".` : "Nichts zu crawlen.");
+      return parsed.mode === "one" ? 1 : 0;
+    }
+    if (!env.GOOGLE_API_KEY) console.log("Hinweis: GOOGLE_API_KEY fehlt, PageSpeed wird übersprungen.");
+    const crawler = await createBrowserCrawler({
+      config,
+      executablePath: process.env.CHROMIUM_PATH,
+      proxy: process.env.HTTPS_PROXY,
+    });
+    try {
+      const deps = {
+        db,
+        crawler,
+        pagespeed: env.GOOGLE_API_KEY ? createPageSpeedClient({ apiKey: env.GOOGLE_API_KEY }) : null,
+        config,
+        recheck: loadRecheckRules(),
+      };
+      console.log(`Crawle ${companies.length} Firma/Firmen …\n`);
+      const outcomes = await mapLimit(companies, config.concurrency, async (c) => {
+        const outcome = await crawlCompany(deps, c);
+        printCrawl(c, outcome);
+        return outcome;
+      });
+      const ok = outcomes.filter((o) => o.kind === "ok").length;
+      console.log(`\n${ok} von ${outcomes.length} erfolgreich. Screenshots unter ${config.screenshot_dir}/`);
+      return 0;
+    } finally {
+      await crawler.close();
+    }
+  } finally {
+    await db.end();
+  }
+}
+
 const commands: Record<string, (args: string[]) => Promise<number>> = {
+  crawl,
   costs: showCosts,
   "check-env": checkEnv,
   migrate: runMigrations,

@@ -249,3 +249,62 @@ export async function setResearchOutcome(
   if (!rows[0]) throw new Error(`Firma ${companyId} nicht gefunden`);
   return rows[0];
 }
+
+/** Crawl fehlgeschlagen: FAILED mit Meldung, erneuter Versuch ab `recheckAfter` (config/recheck.yaml → failed). */
+export async function setCrawlFailed(
+  db: DbClient,
+  companyId: string,
+  detail: string,
+  recheckAfter: Date | null,
+): Promise<void> {
+  await db.query(
+    `update companies set status = 'FAILED', skip_detail = $2, recheck_after = $3, updated_at = now() where id = $1`,
+    [companyId, detail, recheckAfter],
+  );
+}
+
+/** Die "Website" ist nur ein Social-Media-Profil: für Avelio gilt die Firma als ohne Website. */
+export async function markNoWebsite(db: DbClient, companyId: string): Promise<void> {
+  await db.query(`update companies set segment = 'NO_WEBSITE', updated_at = now() where id = $1`, [
+    companyId,
+  ]);
+}
+
+const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+
+/** Firma über ID, Place-ID oder Domain finden (für die CLI). */
+export async function findCompany(db: DbClient, ref: string): Promise<Company | null> {
+  const r = ref.trim();
+  if (UUID.test(r)) {
+    const { rows } = await db.query<Company>("select * from companies where id = $1", [r]);
+    return rows[0] ?? null;
+  }
+  const domain = domainIdentity(r);
+  const { rows } = await db.query<Company>(
+    "select * from companies where place_id = $1 or ($2::text is not null and domain = $2) limit 1",
+    [r, domain],
+  );
+  return rows[0] ?? null;
+}
+
+/** Firmen, die Gate und Prefilter bestanden haben, eine Website haben und noch nie gecrawlt wurden. */
+export async function companiesToCrawl(db: DbClient, limit: number): Promise<Company[]> {
+  const { rows } = await db.query<Company>(
+    `select c.* from companies c
+      where c.status = 'RESEARCHED' and c.segment = 'WEBSITE' and c.website_url is not null
+        and not exists (select 1 from website_snapshots w where w.company_id = c.id)
+      order by c.first_seen_at
+      limit $1`,
+    [limit],
+  );
+  return rows;
+}
+
+/** Erfolgreicher Crawl nach früherem Fehlschlag: zurück in die Pipeline. */
+export async function clearCrawlFailure(db: DbClient, companyId: string): Promise<void> {
+  await db.query(
+    `update companies set status = 'RESEARCHED', skip_detail = null, recheck_after = null, updated_at = now()
+      where id = $1 and status = 'FAILED'`,
+    [companyId],
+  );
+}

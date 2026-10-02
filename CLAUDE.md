@@ -10,6 +10,8 @@ ausprobieren kann. Nach Schritt 6 ist ein Abstimmungstermin (Kalibrierung) vorge
 - `npm test` / `npm run test:watch`: Vitest
 - `npm run check-env`: prüft gesetzte Keys und die Datenbank mit je einem Live-Aufruf (gibt keine Werte aus)
 - `npm run migrate`: wendet neue SQL-Migrationen aus `migrations/` an
+- `npm run cli -- crawl --pending -n 10` bzw. `crawl <id|domain>`: Websites rendern, Screenshots, Fakten,
+  Impressum, PageSpeed (Screenshots unter `data/screenshots/`, nicht im Repo)
 - `npm run costs`: Ausgaben heute/Monat gegen das Budget, letzte 7 Tage je Rolle bzw. Dienst
 - `npm run db-status`: Migrationen, Tabellen, Zeilen, RLS/Data-API-Schutz der Datenbank aus `DATABASE_URL`
 - `npm run cli -- <befehl>`: einzelne Pipeline-Schritte ausführen (Debugging), z. B.
@@ -35,6 +37,11 @@ ausprobieren kann. Nach Schritt 6 ist ein Abstimmungstermin (Kalibrierung) vorge
 - **Kosten:** Jeder LLM-Versuch steht in `agent_runs`, jeder bezahlte API-Aufruf (Places) in `api_usage`
   (`recordApiUsage`). Vor jedem kostenpflichtigen Aufruf `budget.assertAvailable()` (Limits in
   `config/models.yaml → budget`); `BudgetExceededError` hält Läufe sauber an, statt sie scheitern zu lassen.
+- **Crawl:** Gecrawlter Inhalt wird nur gespeichert und regelbasiert ausgewertet (`src/pipeline/crawl/facts.ts`,
+  `impressum.ts`, rein und unit-getestet). Fehler sind `CrawlError` mit Fehlerart (`classify.ts`), nie Abstürze.
+  Browser-Tests laufen gegen einen lokalen Testserver; in Cloud-Sessions `CHROMIUM_PATH=/opt/pw-browsers/chromium`
+  setzen (Playwright-Version ≠ vorinstallierter Browser) und das Proxy-Zertifikat ins NSS-Store eintragen
+  (`certutil -d sql:$HOME/.pki/nssdb -A -t "C,," -n proxy -i /root/.ccr/agent-proxy-ca.crt`).
 - Recherche-Reihenfolge: Places → Dubletten → **Gate (Code) → Prefilter (LLM)**. Das Gate läuft zuerst, weil es
   nichts kostet. Skip-Gründe entsprechen den Schlüsseln in `config/recheck.yaml`.
 

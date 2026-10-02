@@ -18,6 +18,7 @@ import { evaluateGate, type GateRules } from "./gate.js";
 import { MAX_PAGES, placeToCandidate, regionProbe, type Place, type PlacesClient } from "./places.js";
 import type { Prefilter } from "./prefilter.js";
 import { computeRecheckAfter, shouldReprocess, type RecheckRules } from "./recheck.js";
+import { mapLimit } from "../../util/mapLimit.js";
 import { isInRegion, tileQueries, type Region } from "./tiling.js";
 
 /**
@@ -103,20 +104,6 @@ type PlaceOutcome =
   | { kind: "prefilter_error" }
   | { kind: "budget_exceeded"; error: BudgetExceededError }
   | { kind: "passed"; company: Company; costUsd: number };
-
-/** Verarbeitet Elemente mit begrenzter Parallelität, Ergebnisse in Eingabe-Reihenfolge. */
-async function mapLimit<T, R>(items: readonly T[], limit: number, fn: (item: T) => Promise<R>): Promise<R[]> {
-  const results = new Array<R>(items.length);
-  let next = 0;
-  const worker = async () => {
-    while (next < items.length) {
-      const i = next++;
-      results[i] = await fn(items[i]!);
-    }
-  };
-  await Promise.all(Array.from({ length: Math.min(limit, items.length) }, worker));
-  return results;
-}
 
 const increment = (counts: Record<string, number>, key: string) => {
   counts[key] = (counts[key] ?? 0) + 1;

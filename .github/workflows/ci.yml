@@ -31,6 +31,8 @@ jobs:
           node-version-file: .nvmrc
           cache: npm
       - run: npm ci
+      # Echter Browser für die Crawl-Tests (tests/crawl-browser.test.ts)
+      - run: npx playwright install --with-deps chromium
       - run: npm run format:check
       - run: npm run lint
       - run: npm run typecheck
