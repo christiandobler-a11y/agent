@@ -1,0 +1,15 @@
+# Inspiration: Websites, die Christian als Vorbild für eine Branche gefallen. Grundlage für das Creative-Briefing
+# und den Prototype-Agenten (Phase 3, ARCHITECTURE.md 14). Schlüssel = Branche aus config/branches.yaml.
+# Neue Einträge: url, warum (Christians Worte), merkmale (was wir uns abschauen), gespeichert (Datum).
+
+gastro:
+  - url: https://www.zum-augustiner.de/
+    name: Zum Augustiner Rosenheim
+    warum: Gefällt mir sehr gut für bayerische Restaurants.
+    merkmale:
+      - Hero mit warmer Interieur-Fotografie und Dialekt-Slogan („So jung kemma nimma zam!“)
+      - authentisch bayerische, lockere Tonalität, Dialekt stärkt die regionale Identität
+      - klare Abschnitte in sinnvoller Reihenfolge – Wirtshaus, Spezialität (Holzfassanstich), Feiern/Events, Küche, Team, Kontakt
+      - direkte Handlungsaufforderungen – Tisch reservieren (OpenTable), Speisekarte, Event-Anfrage, Telefon
+      - minimalistisches, modernes Layout, das die Bilder wirken lässt
+    gespeichert: 2026-10-03

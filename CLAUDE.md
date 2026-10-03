@@ -44,7 +44,8 @@ ausprobieren kann. Nach Schritt 6 ist ein Abstimmungstermin (Kalibrierung) vorge
   (`src/queue/`), Policy `exclusive` mit Firmen- bzw. Lauf-ID als Schlüssel. Nächster Schritt einer Firma ergibt
   sich aus ihrem gespeicherten Zustand (`nextStep` in `src/queue/pipeline.ts`), nie aus Zwischenspeicher.
   Fachliche Fehler (Website nicht erreichbar) setzen die Firma auf FAILED; geworfene Fehler lösen Wiederholungen aus.
-- Konfiguration (Gewichte, Modelle, Branchen, Regionen) liegt in `config/`, Prompts versioniert in `prompts/`
+- Konfiguration (Gewichte, Modelle, Branchen, Regionen, Vorbild-Websites je Branche in `inspiration.yaml`) liegt in
+  `config/`, Prompts versioniert in `prompts/`
   (`<rolle>.v<N>.md`; geänderter Prompt = neue Version, die alte bleibt).
 - LLM nur über `createLlmGateway` (`src/llm/gateway.ts`): Rolle → Modell aus `config/models.yaml`, festes
   Zod-Ausgabeschema, jeder Aufruf landet in `agent_runs`. Fremde Inhalte nur in die Nutzernachricht, nie in den
