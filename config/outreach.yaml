@@ -50,8 +50,9 @@ spamschutz:
     - höchstens ein Link (WhatsApp-Business-Link oder Kalender), keine Anhänge in der ersten Mail
     - keine Spam-Wörter (kostenlos, gratis, Angebot, Rabatt, garantiert, jetzt zuschlagen), keine Großbuchstaben-Wörter, kein "!!!"
     - persönliche Anrede mit Namen aus dem Impressum, sonst "Hallo zusammen" bzw. "Hallo Team {firma}"
-    - von Christians normalem Postfach, höchstens 10 bis 15 neue Mails am Tag, über den Tag verteilt
-    - Domain mit SPF, DKIM und DMARC (einmalig prüfen)
+    - von Christians privatem Postfach (Adresse nur in der .env: OUTREACH_FROM), höchstens 10 bis 15 neue Mails am Tag,
+      über den Tag verteilt
+    - avelio.digital hat SPF, DKIM (IONOS s1/s2) und DMARC p=none, wird aber bisher nicht zum Senden genutzt
 
 # Kontaktweg (03.10.2026): nicht auf die eigene Website verweisen (passt noch nicht zum Anspruch), sondern auf
 # WhatsApp Business (wa.me-Link mit vorausgefülltem Text) oder den Kalender-Link. Die Werte selbst stehen nicht im
@@ -61,4 +62,22 @@ kontaktweg:
   whatsapp_text: Hallo Christian, ich hab deine Nachricht zu unserer Website bekommen.
   brief_qr: whatsapp # QR-Code auf der Befund-Seite öffnet WhatsApp mit vorausgefülltem Text
   email_cta: >-
-    Am einfachsten schreiben Sie mir kurz per WhatsApp ({whatsapp}) oder suchen sich direkt einen Termin aus ({kalender}).
+    Am einfachsten antworten Sie kurz hier oder per WhatsApp ({whatsapp}).
+
+# Terminvorschläge statt offenem Kalender (03.10.2026): Knappheit erzeugen, nicht "Mo bis Fr alles frei".
+# Jede Nachricht schlägt 2 konkrete Tage mit je 2 Uhrzeiten vor, z. B. "Dienstag um 12 oder 18 Uhr, sonst Donnerstag
+# um 8 oder 19:30". Avelio merkt sich angebotene Termine und bietet denselben Termin höchstens 2 Leads gleichzeitig an.
+termine:
+  zeitfenster: # Wochentag → mögliche Uhrzeiten (deutsche Zeit)
+    dienstag: ["12:00", "18:00"]
+    mittwoch: ["08:30", "17:30"]
+    donnerstag: ["08:00", "19:30"]
+    freitag: ["11:00"]
+  tage_je_nachricht: 2
+  uhrzeiten_je_tag: 2
+  fruehestens_in_tagen: 2 # Vorlauf, damit die Antwort noch rechtzeitig kommt
+  spaetestens_in_tagen: 9
+  max_leads_je_termin: 2
+  formulierungen:
+    - Hätten Sie {tag1} um {zeit1a} oder {zeit1b} Uhr kurz Zeit? Sonst ginge noch {tag2} um {zeit2a} oder {zeit2b} Uhr.
+    - Passt Ihnen {tag1} um {zeit1a} oder {zeit1b} Uhr? Alternativ hätte ich {tag2} um {zeit2a} oder {zeit2b} Uhr noch was frei.
