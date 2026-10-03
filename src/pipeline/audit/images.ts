@@ -34,7 +34,11 @@ async function encode(img: Sharp, label: string): Promise<AuditImage> {
   };
 }
 
-async function region(path: string, heightPx: number | null, label: string): Promise<AuditImage> {
+export async function screenRegion(
+  path: string,
+  heightPx: number | null,
+  label: string,
+): Promise<AuditImage> {
   const meta = await sharp(path).metadata();
   const width = meta.width ?? 0;
   const full = meta.height ?? 0;
@@ -59,8 +63,8 @@ export interface ScreenshotSpec {
 /** Drei Bilder: erster Bildschirm desktop (scharf), ganze Seite desktop (Überblick), mobil zwei Bildschirme. */
 export async function prepareAuditImages(spec: ScreenshotSpec): Promise<AuditImage[]> {
   return Promise.all([
-    region(spec.desktopPath, spec.desktopScreenPx, "Desktop, erster Bildschirm"),
-    region(spec.desktopPath, null, "Desktop, Seite bis zu drei Bildschirmhöhen"),
-    region(spec.mobilePath, spec.mobileScreenPx * 2, "Smartphone, erste zwei Bildschirme"),
+    screenRegion(spec.desktopPath, spec.desktopScreenPx, "Desktop, erster Bildschirm"),
+    screenRegion(spec.desktopPath, null, "Desktop, Seite bis zu drei Bildschirmhöhen"),
+    screenRegion(spec.mobilePath, spec.mobileScreenPx * 2, "Smartphone, erste zwei Bildschirme"),
   ]);
 }

@@ -34,8 +34,8 @@ regeln:
 kanaele:
   email: Kurz, Text, von Christians Postfach. Rechtlich heikel (UWG), Entscheidung liegt bei Christian.
   letter: >-
-    "Befund-Seite": Handy-Screenshot der aktuellen Seite mit 2-3 roten, handschriftlich wirkenden Markierungen,
-    daneben wenige handschriftlich wirkende Zeilen und ein QR-Code. Keine ausgedruckte Mail.
+    "Befund-Seite" (Abschnitt brief unten): Screenshot der Startseite am Rechner mit 2-3 roten, handschriftlich
+    wirkenden Markierungen, daneben wenige handschriftlich wirkende Zeilen und ein QR-Code. Keine ausgedruckte Mail.
 
 # Gegen Spamfilter (03.10.2026, Christians Wunsch): jede Mail etwas anders, wenig Masse, sauberer Absender.
 spamschutz:
@@ -111,3 +111,14 @@ termine:
   formulierungen:
     - Hätten Sie {tag1} um {zeit1a} oder {zeit1b} Uhr kurz Zeit? Sonst ginge noch {tag2} um {zeit2a} oder {zeit2b} Uhr.
     - Passt Ihnen {tag1} um {zeit1a} oder {zeit1b} Uhr? Alternativ hätte ich {tag2} um {zeit2a} oder {zeit2b} Uhr noch was frei.
+
+# Befund-Seite für Briefe (03.10.2026): ein Blatt A4, Umschlag schreibt Christian von Hand (wirkt persönlicher als
+# ein Sichtfenster). Den Text unter dem Bild schreibt das LLM (prompts/letter.v1.md), den Rest setzt der Code.
+brief:
+  bildunterschrift: Ihre Startseite am Rechner, Stand {datum}
+  bildunterschrift_du: Eure Startseite am Rechner, Stand {datum}
+  qr_text: Kurz scannen, dann landen Sie direkt bei mir auf WhatsApp.
+  qr_text_du: Kurz scannen, dann landest du direkt bei mir auf WhatsApp.
+  qr_text_telefon: Oder einfach kurz anrufen.
+  gruss: [Viele Grüße, Beste Grüße, Grüße aus Peißenberg]
+  unterschrift: Christian

@@ -163,6 +163,7 @@ export const HELP_TEXT = [
 export type CrmCallback =
   | { kind: "status"; status: SalesStatus; companyId: string }
   | { kind: "email"; companyId: string }
+  | { kind: "letter"; companyId: string }
   | { kind: "remind"; days: number; companyId: string }
   | { kind: "done"; interactionId: string }
   | { kind: "snooze"; interactionId: string };
@@ -175,6 +176,8 @@ export function crmCallback(c: CrmCallback): string {
       return `ss:${SALES_CODES[c.status]}:${c.companyId}`;
     case "email":
       return `dm:${c.companyId}`;
+    case "letter":
+      return `bl:${c.companyId}`;
     case "remind":
       return `sr:${c.days}:${c.companyId}`;
     case "done":
@@ -192,6 +195,8 @@ export function parseCrmCallback(data: string): CrmCallback | null {
   }
   m = new RegExp(`^dm:(${UUID})$`).exec(data);
   if (m) return { kind: "email", companyId: m[1]! };
+  m = new RegExp(`^bl:(${UUID})$`).exec(data);
+  if (m) return { kind: "letter", companyId: m[1]! };
   m = new RegExp(`^sr:(\\d{1,2}):(${UUID})$`).exec(data);
   if (m) return { kind: "remind", days: Number(m[1]), companyId: m[2]! };
   m = new RegExp(`^r([dz]):(${UUID})$`).exec(data);
@@ -250,7 +255,10 @@ export function leadCrmCard(
       [btn("INTERESTED"), btn("PROTOTYPE")],
       [btn("WON"), btn("LOST")],
       [btn("READY_FOR_CONTACT")],
-      [{ text: "✍️ E-Mail-Entwurf", callback_data: crmCallback({ kind: "email", companyId: c.id }) }],
+      [
+        { text: "✍️ E-Mail-Entwurf", callback_data: crmCallback({ kind: "email", companyId: c.id }) },
+        { text: "🖨️ Befund-Seite", callback_data: crmCallback({ kind: "letter", companyId: c.id }) },
+      ],
       [
         { text: "⏰ in 3 Tagen", callback_data: crmCallback({ kind: "remind", days: 3, companyId: c.id }) },
         { text: "⏰ in 7 Tagen", callback_data: crmCallback({ kind: "remind", days: 7, companyId: c.id }) },
@@ -349,6 +357,36 @@ export function emailDraftMessages(
           callback_data: crmCallback({ kind: "status", status: "CONTACTED", companyId: company.id }),
         },
         { text: "🔄 Neu schreiben", callback_data: crmCallback({ kind: "email", companyId: company.id }) },
+      ],
+    ],
+  };
+}
+
+/** Befund-Seite: Vorschau-Text (Umschlag zum Kopieren, Notizen, Hinweise) und Buttons unter dem PDF. */
+export function letterMessages(
+  company: Company,
+  d: { envelope: string[]; notes: string[]; warnings: string[]; variant: number },
+): { caption: string; pdfCaption: string; keyboard: InlineKeyboardButton[][] } {
+  const caption = [
+    `🖨️ <b>Befund-Seite für ${escapeHtml(company.name)}</b>${d.variant > 1 ? ` (Variante ${d.variant})` : ""}`,
+    "",
+    "<b>Umschlag (von Hand schreiben):</b>",
+    d.envelope.length > 0 ? `<pre>${escapeHtml(d.envelope.join("\n"))}</pre>` : "keine Anschrift gefunden",
+    "",
+    "<b>Markiert:</b>",
+    ...(d.notes.length > 0 ? d.notes.map(escapeHtml) : ["nichts"]),
+  ];
+  if (d.warnings.length > 0) caption.push("", `⚠️ ${escapeHtml(d.warnings.join(" · "))}`);
+  return {
+    caption: caption.join("\n"),
+    pdfCaption: "Zum Ausdrucken (A4). Nach dem Einwerfen auf „Verschickt, kontaktiert“ tippen.",
+    keyboard: [
+      [
+        {
+          text: "📮 Verschickt, kontaktiert",
+          callback_data: crmCallback({ kind: "status", status: "CONTACTED", companyId: company.id }),
+        },
+        { text: "🔄 Neu erstellen", callback_data: crmCallback({ kind: "letter", companyId: company.id }) },
       ],
     ],
   };

@@ -38,6 +38,25 @@ export const outreachConfigSchema = z.object({
     vorbereitet: z.array(z.string()).min(1),
     vorbereitet_du: z.array(z.string()).min(1),
   }),
+  brief: z
+    .object({
+      bildunterschrift: z.string(),
+      bildunterschrift_du: z.string(),
+      qr_text: z.string(),
+      qr_text_du: z.string(),
+      qr_text_telefon: z.string(),
+      gruss: z.array(z.string()).min(1),
+      unterschrift: z.string().min(1),
+    })
+    .default({
+      bildunterschrift: "Ihre Startseite am Rechner, Stand {datum}",
+      bildunterschrift_du: "Eure Startseite am Rechner, Stand {datum}",
+      qr_text: "Kurz scannen, dann landen Sie direkt bei mir auf WhatsApp.",
+      qr_text_du: "Kurz scannen, dann landest du direkt bei mir auf WhatsApp.",
+      qr_text_telefon: "Oder einfach kurz anrufen.",
+      gruss: ["Viele Grüße"],
+      unterschrift: "Christian",
+    }),
   termine: z.object({
     zeitfenster: z.partialRecord(z.enum(WEEKDAYS), z.array(hm)),
     ausnahmen_mittagspause: z.partialRecord(z.enum(WEEKDAYS), z.array(hm)).default({}),

@@ -52,14 +52,16 @@ const SEVERITY = { high: 0, medium: 1, low: 2 } as const;
 // Christian überzeugt vor allem über den Gesamteindruck (Desktop); Handy-Mängel zählen, stehen aber nicht vorne.
 const CATEGORY = { design: 0, conversion: 1, content: 2, trust: 3, mobile: 4, technical: 5 } as const;
 
+/** Schwere zuerst, bei Gleichstand das, was den ersten Eindruck am meisten prägt. */
+export const byImpact = (a: Finding, b: Finding): number =>
+  SEVERITY[a.severity] - SEVERITY[b.severity] || CATEGORY[a.category] - CATEGORY[b.category];
+
 /**
  * Befunde für die Mail: ein wirklich starker (schwer) oder sonst die zwei bis drei auffälligsten. Sortiert nach
  * Schwere, bei Gleichstand nach dem, was den ersten Eindruck am meisten prägt.
  */
 export function pickFindings(findings: readonly Finding[]): Finding[] {
-  const sorted = [...findings].sort(
-    (a, b) => SEVERITY[a.severity] - SEVERITY[b.severity] || CATEGORY[a.category] - CATEGORY[b.category],
-  );
+  const sorted = [...findings].sort(byImpact);
   return sorted[0]?.severity === "high" ? sorted.slice(0, 1) : sorted.slice(0, 3);
 }
 
@@ -134,10 +136,10 @@ export function mailtoLink(to: string | null, subject: string, body: string): st
  * Baustein wählen: Startpunkt je Firma aus dem Seed, jede neue Variante ("Neu schreiben") rückt einen weiter. So
  * unterscheidet sich jede Variante sicher von der vorigen, sobald es mehr als eine Auswahl gibt.
  */
-const pick = <T>(list: readonly T[], seed: number, shift: number, variant: number): T =>
+export const pick = <T>(list: readonly T[], seed: number, shift: number, variant: number): T =>
   list[((seed >>> shift) + variant) % list.length]!;
 
-interface Recipient {
+export interface Recipient {
   email: string | null;
   /** Woher die Adresse stammt. */
   emailSource: "impressum" | "website" | "google" | null;
@@ -145,7 +147,7 @@ interface Recipient {
   salutation: "Herr" | "Frau" | null;
 }
 
-async function recipient(db: Db, companyId: string): Promise<Recipient> {
+export async function recipient(db: Db, companyId: string): Promise<Recipient> {
   const { rows: contacts } = await db.query<{
     name: string | null;
     salutation: "Herr" | "Frau" | null;
@@ -197,7 +199,8 @@ export async function draftEmail(
   const inForm = (sieText: string, duText: string) =>
     form === "sie" ? sieText : form === "du" ? duText : duToIhr(duText);
   const { rows: prior } = await db.query<{ body: string | null }>(
-    "select body from interactions where company_id = $1 and type = 'draft' order by created_at desc",
+    `select body from interactions
+      where company_id = $1 and type = 'draft' and channel = 'email' order by created_at desc`,
     [company.id],
   );
   const variant = prior.length;

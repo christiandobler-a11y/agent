@@ -1,4 +1,4 @@
-import { Bot, type Context } from "grammy";
+import { Bot, InputFile, type Context } from "grammy";
 import type { UserFromGetMe } from "grammy/types";
 import { setRating } from "../db/calibration.js";
 import { findCompany, type Company } from "../db/companies.js";
@@ -14,6 +14,8 @@ import {
 import { loadCrmConfig, SALES_LABELS } from "../crm/status.js";
 import type { OutreachConfig } from "../outreach/config.js";
 import { draftEmail, mailtoLink, type OutreachDeps } from "../outreach/draft.js";
+import { draftLetter } from "../outreach/letter.js";
+import { chromiumLetterRenderer, type LetterRenderer } from "../outreach/letterPdf.js";
 import { raiseBudgetToday } from "../llm/budget.js";
 import { askManager, type ManagerDeps } from "../manager/agent.js";
 import { findLead } from "../manager/leads.js";
@@ -28,6 +30,7 @@ import {
   HELP_TEXT,
   markdownToTelegramHtml,
   emailDraftMessages,
+  letterMessages,
   leadButtons,
   topLeadsText,
   leadCrmCard,
@@ -51,7 +54,12 @@ export interface BotOptions {
   botInfo?: UserFromGetMe;
   fetch?: typeof globalThis.fetch;
   /** Kontakt-Entwürfe (Phase 2). Ohne Angabe zeigt der Button einen Hinweis. */
-  outreach?: { config: OutreachConfig; contact: OutreachDeps["contact"] };
+  outreach?: {
+    config: OutreachConfig;
+    contact: OutreachDeps["contact"];
+    /** Befund-Seite als PDF; ohne Angabe Chromium (CHROMIUM_PATH). */
+    renderLetter?: LetterRenderer;
+  };
 }
 
 const log = (level: "info" | "warn" | "error", msg: string, extra: Record<string, unknown> = {}) =>
@@ -333,6 +341,56 @@ export function createBot(options: BotOptions): Bot {
         };
         // mailto-Links akzeptiert nicht jede Telegram-Version; dann ohne Link senden.
         await sendBody(mailtoLink(draft.to, draft.subject, draft.body)).catch(() => sendBody(null));
+        return;
+      }
+      if (crm.kind === "letter") {
+        if (!options.outreach) {
+          await ctx.answerCallbackQuery({ text: "Entwürfe sind noch nicht eingerichtet", show_alert: true });
+          return;
+        }
+        await ctx.answerCallbackQuery({ text: "Erstelle Befund-Seite, dauert etwa 30 Sekunden …" });
+        await ctx.replyWithChatAction("upload_document").catch(() => undefined);
+        const crawl = pipeline.crawl.config;
+        const letter = await draftLetter(
+          {
+            db: pipeline.db,
+            llm: options.manager.llm,
+            outreach: options.outreach.config,
+            branches: pipeline.lead.branches,
+            now: pipeline.now,
+            contact: options.outreach.contact,
+            render: options.outreach.renderLetter ?? chromiumLetterRenderer(process.env.CHROMIUM_PATH),
+            desktopScreenPx: crawl.desktop.height * crawl.desktop.scale,
+          },
+          company,
+          by(ctx.chat?.id),
+        ).catch((err: unknown) => {
+          log("error", "Befund-Seite fehlgeschlagen", {
+            error: err instanceof Error ? err.message : String(err),
+          });
+          return null;
+        });
+        if (!letter) {
+          await ctx.reply("Die Befund-Seite hat gerade nicht geklappt. Versuch es bitte gleich noch einmal.");
+          return;
+        }
+        if ("kind" in letter) {
+          await ctx.reply(
+            letter.kind === "no_audit"
+              ? `${company.name} ist noch nicht auditiert, dafür fehlt mir der Befund.`
+              : `Für ${company.name} gibt es keinen Screenshot der Website. Erst neu crawlen, dann noch einmal.`,
+          );
+          return;
+        }
+        const m = letterMessages(company, letter);
+        await ctx.replyWithPhoto(new InputFile(letter.png, "vorschau.png"), {
+          caption: m.caption,
+          parse_mode: "HTML",
+        });
+        await ctx.replyWithDocument(new InputFile(letter.pdf, letter.filename), {
+          caption: m.pdfCaption,
+          reply_markup: { inline_keyboard: m.keyboard },
+        });
         return;
       }
       if (crm.kind === "status") {

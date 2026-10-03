@@ -26,6 +26,13 @@ roles:
     effort: low
     cache_system: true
 
+  # Befund-Seite (Brief): sieht den Screenshot, liefert Markierungen, Notizen und ein paar Zeilen.
+  letter:
+    model: claude-sonnet-5-5
+    max_tokens: 3000 # inkl. Denkphase
+    effort: low
+    cache_system: true
+
 # Budget-Wächter: gilt für LLM-Aufrufe UND bezahlte APIs (Places) zusammen. Tag/Monat nach deutscher Zeit.
 # Ist ein Limit erreicht, startet kein neuer kostenpflichtiger Aufruf mehr (laufende werden fertig).
 budget:

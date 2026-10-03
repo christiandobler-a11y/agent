@@ -18,6 +18,8 @@ ausprobieren kann. Nach Schritt 6 ist ein Abstimmungstermin (Kalibrierung) vorge
 "<Begriff>" <region> -n N [--wait]`, `runs`, `failed`
 - `npm run cli -- coverage [region] [branche]` (Telegram `/abdeckung`): Abdeckung je Region × Branche; `search … --alle`
   bzw. „Such alle …“ = Komplett-Suche ohne Zielzahl (`src/pipeline/research/coverage.ts`, Tabelle `search_coverage`)
+- `npm run cli -- letter <firma>` (Telegram: Lead-Karte → „🖨️ Befund-Seite“): Befund-Seite als PDF für einen Brief
+  nach `data/letters/`
 - `npm run cli -- chat "…"`: Manager-Agent ohne Telegram befragen (gleicher Verlauf wie der Chat)
 - `npm run cli -- calibrate [export|--file|rate <firma> <A|B|C|X>]`: Golden Set (Telegram `/kalibrieren`,
   `/auswertung`); `tests/golden/golden.json` ist Regressionstest für Gewichte und Prompts (`tests/golden.test.ts`)
@@ -72,7 +74,9 @@ ausprobieren kann. Nach Schritt 6 ist ein Abstimmungstermin (Kalibrierung) vorge
 - **Kontakt-Entwürfe:** Das LLM (Rolle `contact`) schreibt nur Anrede und Mittelteil; Betreff, Termine
   (`src/outreach/slots.ts`), Kontaktweg, Gruß und Signatur setzt Code nach `config/outreach.yaml` (keine Gedankenstriche,
   ein Befund, Abwechslung gegen Spamfilter). Avelio sendet nie selbst; Entwürfe stehen als `interactions.type = 'draft'`
-  mit angebotenen Terminen in `meta`.
+  mit angebotenen Terminen in `meta`. Befund-Seite (Brief, `src/outreach/letter.ts`): Rolle `letter` sieht den
+  Desktop-Screenshot und liefert nur Markierungen (Prozent-Rechtecke), Notizen und Zeilen; Layout (`letterPage.ts`, rein),
+  QR-Code und Kontaktdaten setzt Code, Chromium druckt das PDF (`letterPdf.ts`).
 - Recherche-Reihenfolge: Places → Dubletten → **Gate (Code) → Prefilter (LLM)**. Das Gate läuft zuerst, weil es
   nichts kostet. Skip-Gründe entsprechen den Schlüsseln in `config/recheck.yaml`.
 
