@@ -64,6 +64,15 @@ export function telegramNotifier(
     async planReady(date, result, nightReport = []) {
       if (opts.morning) await opts.morning(date, nightReport);
       else if (opts.db) await sendPlanHeader(api, opts.db, targets(), date, nightReport);
+      const problems = [
+        ...result.warnings,
+        ...result.skipped.filter((x) => x.reason.startsWith("Fehler")).map((x) => `${x.name}: ${x.reason}`),
+      ];
+      if (problems.length > 0)
+        await sendAll(
+          targets(),
+          `⚠️ Hinweise zur Vorbereitung:\n${problems.slice(0, 5).map(escapeHtml).join("\n")}${problems.length > 5 ? `\n… und ${problems.length - 5} weitere` : ""}`,
+        );
       if (result.stoppedByBudget)
         await sendAll(
           targets(),

@@ -79,7 +79,23 @@ async function eveningSummary(
 /** Job: Tagesplan bauen und als fertig vermerken (der nächste Sweep meldet ihn ab `morgens`). */
 export async function runPlanJob(ctx: PipelineContext): Promise<PlanBuildResult | null> {
   if (!ctx.autopilot) return null;
-  const result = await buildDailyPlan(ctx.autopilot.planDeps());
+  let result: PlanBuildResult;
+  try {
+    result = await buildDailyPlan(ctx.autopilot.planDeps());
+  } catch (err) {
+    // Nicht still scheitern: morgens kommt trotzdem eine Nachricht mit dem Grund (und was schon fertig ist).
+    const message = err instanceof Error ? err.message : String(err);
+    result = {
+      date: berlinDate(ctx.now()),
+      followups: 0,
+      emails: 0,
+      letters: 0,
+      prototypes: 0,
+      skipped: [],
+      stoppedByBudget: false,
+      warnings: [`Vorbereitung abgebrochen: ${message.slice(0, 200)}`],
+    };
+  }
   await setState(ctx.db, `plan-built:${result.date}`, result);
   return result;
 }

@@ -13,7 +13,7 @@ import {
   type AutopilotConfig,
 } from "../src/autopilot/plan.js";
 import { autopilotTick, berlinTime } from "../src/autopilot/schedule.js";
-import { nightOf, nightReport, searchTick } from "../src/autopilot/search.js";
+import { nightOf, nightReport, pickNextSearch, searchTick } from "../src/autopilot/search.js";
 import { loadBranches } from "../src/pipeline/research/branches.js";
 import { loadResearchConfig } from "../src/pipeline/research/run.js";
 import { loadRegion } from "../src/pipeline/research/tiling.js";
@@ -592,5 +592,62 @@ describeDb("Morgen-Paket mit Datenbank", () => {
     // Suchläufe tragen die echte Erstellungszeit, daher hier die echte Uhr.
     const report = await nightReport({ ...ctx, now: () => new Date() });
     expect(report[0]).toContain("Landkreis Rosenheim");
+  });
+  it("Ein fehlerhafter Lead wirft den Plan nicht um", async () => {
+    await db().query("update companies set status = 'LOST'");
+    await db().query("delete from outreach_plan");
+    const bad = await lead({ score: 79 });
+    const good = await lead({ score: 70 });
+    const structured = vi.fn((req: { companyId?: string }) =>
+      req.companyId === bad.id
+        ? Promise.reject(new Error("Modell überlastet"))
+        : Promise.resolve({
+            output: { absatz: "ich heiße Christian und mache Online-Auftritte zeitgemäß." },
+            agentRunId: "r",
+            costUsd: 0,
+            model: "m",
+          }),
+    );
+    const llm = { structured } as unknown as LlmGateway;
+    const tmp = mkdtempSync(join(tmpdir(), "avelio-plan2-"));
+    const result = await buildDailyPlan({
+      db: db(),
+      now: () => NOW,
+      config: { ...config({ start: 5 }), briefe: { pro_tag: 0, ab_score: 80 } },
+      letter: {
+        db: db(),
+        llm,
+        outreach: loadOutreachConfig(),
+        branches: {},
+        now: () => NOW,
+        contact: { whatsapp: null, phone: null },
+        render: () => Promise.resolve({ pdf: Buffer.from(""), png: Buffer.from("") }),
+        desktopScreenPx: 900,
+      },
+      prototype: null,
+      mx: () => Promise.resolve(true),
+      lettersDir: tmp,
+    });
+    expect(result.emails).toBe(1);
+    expect(result.skipped).toEqual([{ name: bad.name, reason: "Fehler: Modell überlastet" }]);
+    expect((await planItems(db(), "2026-10-05")).map((i) => i.company_id)).toEqual([good.id]);
+  });
+
+  it("Nachtsuche überspringt eine Kombination nach zwei Fehlschlägen", async () => {
+    await db().query("delete from search_runs");
+    for (let i = 0; i < 2; i++)
+      await db().query(
+        `insert into search_runs (requested_by, query, target_count, status) values ('autopilot', $1, 1, 'FAILED')`,
+        [JSON.stringify({ term: "Physiotherapie", region: "rosenheim", complete: true })],
+      );
+    const ctx = {
+      db: db(),
+      now: () => NOW,
+      loadRegion,
+      research: { branches: loadBranches(), config: loadResearchConfig() },
+    } as unknown as PipelineContext;
+    expect(await pickNextSearch(ctx, ["rosenheim"], ["physiotherapie", "fahrrad"])).toMatchObject({
+      branchKey: "fahrrad",
+    });
   });
 });

@@ -32,8 +32,17 @@ export async function pickNextSearch(
       const branch = branches[branchKey];
       if (!branch) continue;
       const c = coverage.find((x) => x.subject === branchKey);
-      if (!c || c.tilesDone < c.tilesTotal)
-        return { regionKey, branchKey, term: branch.aliases[0] ?? branch.label };
+      if (c && c.tilesDone >= c.tilesTotal) continue;
+      const term = branch.aliases[0] ?? branch.label;
+      // Zweimal hintereinander gescheitert (z. B. Google-Fehler): erst einmal überspringen statt jede Nacht festhängen.
+      const { rows } = await ctx.db.query<{ status: string }>(
+        `select status from search_runs
+          where requested_by = 'autopilot' and query->>'region' = $1 and query->>'term' = $2
+          order by created_at desc limit 2`,
+        [regionKey, term],
+      );
+      if (rows.length === 2 && rows.every((r) => r.status === "FAILED")) continue;
+      return { regionKey, branchKey, term };
     }
   }
   return null;

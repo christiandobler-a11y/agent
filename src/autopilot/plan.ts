@@ -132,6 +132,20 @@ async function candidates(db: Db, date: string, limit: number): Promise<Company[
   return rows;
 }
 
+/**
+ * Ein Lead darf den Plan nicht umwerfen: Fehler (LLM, Browser, Website) werden als übersprungen vermerkt, nur das
+ * Budget-Ende bricht ab.
+ */
+async function isolated(company: Company, result: PlanBuildResult, work: () => Promise<void>): Promise<void> {
+  try {
+    await work();
+  } catch (err) {
+    if (err instanceof BudgetExceededError) throw err;
+    const message = err instanceof Error ? err.message : String(err);
+    result.skipped.push({ name: company.name, reason: `Fehler: ${message.slice(0, 120)}` });
+  }
+}
+
 export async function buildDailyPlan(deps: PlanDeps, by = "autopilot"): Promise<PlanBuildResult> {
   const now = deps.now();
   const date = berlinDate(now);
@@ -152,22 +166,24 @@ export async function buildDailyPlan(deps: PlanDeps, by = "autopilot"): Promise<
     // 1. Nachfassen (auch am Wochenende vorbereitet, gesendet wird per Knopf).
     if (config.nachfassen.hoechstens > 0) {
       for (const { company, first } of await dueFollowUps(db, now, config.nachfassen.nach_tagen)) {
-        const draft = await createFollowUpDraft(
-          { db, outreach: outreachDeps.outreach, phone: outreachDeps.contact.phone, now },
-          company,
-          first,
-          by,
-        );
-        if (
-          await addPlanItem(db, {
-            date,
-            companyId: company.id,
-            kind: "followup",
-            channel: "email",
-            draftId: draft.draftId,
-          })
-        )
-          result.followups++;
+        await isolated(company, result, async () => {
+          const draft = await createFollowUpDraft(
+            { db, outreach: outreachDeps.outreach, phone: outreachDeps.contact.phone, now },
+            company,
+            first,
+            by,
+          );
+          if (
+            await addPlanItem(db, {
+              date,
+              companyId: company.id,
+              kind: "followup",
+              channel: "email",
+              draftId: draft.draftId,
+            })
+          )
+            result.followups++;
+        });
       }
     }
 
@@ -177,65 +193,71 @@ export async function buildDailyPlan(deps: PlanDeps, by = "autopilot"): Promise<
     let lettersLeft = config.briefe.pro_tag;
     for (const company of await candidates(db, date, Math.max(0, target - already) * 3)) {
       if (result.emails + result.letters + already >= target) break;
-      const person = await recipient(db, company.id);
-      const mailOk = person.email ? await deps.mx(person.email) : false;
-      const channel = chooseChannel(
-        { score: company.current_score, hasAddress: Boolean(company.street && company.postal_code), mailOk },
-        lettersLeft,
-        config.briefe.ab_score,
-      );
-      if (!channel) {
-        result.skipped.push({ name: company.name, reason: "keine gültige E-Mail und keine Anschrift" });
-        continue;
-      }
-      if (deps.prototype && config.prototyp_fuer_neue && company.segment !== "NO_WEBSITE") {
-        try {
-          const p = await buildPrototype(deps.prototype, company, by);
-          if (!("kind" in p)) result.prototypes++;
-        } catch (err) {
-          if (err instanceof BudgetExceededError) throw err;
-          result.warnings.push(`Prototyp ${company.name}: ${String(err).slice(0, 120)}`);
-        }
-      }
-      if (channel === "letter") {
-        const letter = await draftLetter(deps.letter, company, by);
-        if ("kind" in letter) {
-          result.skipped.push({ name: company.name, reason: letter.kind });
-          continue;
-        }
-        const dir = join(deps.lettersDir, date);
-        await mkdir(dir, { recursive: true });
-        const pdf = join(dir, letter.filename);
-        await writeFile(pdf, letter.pdf);
-        await writeFile(pdf.replace(/\.pdf$/, ".png"), letter.png);
-        await db.query(
-          `update interactions set meta = meta || jsonb_build_object('pdf', $2::text, 'png', $3::text) where id = $1`,
-          [letter.draftId, pdf, pdf.replace(/\.pdf$/, ".png")],
+      await isolated(company, result, async () => {
+        const person = await recipient(db, company.id);
+        const mailOk = person.email ? await deps.mx(person.email) : false;
+        const channel = chooseChannel(
+          {
+            score: company.current_score,
+            hasAddress: Boolean(company.street && company.postal_code),
+            mailOk,
+          },
+          lettersLeft,
+          config.briefe.ab_score,
         );
-        await addPlanItem(db, {
-          date,
-          companyId: company.id,
-          kind: "new",
-          channel: "letter",
-          draftId: letter.draftId,
-        });
-        result.letters++;
-        lettersLeft--;
-      } else {
-        const mail = await draftEmail(outreachDeps, company, by);
-        if ("kind" in mail) {
-          result.skipped.push({ name: company.name, reason: mail.kind });
-          continue;
+        if (!channel) {
+          result.skipped.push({ name: company.name, reason: "keine gültige E-Mail und keine Anschrift" });
+          return;
         }
-        await addPlanItem(db, {
-          date,
-          companyId: company.id,
-          kind: "new",
-          channel: "email",
-          draftId: mail.draftId,
-        });
-        result.emails++;
-      }
+        if (deps.prototype && config.prototyp_fuer_neue && company.segment !== "NO_WEBSITE") {
+          try {
+            const p = await buildPrototype(deps.prototype, company, by);
+            if (!("kind" in p)) result.prototypes++;
+          } catch (err) {
+            if (err instanceof BudgetExceededError) throw err;
+            result.warnings.push(`Prototyp ${company.name}: ${String(err).slice(0, 120)}`);
+          }
+        }
+        if (channel === "letter") {
+          const letter = await draftLetter(deps.letter, company, by);
+          if ("kind" in letter) {
+            result.skipped.push({ name: company.name, reason: letter.kind });
+            return;
+          }
+          const dir = join(deps.lettersDir, date);
+          await mkdir(dir, { recursive: true });
+          const pdf = join(dir, letter.filename);
+          await writeFile(pdf, letter.pdf);
+          await writeFile(pdf.replace(/\.pdf$/, ".png"), letter.png);
+          await db.query(
+            `update interactions set meta = meta || jsonb_build_object('pdf', $2::text, 'png', $3::text) where id = $1`,
+            [letter.draftId, pdf, pdf.replace(/\.pdf$/, ".png")],
+          );
+          await addPlanItem(db, {
+            date,
+            companyId: company.id,
+            kind: "new",
+            channel: "letter",
+            draftId: letter.draftId,
+          });
+          result.letters++;
+          lettersLeft--;
+        } else {
+          const mail = await draftEmail(outreachDeps, company, by);
+          if ("kind" in mail) {
+            result.skipped.push({ name: company.name, reason: mail.kind });
+            return;
+          }
+          await addPlanItem(db, {
+            date,
+            companyId: company.id,
+            kind: "new",
+            channel: "email",
+            draftId: mail.draftId,
+          });
+          result.emails++;
+        }
+      });
     }
   } catch (err) {
     if (!(err instanceof BudgetExceededError)) throw err;
