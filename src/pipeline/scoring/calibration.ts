@@ -174,7 +174,7 @@ export function formatCalibrationReport(r: CalibrationReport, version: string): 
   lines.push(
     r.topA.needed === 0
       ? "  – keine A-Firmen bewertet"
-      : `  ${ok(r.topA.pass)} ${r.topA.found} von ${r.topA.needed} A-Firmen in den System-Top-${r.topA.window}` +
+      : `  ${ok(r.topA.pass)} ${r.topA.found} A-Firmen in den System-Top-${r.topA.window} (nötig: ${r.topA.needed})` +
           (r.topA.missed.length
             ? ` (zu weit hinten: ${r.topA.missed.map((m) => `${m.entry.name} Rang ${m.rank}`).join(", ")})`
             : ""),

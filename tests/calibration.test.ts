@@ -100,7 +100,7 @@ describe("Kalibrierung", () => {
     expect(r.concordance!).toBeLessThan(1);
     expect(r.pass).toBe(false);
     const text = formatCalibrationReport(r, config.version);
-    expect(text).toContain("A-Firmen in den System-Top-8");
+    expect(text).toMatch(/\d+ A-Firmen in den System-Top-8 \(nötig: 5\)/);
     expect(text).toContain("noch nicht bestanden");
   });
 
