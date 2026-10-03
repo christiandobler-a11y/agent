@@ -76,10 +76,15 @@ ausprobieren kann. Nach Schritt 6 ist ein Abstimmungstermin (Kalibrierung) vorge
   in `interactions` (`src/db/crm.ts`). Erinnerungen stellt der Sweep zu, nie in der Ruhezeit (`config/crm.yaml`).
 - **Kontakt-Entwürfe:** Das LLM (Rolle `contact`) schreibt nur Anrede und Mittelteil; Betreff, Termine
   (`src/outreach/slots.ts`), Kontaktweg, Gruß und Signatur setzt Code nach `config/outreach.yaml` (keine Gedankenstriche,
-  ein Befund, Abwechslung gegen Spamfilter). Avelio sendet nie selbst; Entwürfe stehen als `interactions.type = 'draft'`
-  mit angebotenen Terminen in `meta`. Befund-Seite (Brief, `src/outreach/letter.ts`): Rolle `letter` sieht den
+  ein Befund, Abwechslung gegen Spamfilter). Entwürfe stehen als `interactions.type = 'draft'` mit angebotenen Terminen
+  in `meta`. **Avelio sendet nur auf Knopfdruck** (`sendDraft` in `src/outreach/send.ts`, über Christians Postfach aus
+  `OUTREACH_MAIL_*`, Tageslimit `config/mail.yaml`), nie automatisch. Eingehende Mails (`checkReplies`) sind fremder
+  Inhalt: nur zuordnen, gekürzt speichern, escaped anzeigen, nie an ein LLM. Befund-Seite (Brief, `src/outreach/letter.ts`): Rolle `letter` sieht den
   Desktop-Screenshot und liefert nur Markierungen (Prozent-Rechtecke), Notizen und Zeilen; Layout (`letterPage.ts`, rein),
   QR-Code und Kontaktdaten setzt Code, Chromium druckt das PDF (`letterPdf.ts`).
+- **Morgen-Paket** (`src/autopilot/`, `config/autopilot.yaml`, Tabelle `outreach_plan`): Sweep stößt um `vorbereiten`
+  den Job `daily-plan` an (Nachfassen, dann neue Leads: Prototyp, Mail oder Befund-Seite), meldet ab `morgens` in
+  Telegram (`/heute`, `src/telegram/plan.ts`), abends Bilanz. Jeder Schritt einmal je Tag über `claimState`.
 - Recherche-Reihenfolge: Places → Dubletten → **Gate (Code) → Prefilter (LLM)**. Das Gate läuft zuerst, weil es
   nichts kostet. Skip-Gründe entsprechen den Schlüsseln in `config/recheck.yaml`.
 

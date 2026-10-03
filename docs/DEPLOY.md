@@ -188,6 +188,30 @@ Die Seiten sind nicht bei Google auffindbar und nur mit dem Link erreichbar (Zuf
 
 Alte Entwürfe löscht Avelio nach 60 Tagen (`config/prototype.yaml`), außer der Lead ist im Gespräch.
 
+## 12. Postfach für das Morgen-Paket (Versand per Knopf, Antworten erkennen)
+
+Avelio schickt Mails nur, wenn du in Telegram auf „📤 Senden“ tippst, und zwar über dein eigenes Postfach. Die Mail
+landet bei dir unter „Gesendet“, Antworten erkennt Avelio automatisch (Status „geantwortet“, Nachfassen stoppt, du
+bekommst sofort eine Meldung). Dafür braucht Avelio ein **App-Passwort**, nicht dein normales Passwort:
+
+- **iCloud:** [account.apple.com](https://account.apple.com) → Anmeldung und Sicherheit → App-spezifische Passwörter
+  → „+“, Name `Avelio`. Anbieter `icloud`.
+- **Gmail:** Google-Konto → Sicherheit → Bestätigung in zwei Schritten → App-Passwörter. Anbieter `gmail`.
+- **GMX / web.de:** Einstellungen → POP3/IMAP aktivieren, dann das normale Passwort oder ein App-Passwort. Anbieter
+  `gmx` bzw. `webde`.
+
+Auf dem Server in die `.env` (`nano /opt/avelio/.env`):
+
+```
+OUTREACH_MAIL_ADDRESS=deine-adresse@…
+OUTREACH_MAIL_PASSWORD=das-app-passwort
+OUTREACH_MAIL_PROVIDER=icloud
+```
+
+Danach `bash /opt/avelio/scripts/deploy.sh`. Ab dem nächsten Morgen um 7 Uhr kommt das Paket („Heute: 0/15“), sofort
+geht es mit `/heute`. Grenzen: höchstens 40 neue Mails am Tag (`config/mail.yaml`), geplant sind 15, nach zwei Wochen
+30 (`config/autopilot.yaml`). Ohne App-Passwort funktioniert alles auch, nur mit „✅ Selbst gesendet“ statt „Senden“.
+
 ## Betrieb
 
 | Was | Befehl (auf dem Server, nach `ssh root@<IP>`) |
