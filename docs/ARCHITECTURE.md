@@ -529,6 +529,19 @@ prüfe ich vor der Umsetzung in den aktuellen Bedingungen.
 - *Phase 2:* CRM-Statuswechsel per Button, Notizen, Kontakt-Entwürfe (Brief/Anruf/E-Mail), Follow-up-Reminder,
   Daily Standup 08:00, nächtliche automatische Recherche (Cron + Batch API), Wochenreport
 - *Phase 3:* Creative-Briefing, Prototype-Agent, Preview-Deploy, Review-Schritt, „Bau einen Prototyp“-Button
+- *Regionen-Abdeckung Deutschland (Wunsch vom 03.10.2026):* ein auf die Regionen-Suche spezialisierter Agent, damit
+  kein Fleck in Deutschland vergessen wird. Skizze:
+  - **Abdeckung ist Code, nicht LLM.** Grundlage ist das amtliche Gemeindeverzeichnis (Destatis, rund 10.800 Gemeinden
+    mit Gemeindeschlüssel, Einwohnern und Koordinaten). Regionen-Dateien (`config/regions/*.yaml`) werden daraus
+    erzeugt statt von Hand gepflegt. Großstädte werden nach Stadtteilen gekachelt, weil Places höchstens 60 Treffer je
+    Anfrage liefert.
+  - **Abdeckungs-Tabelle** je Gemeinde × Branche: zuletzt gesucht, Treffer, Leads, Kosten. Das zeigt jederzeit, was
+    noch fehlt, z. B. als Karte oder Liste („Landkreis Traunstein: 12 von 35 Gemeinden, Hotels fehlen noch“).
+  - **Der Agent plant nur:** Er schlägt die nächsten Gebiete vor (Lücken, Ergiebigkeit bisheriger Gebiete, Budget) und
+    startet Suchen über die vorhandenen Werkzeuge. Christian bestätigt in Telegram, nächtliche Läufe kommen aus Phase 2.
+  - **Kosten grob:** etwa 3 Cent je Places-Anfrage. Ganz Deutschland für eine Branche mit einer Anfrage je Gemeinde
+    kostet rund 350 $ Places plus Audits (3–5 Cent je Firma, die durchs Gate kommt). Daher Gebiet für Gebiet
+    innerhalb des Budgets.
 
 ---
 
