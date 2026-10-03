@@ -107,6 +107,9 @@ describe("Entwurf (rein)", () => {
     expect(duToIhr("Hättest du Dienstag kurz Zeit?")).toBe("Hättet ihr Dienstag kurz Zeit?");
     expect(subjectFor("Kurze Frage zu Ihrer Website", "du")).toBe("Kurze Frage zu Eurer Website");
     expect(subjectFor("Ihr erster Eindruck online", "sie")).toBe("Ihr erster Eindruck online");
+    expect(subjectFor("Ein Gedanke zu Ihrem Online-Auftritt", "ihr")).toBe(
+      "Ein Gedanke zu Eurem Online-Auftritt",
+    );
     expect(lowerFirst("Ich heiße Christian")).toBe("ich heiße Christian");
     expect(lowerFirst("Sie haben")).toBe("Sie haben");
   });

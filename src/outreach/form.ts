@@ -24,8 +24,9 @@ export function duToIhr(text: string): string {
 /** Sie-Betreff in Du-Form. Die Website gehört dem Betrieb, also "Eure Website" (auch bei du an eine Person). */
 export function subjectFor(subject: string, form: Form): string {
   if (form === "sie") return subject;
-  const [ihr, ihre, ihrer, ihren] = ["Euer", "Eure", "Eurer", "Euren"];
+  const [ihr, ihre, ihrer, ihren, ihrem] = ["Euer", "Eure", "Eurer", "Euren", "Eurem"];
   return subject
+    .replace(/\bIhrem\b/g, ihrem)
     .replace(/\bIhrer\b/g, ihrer)
     .replace(/\bIhren\b/g, ihren)
     .replace(/\bIhre\b/g, ihre)
