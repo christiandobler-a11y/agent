@@ -52,6 +52,7 @@ const output: PrototypeOutput = {
   hero_foto: 2,
   ueber_uns_foto: null,
   galerie_fotos: [1, 3],
+  abgelehnte_fotos: [],
 };
 
 const company = {
@@ -141,6 +142,17 @@ describe("Prototyp (rein)", () => {
       about: null,
       gallery: ["https://x.de/a.jpg", "https://x.de/c.jpg"],
     });
+    // Abgelehnt (z. B. Text-Banner): nie verwenden, auch nicht als Ersatz.
+    expect(
+      pickPhotos({ hero_foto: null, ueber_uns_foto: null, galerie_fotos: [], abgelehnte_fotos: [2] }, photos)
+        .hero,
+    ).toBe("https://x.de/a.jpg");
+    expect(
+      pickPhotos(
+        { hero_foto: 2, ueber_uns_foto: null, galerie_fotos: [2], abgelehnte_fotos: [1, 2] },
+        photos,
+      ),
+    ).toEqual({ hero: null, about: null, gallery: [] });
     // Zu kleines Hero-Foto (900 px): größtes gebilligtes Querformat stattdessen; b.jpg wurde nicht gebilligt.
     expect(pickPhotos({ hero_foto: 3, ueber_uns_foto: null, galerie_fotos: [1] }, photos).hero).toBe(
       "https://x.de/a.jpg",

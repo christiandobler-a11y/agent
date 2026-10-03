@@ -27,7 +27,7 @@ import { fetchPlaceDetails, PLACE_DETAILS_COST_USD, type PlaceDetails } from "./
  * Screenshots für Nachrichten (Vorher/Nachher).
  */
 
-export const PROTOTYPE_PROMPT_VERSION = "v2";
+export const PROTOTYPE_PROMPT_VERSION = "v3";
 
 const configSchema = z.object({
   previews_dir: z.string(),
@@ -94,10 +94,16 @@ export const MIN_HERO_WIDTH = 1000;
  * welche gebilligt hat).
  */
 export function pickPhotos(
-  out: Pick<PrototypeOutput, "hero_foto" | "ueber_uns_foto" | "galerie_fotos">,
-  photos: SiteImages["photos"],
+  out: Pick<PrototypeOutput, "hero_foto" | "ueber_uns_foto" | "galerie_fotos"> & {
+    abgelehnte_fotos?: number[];
+  },
+  all: SiteImages["photos"],
 ): { hero: string | null; about: string | null; gallery: string[] } {
-  const at = (i: number | null) => (i !== null && i >= 1 && i <= photos.length ? photos[i - 1]! : null);
+  // Abgelehnte Fotos (Banner, Grafiken) gibt es für diese Seite nicht, auch nicht als Ersatz.
+  const rejected = new Set((out.abgelehnte_fotos ?? []).map((i) => all[i - 1]?.url));
+  const photos = all.map((p) => (rejected.has(p.url) ? null : p));
+  const at = (i: number | null) =>
+    i !== null && i >= 1 && i <= photos.length ? (photos[i - 1] ?? null) : null;
   const approved = [out.hero_foto, out.ueber_uns_foto, ...out.galerie_fotos]
     .map(at)
     .filter((p): p is SiteImages["photos"][number] => p !== null);
@@ -106,7 +112,8 @@ export function pickPhotos(
   // schwächer als z. B. eine Landschaft der Region.
   const widest = (list: SiteImages["photos"]) =>
     list.filter((p) => p.w >= MIN_HERO_WIDTH && p.w / p.h >= 1.3).sort((a, b) => b.w * b.h - a.w * a.h)[0];
-  const landscape = widest(approved) ?? widest(photos);
+  const landscape =
+    widest(approved) ?? widest(photos.filter((p): p is SiteImages["photos"][number] => p !== null));
   const hero = (chosen && chosen.w >= MIN_HERO_WIDTH ? chosen : landscape)?.url ?? null;
   const aboutPick = at(out.ueber_uns_foto)?.url ?? null;
   const about = aboutPick === hero ? null : aboutPick;
@@ -364,7 +371,8 @@ export async function buildPrototype(
   const slug = existing[0]?.slug ?? `${slugify(content.name) || "entwurf"}-${randomBytes(4).toString("hex")}`;
   const dir = join(deps.config.previews_dir, slug);
   await rm(dir, { recursive: true, force: true });
-  const built = await buildSite(content, dir, fetchImage);
+  const template = deps.config.templates[company.branch_key ?? ""] ?? deps.config.fallback;
+  const built = await buildSite(content, dir, fetchImage, template);
   if (built.images === 0) warnings.push("Keine Fotos geladen, Seite nutzt Farbflächen");
   const shoot = deps.shoot ?? chromiumShooter(process.env.CHROMIUM_PATH);
   const shots = await shoot(join(process.cwd(), dir, "index.html"), join(deps.config.shots_dir, slug));
@@ -375,7 +383,7 @@ export async function buildPrototype(
     [
       company.id,
       slug,
-      deps.config.templates[company.branch_key ?? ""] ?? deps.config.fallback,
+      template,
       JSON.stringify(built.content),
       PROTOTYPE_PROMPT_VERSION,
       cost.toFixed(5),

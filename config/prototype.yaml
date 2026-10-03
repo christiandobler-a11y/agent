@@ -7,4 +7,12 @@ keep_days: 60
 # Branche → Vorlage (src/prototype/templates). Branchen ohne eigene Vorlage nutzen "fallback".
 templates:
   physiotherapie: physio
-fallback: physio
+  kosmetik: physio
+  friseur: physio
+  fahrrad: werkstatt
+  maler: werkstatt
+  schreiner: werkstatt
+  sanitaer: werkstatt
+  elektriker: werkstatt
+  kfz: werkstatt
+fallback: physio # Gastro und Hotel bekommen später eine eigene Vorlage

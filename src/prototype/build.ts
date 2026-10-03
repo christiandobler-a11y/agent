@@ -3,7 +3,7 @@ import { createRequire } from "node:module";
 import { join } from "node:path";
 import sharp from "sharp";
 import type { SiteContent } from "./content.js";
-import { renderPhysio } from "./templates/physio.js";
+import { renderTemplate } from "./templates/index.js";
 
 /**
  * Prototyp als statische Seite in einen Ordner schreiben: Fotos und Logo laden (nur http/https, Größe begrenzt),
@@ -127,6 +127,7 @@ export async function buildSite(
   content: SiteContent,
   dir: string,
   fetchImage: ImageFetcher = httpImageFetcher(),
+  template = "physio",
 ): Promise<BuildResult> {
   await mkdir(join(dir, "img"), { recursive: true });
   await mkdir(join(dir, "fonts"), { recursive: true });
@@ -161,7 +162,7 @@ export async function buildSite(
     about: { ...content.about, image: aboutImage },
     gallery: gallery.filter((g) => g !== heroImage && g !== aboutImage),
   };
-  await writeFile(join(dir, "index.html"), renderPhysio(built));
+  await writeFile(join(dir, "index.html"), renderTemplate(template, built));
   await writeFile(join(dir, "robots.txt"), "User-agent: *\nDisallow: /\n");
   return { dir, content: built, images: [heroImage, aboutImage, ...gallery].filter(Boolean).length };
 }

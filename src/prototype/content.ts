@@ -29,6 +29,26 @@ export const ICONS = [
   "users",
   "zap",
   "calendar-check",
+  // Handwerk, Fahrrad, Kfz, Gastro (Vorlage "werkstatt" und künftige)
+  "wrench",
+  "hammer",
+  "paint-roller",
+  "paintbrush",
+  "bike",
+  "droplets",
+  "ruler",
+  "drill",
+  "hard-hat",
+  "truck",
+  "bath",
+  "plug-zap",
+  "thermometer",
+  "sofa",
+  "trees",
+  "car",
+  "scissors",
+  "utensils",
+  "badge-check",
 ] as const;
 export type IconName = (typeof ICONS)[number];
 
@@ -60,6 +80,8 @@ export const prototypeOutputSchema = z.object({
   ueber_uns_foto: z.number().int().nullable(),
   /** Weitere gute Fotos in Reihenfolge (Nummern), Unpassendes weggelassen. */
   galerie_fotos: z.array(z.number().int()).max(12),
+  /** Untaugliche Fotos (Banner, Grafiken): nie verwenden, auch nicht als Ersatz. */
+  abgelehnte_fotos: z.array(z.number().int()).max(12),
 });
 export type PrototypeOutput = z.infer<typeof prototypeOutputSchema>;
 
