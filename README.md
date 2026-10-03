@@ -192,3 +192,16 @@ Für Vollständigkeit:
   Fällige Erinnerungen kommen als Telegram-Nachricht mit „Erledigt“ / „+2 Tage“, nie nachts (21–8 Uhr).
 - Freitext geht auch: „Hab Radl Sepp angerufen, will ein Angebot“, „Notiz zu Ariadne: …“, „Erinner mich Freitag an …“.
 - `/pipeline`: alle Leads im Vertrieb je Status und offene Erinnerungen.
+
+## Kontakt-Entwürfe (Phase 2)
+
+Auf der CRM-Karte (**Kontakt**) gibt es **✍️ E-Mail-Entwurf**. Avelio schreibt eine kurze, persönliche Mail:
+Einstieg („Ich heiße Christian und mache Online-Auftritte zeitgemäß …“), genau ein echter Befund aus dem Audit, ein
+Kompliment mit Fakt (Google-Bewertung), Terminvorschlag mit Knappheit (2 Tage × 2 Uhrzeiten um den Hauptjob herum,
+derselbe Termin höchstens an 2 Leads) und WhatsApp-Link mit vorausgefülltem Text. Sie/Du/Ihr je nach Branche und
+Ansprechpartner, Betreff, Einstieg, Überleitung und Gruß wechseln gegen Spamfilter.
+
+Gesendet wird von Christians eigenem Postfach (Stufe 2): Adresse, Betreff und Text in Telegram antippen zum Kopieren
+(oder „In Mail-App öffnen“, wenn Telegram den Link zulässt), danach **📤 Gesendet, kontaktiert** → Nachfass-Erinnerung.
+Avelio verschickt nichts selbst. Regeln, Texte und Zeitfenster: `config/outreach.yaml`; Prompt: `prompts/contact.v1.md`;
+Nummern in der `.env` (`OUTREACH_WHATSAPP`, `OUTREACH_PHONE`). Ein Entwurf kostet etwa 0,3–0,6 Cent.

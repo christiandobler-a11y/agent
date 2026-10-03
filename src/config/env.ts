@@ -30,6 +30,9 @@ const envSchema = z.object({
   GOOGLE_API_KEY: optionalSecret,
   TELEGRAM_BOT_TOKEN: optionalSecret,
   TELEGRAM_ALLOWED_CHAT_IDS: chatIdList,
+  /** Kontakt-Entwürfe: WhatsApp-Business-Nummer (international, z. B. +49 151 …) und Telefon für die Signatur. */
+  OUTREACH_WHATSAPP: optionalSecret,
+  OUTREACH_PHONE: optionalSecret,
   /** Optional: Ping-URL eines Uptime-Dienstes (z. B. Healthchecks.io). Enthält ein Token, nie loggen. */
   HEALTHCHECK_URL: optionalSecret.pipe(z.url().optional()),
 });

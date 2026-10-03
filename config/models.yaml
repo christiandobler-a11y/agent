@@ -19,6 +19,13 @@ roles:
     effort: low # Chat: kurze Antworten, Werkzeuge erledigen die Arbeit
     cache_system: true
 
+  # Phase 2: Kontakt-Entwurf (E-Mail, Befund-Seite). Kurzer Text, Ton wichtig.
+  contact:
+    model: claude-sonnet-5-5
+    max_tokens: 3000 # inkl. Denkphase
+    effort: low
+    cache_system: true
+
 # Budget-Wächter: gilt für LLM-Aufrufe UND bezahlte APIs (Places) zusammen. Tag/Monat nach deutscher Zeit.
 # Ist ein Limit erreicht, startet kein neuer kostenpflichtiger Aufruf mehr (laufende werden fertig).
 budget:

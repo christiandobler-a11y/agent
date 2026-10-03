@@ -12,6 +12,8 @@ import {
   snoozeReminder,
 } from "../db/crm.js";
 import { loadCrmConfig, SALES_LABELS } from "../crm/status.js";
+import type { OutreachConfig } from "../outreach/config.js";
+import { draftEmail, mailtoLink, type OutreachDeps } from "../outreach/draft.js";
 import { raiseBudgetToday } from "../llm/budget.js";
 import { askManager, type ManagerDeps } from "../manager/agent.js";
 import { runTool } from "../manager/tools.js";
@@ -24,6 +26,7 @@ import {
   chunk,
   HELP_TEXT,
   markdownToTelegramHtml,
+  emailDraftMessage,
   leadCrmCard,
   parseCallback,
   parseCrmCallback,
@@ -44,6 +47,8 @@ export interface BotOptions {
   /** Für Tests: Bot-Infos vorgeben (kein getMe-Aufruf). */
   botInfo?: UserFromGetMe;
   fetch?: typeof globalThis.fetch;
+  /** Kontakt-Entwürfe (Phase 2). Ohne Angabe zeigt der Button einen Hinweis. */
+  outreach?: { config: OutreachConfig; contact: OutreachDeps["contact"] };
 }
 
 const log = (level: "info" | "warn" | "error", msg: string, extra: Record<string, unknown> = {}) =>
@@ -226,6 +231,48 @@ export function createBot(options: BotOptions): Bot {
         await ctx.answerCallbackQuery({ text: "Lead nicht gefunden" });
         return;
       }
+      if (crm.kind === "email") {
+        if (!options.outreach) {
+          await ctx.answerCallbackQuery({ text: "Entwürfe sind noch nicht eingerichtet", show_alert: true });
+          return;
+        }
+        await ctx.answerCallbackQuery({ text: "Schreibe Entwurf …" });
+        await ctx.replyWithChatAction("typing").catch(() => undefined);
+        const draft = await draftEmail(
+          {
+            db: pipeline.db,
+            llm: options.manager.llm,
+            outreach: options.outreach.config,
+            branches: pipeline.lead.branches,
+            now: pipeline.now,
+            contact: options.outreach.contact,
+          },
+          company,
+          by(ctx.chat?.id),
+        ).catch((err: unknown) => {
+          log("error", "Entwurf fehlgeschlagen", { error: err instanceof Error ? err.message : String(err) });
+          return null;
+        });
+        if (!draft) {
+          await ctx.reply("Der Entwurf hat gerade nicht geklappt. Versuch es bitte gleich noch einmal.");
+          return;
+        }
+        if ("kind" in draft) {
+          await ctx.reply(`${company.name} ist noch nicht auditiert, dafür fehlt mir der Befund.`);
+          return;
+        }
+        const send = (mailto: string | null) => {
+          const m = emailDraftMessage(company, draft, mailto);
+          return ctx.reply(m.text, {
+            parse_mode: "HTML",
+            link_preview_options: { is_disabled: true },
+            reply_markup: { inline_keyboard: m.keyboard },
+          });
+        };
+        // mailto-Links akzeptiert nicht jede Telegram-Version; dann ohne Link senden.
+        await send(mailtoLink(draft.to, draft.subject, draft.body)).catch(() => send(null));
+        return;
+      }
       if (crm.kind === "status") {
         const { reminder } = await setSalesStatus(pipeline.db, company.id, crm.status, {
           by: by(ctx.chat?.id),
@@ -235,7 +282,7 @@ export function createBot(options: BotOptions): Bot {
         await ctx.answerCallbackQuery({
           text: `${SALES_LABELS[crm.status]}${reminder ? ` · Nachfassen in ${crmConfig().follow_up_days} Tagen` : ""}`,
         });
-      } else {
+      } else if (crm.kind === "remind") {
         await addReminder(pipeline.db, company.id, {
           dueAt: new Date(now.getTime() + crm.days * 86_400_000),
           text: "Melden",

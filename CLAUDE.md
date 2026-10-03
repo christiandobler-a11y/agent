@@ -69,6 +69,10 @@ ausprobieren kann. Nach Schritt 6 ist ein Abstimmungstermin (Kalibrierung) vorge
 - **CRM (Phase 2):** Vertriebsstatus (`src/crm/status.ts`, ab `READY_FOR_CONTACT`) setzt nur Christian (Buttons,
   Manager-Werkzeuge `set_status`/`add_note`/`add_reminder`/`pipeline`); jeder Wechsel, jede Notiz und Erinnerung steht
   in `interactions` (`src/db/crm.ts`). Erinnerungen stellt der Sweep zu, nie in der Ruhezeit (`config/crm.yaml`).
+- **Kontakt-Entwürfe:** Das LLM (Rolle `contact`) schreibt nur Anrede und Mittelteil; Betreff, Termine
+  (`src/outreach/slots.ts`), Kontaktweg, Gruß und Signatur setzt Code nach `config/outreach.yaml` (keine Gedankenstriche,
+  ein Befund, Abwechslung gegen Spamfilter). Avelio sendet nie selbst; Entwürfe stehen als `interactions.type = 'draft'`
+  mit angebotenen Terminen in `meta`.
 - Recherche-Reihenfolge: Places → Dubletten → **Gate (Code) → Prefilter (LLM)**. Das Gate läuft zuerst, weil es
   nichts kostet. Skip-Gründe entsprechen den Schlüsseln in `config/recheck.yaml`.
 

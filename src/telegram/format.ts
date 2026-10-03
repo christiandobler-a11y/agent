@@ -161,6 +161,7 @@ export const HELP_TEXT = [
 
 export type CrmCallback =
   | { kind: "status"; status: SalesStatus; companyId: string }
+  | { kind: "email"; companyId: string }
   | { kind: "remind"; days: number; companyId: string }
   | { kind: "done"; interactionId: string }
   | { kind: "snooze"; interactionId: string };
@@ -171,6 +172,8 @@ export function crmCallback(c: CrmCallback): string {
   switch (c.kind) {
     case "status":
       return `ss:${SALES_CODES[c.status]}:${c.companyId}`;
+    case "email":
+      return `dm:${c.companyId}`;
     case "remind":
       return `sr:${c.days}:${c.companyId}`;
     case "done":
@@ -186,6 +189,8 @@ export function parseCrmCallback(data: string): CrmCallback | null {
     const status = salesStatusFromCode(m[1]!);
     return status ? { kind: "status", status, companyId: m[2]! } : null;
   }
+  m = new RegExp(`^dm:(${UUID})$`).exec(data);
+  if (m) return { kind: "email", companyId: m[1]! };
   m = new RegExp(`^sr:(\\d{1,2}):(${UUID})$`).exec(data);
   if (m) return { kind: "remind", days: Number(m[1]), companyId: m[2]! };
   m = new RegExp(`^r([dz]):(${UUID})$`).exec(data);
@@ -243,6 +248,7 @@ export function leadCrmCard(
       [btn("CONTACTED"), btn("REPLIED")],
       [btn("INTERESTED"), btn("PROTOTYPE")],
       [btn("WON"), btn("LOST")],
+      [{ text: "✍️ E-Mail-Entwurf", callback_data: crmCallback({ kind: "email", companyId: c.id }) }],
       [
         { text: "⏰ in 3 Tagen", callback_data: crmCallback({ kind: "remind", days: 3, companyId: c.id }) },
         { text: "⏰ in 7 Tagen", callback_data: crmCallback({ kind: "remind", days: 7, companyId: c.id }) },
@@ -292,4 +298,37 @@ export function pipelineMessage(
       lines.push(`⏰ ${r.due_at ? shortDate(r.due_at) : "?"} ${r.company_name}: ${r.body ?? ""}`);
   }
   return lines.join("\n");
+}
+
+/** E-Mail-Entwurf: Empfänger und Betreff zum Antippen-Kopieren, Text als Block (Antippen kopiert alles). */
+export function emailDraftMessage(
+  company: Company,
+  d: { to: string | null; subject: string; body: string; warnings: string[]; costUsd: number },
+  mailto: string | null,
+): { text: string; keyboard: InlineKeyboardButton[][] } {
+  const lines = [
+    `✍️ <b>E-Mail-Entwurf für ${escapeHtml(company.name)}</b>`,
+    `An: ${d.to ? `<code>${escapeHtml(d.to)}</code>` : "– keine Adresse gefunden, bitte selbst eintragen"}`,
+    `Betreff: <code>${escapeHtml(d.subject)}</code>`,
+    "",
+    `<pre>${escapeHtml(d.body)}</pre>`,
+  ];
+  if (mailto) lines.push("", `<a href="${escapeHtml(mailto)}">✉️ In Mail-App öffnen</a>`);
+  lines.push(
+    "",
+    "<i>Antippen kopiert Adresse, Betreff bzw. Text. Nach dem Senden auf „kontaktiert“ tippen.</i>",
+  );
+  if (d.warnings.length > 0) lines.push(`⚠️ ${escapeHtml(d.warnings.join(" · "))}`);
+  return {
+    text: lines.join("\n"),
+    keyboard: [
+      [
+        {
+          text: "📤 Gesendet, kontaktiert",
+          callback_data: crmCallback({ kind: "status", status: "CONTACTED", companyId: company.id }),
+        },
+        { text: "🔄 Neu schreiben", callback_data: crmCallback({ kind: "email", companyId: company.id }) },
+      ],
+    ],
+  };
 }

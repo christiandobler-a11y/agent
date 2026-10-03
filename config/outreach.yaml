@@ -6,6 +6,11 @@ positionierung: >-
   selbst. Die Website ist online das erste Bild eines Betriebs. Kein Berufsetikett wie "Webdesigner aus XY".
   Direkt nach dem Befund kommt ein Kompliment mit Fakt, damit "zeitgemäß" nicht nach "veraltet" klingt.
 
+absender_name: Christian Dobler
+absender_zusatz: Avelio, Rosenheim
+# Du für diese Branchen, sonst Sie.
+du_branchen: [fahrrad, gastro, friseur, kosmetik]
+
 # Gewählter Einstieg (Variante 2, 03.10.2026). Die anderen nur zur Abwechslung, damit nicht jede Mail gleich klingt.
 einstieg: Ich heiße Christian und mache Online-Auftritte zeitgemäß. Für die meisten Kunden ist die Website ja das Erste, was sie von einem sehen.
 einstiege_abwechslung:
@@ -59,9 +64,21 @@ spamschutz:
 kontaktweg:
   bevorzugt: whatsapp # alternativ: kalender
   whatsapp_text: Hallo Christian, ich hab deine Nachricht zu unserer Website bekommen.
+  whatsapp_text_sie: Hallo Christian, ich habe Ihre Nachricht zu unserer Website bekommen.
   brief_qr: whatsapp # QR-Code auf der Befund-Seite öffnet WhatsApp mit vorausgefülltem Text
-  email_cta: >-
-    Am einfachsten antworten Sie kurz hier oder per WhatsApp ({whatsapp}).
+  email_cta: Am einfachsten antworten Sie kurz hier oder schreiben mir per WhatsApp ({whatsapp}).
+  email_cta_du: Am einfachsten antwortest du kurz hier oder schreibst mir per WhatsApp ({whatsapp}).
+  email_cta_ohne_whatsapp: Am einfachsten antworten Sie kurz auf diese Mail.
+  email_cta_ohne_whatsapp_du: Am einfachsten antwortest du kurz auf diese Mail.
+  # Überleitung zum Terminvorschlag ("ich hab was vorbereitet"), wird abgewechselt.
+  vorbereitet:
+    - Ich hab Ihnen dazu etwas vorbereitet und würde es gern kurz mit Ihnen durchgehen, 5 bis 10 Minuten reichen.
+    - Dazu hab ich schon was vorbereitet, das ich Ihnen gern kurz zeigen würde. Dauert 5 bis 10 Minuten.
+    - Ich hab mir dazu schon Gedanken gemacht und etwas vorbereitet, das würde ich Ihnen gern in 5 bis 10 Minuten zeigen.
+  vorbereitet_du:
+    - Ich hab dir dazu was vorbereitet und würd das gern kurz mit dir durchgehen, 5 bis 10 Minuten reichen.
+    - Dazu hab ich schon was vorbereitet, das ich dir gern kurz zeigen würde. Dauert 5 bis 10 Minuten.
+    - Ich hab mir dazu schon Gedanken gemacht und was vorbereitet, das würd ich dir gern in 5 bis 10 Minuten zeigen.
 
 # Terminvorschläge statt offenem Kalender (03.10.2026): Knappheit erzeugen, nicht "Mo bis Fr alles frei".
 # Jede Nachricht schlägt 2 konkrete Tage mit je 2 Uhrzeiten vor, z. B. "Dienstag um 12 oder 18 Uhr, sonst Donnerstag
@@ -88,6 +105,9 @@ termine:
   fruehestens_in_tagen: 2 # Vorlauf, damit die Antwort noch rechtzeitig kommt
   spaetestens_in_tagen: 9
   max_leads_je_termin: 2
+  formulierungen_du:
+    - Hättest du {tag1} um {zeit1a} oder {zeit1b} Uhr kurz Zeit? Sonst ginge noch {tag2} um {zeit2a} oder {zeit2b} Uhr.
+    - Passt dir {tag1} um {zeit1a} oder {zeit1b} Uhr? Alternativ hätte ich {tag2} um {zeit2a} oder {zeit2b} Uhr noch was frei.
   formulierungen:
     - Hätten Sie {tag1} um {zeit1a} oder {zeit1b} Uhr kurz Zeit? Sonst ginge noch {tag2} um {zeit2a} oder {zeit2b} Uhr.
     - Passt Ihnen {tag1} um {zeit1a} oder {zeit1b} Uhr? Alternativ hätte ich {tag2} um {zeit2a} oder {zeit2b} Uhr noch was frei.

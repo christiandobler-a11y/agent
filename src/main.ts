@@ -1,5 +1,6 @@
 import { createApp } from "./app.js";
 import { createHeartbeat } from "./health.js";
+import { loadOutreachConfig } from "./outreach/config.js";
 import { loadDotEnv, loadEnv } from "./config/env.js";
 import { combineNotifiers, logNotifier } from "./queue/notifier.js";
 import { startWorkers } from "./queue/workers.js";
@@ -20,6 +21,10 @@ if (env.TELEGRAM_BOT_TOKEN && env.TELEGRAM_ALLOWED_CHAT_IDS.length > 0) {
     token: env.TELEGRAM_BOT_TOKEN,
     allowedChatIds: env.TELEGRAM_ALLOWED_CHAT_IDS,
     manager: { ctx: app.ctx, llm: app.llm },
+    outreach: {
+      config: loadOutreachConfig(),
+      contact: { whatsapp: env.OUTREACH_WHATSAPP ?? null, phone: env.OUTREACH_PHONE ?? null },
+    },
   });
   app.ctx.notifier = combineNotifiers(logNotifier, telegramNotifier(bot.api, env.TELEGRAM_ALLOWED_CHAT_IDS));
 } else if (env.TELEGRAM_BOT_TOKEN) {

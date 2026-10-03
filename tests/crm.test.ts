@@ -15,6 +15,7 @@ import { berlinDateTime, runTool } from "../src/manager/tools.js";
 import { deliverDueReminders, type PipelineContext } from "../src/queue/pipeline.js";
 import type { DueReminder } from "../src/queue/notifier.js";
 import { createBot } from "../src/telegram/bot.js";
+import { loadOutreachConfig } from "../src/outreach/config.js";
 import { callbackData, crmCallback, parseCrmCallback, pipelineMessage } from "../src/telegram/format.js";
 import { describeDb, useTestDb } from "./helpers/db.js";
 
@@ -189,6 +190,88 @@ describeDb("CRM mit Datenbank", () => {
     expect(last("answerCallbackQuery")).toMatchObject({ text: "Erledigt" });
     expect(await openReminders(db(), c.id)).toEqual([]);
     expect(toolStep).not.toHaveBeenCalled();
+  });
+
+  it("Telegram: E-Mail-Entwurf per Button, Text zum Kopieren, danach „Gesendet, kontaktiert“", async () => {
+    const c = await lead("Physio Entwurf");
+    await db().query(
+      `insert into audits (company_id, prompt_version, model, findings, rubric, commercial, summary)
+       values ($1, 'v1', 'm', $2, '{}', '{}', 's')`,
+      [
+        c.id,
+        JSON.stringify([
+          {
+            title: "Nummer nicht antippbar",
+            detail: "d",
+            evidence: "e",
+            severity: "high",
+            category: "mobile",
+          },
+        ]),
+      ],
+    );
+    const pctx = {
+      db: db(),
+      now: () => NOW,
+      crm: { follow_up_days: 5, quiet_hours: QUIET },
+      lead: { branches: {} },
+    } as unknown as PipelineContext;
+    const structured = vi.fn(() =>
+      Promise.resolve({
+        output: {
+          anrede: "Hallo zusammen,",
+          absatz: "Ich heiße Christian. Bei Ihnen ist die Nummer nicht antippbar. Schade.",
+        },
+        agentRunId: "r",
+        costUsd: 0.004,
+        model: "m",
+      }),
+    );
+    const calls: { method: string; payload: Record<string, unknown> }[] = [];
+    const bot = createBot({
+      token: "123:test",
+      allowedChatIds: [ALLOWED],
+      manager: { ctx: pctx, llm: { structured, toolStep: vi.fn() } as unknown as LlmGateway },
+      botInfo: BOT_INFO,
+      outreach: { config: loadOutreachConfig(), contact: { whatsapp: "+49 151 1", phone: null } },
+    });
+    let rejectMailto = true;
+    bot.api.config.use((_prev, method, payload) => {
+      calls.push({ method, payload });
+      // Erste Antwort mit mailto-Link ablehnen wie ein strenger Telegram-Server → Fallback ohne Link.
+      if (
+        method === "sendMessage" &&
+        String((payload as { text?: string }).text).includes("mailto:") &&
+        rejectMailto
+      ) {
+        rejectMailto = false;
+        return Promise.reject(new Error("Bad Request: unsupported URL protocol"));
+      }
+      return Promise.resolve({
+        ok: true,
+        result:
+          method === "sendMessage"
+            ? { message_id: 1, date: 0, chat: { id: ALLOWED, type: "private" } }
+            : true,
+      } as never);
+    });
+    await bot.handleUpdate(callbackUpdate(crmCallback({ kind: "email", companyId: c.id })));
+    const msg = calls.filter((x) => x.method === "sendMessage").at(-1)!.payload;
+    expect(String(msg.text)).toContain("✍️ <b>E-Mail-Entwurf für Physio Entwurf</b>");
+    expect(String(msg.text)).toContain("<pre>Hallo zusammen,\n\nich heiße Christian.");
+    expect(String(msg.text)).not.toContain("mailto:");
+    expect(String(msg.text)).toContain("keine Adresse gefunden");
+    const buttons = (
+      msg.reply_markup as { inline_keyboard: { text: string; callback_data: string }[][] }
+    ).inline_keyboard.flat();
+    expect(buttons.map((b) => b.text)).toEqual(["📤 Gesendet, kontaktiert", "🔄 Neu schreiben"]);
+    expect(structured).toHaveBeenCalledTimes(1);
+
+    await bot.handleUpdate(callbackUpdate(buttons[0]!.callback_data));
+    const { rows } = await db().query<{ status: string }>("select status from companies where id = $1", [
+      c.id,
+    ]);
+    expect(rows[0]!.status).toBe("CONTACTED");
   });
 
   it("Manager-Werkzeuge: Status mit Kanal, Notiz, Erinnerung mit Datum, Pipeline, Verlauf im Lead", async () => {
