@@ -136,6 +136,11 @@ export function siteForm(text: string): "sie" | "du" | null {
   return null;
 }
 
+/** Handwerk und Dienstleister ohne Laden (Vorlage "werkstatt", außer Fahrradhandel). */
+export function isCompanySite(branchKey: string | null, config: PrototypeConfig): boolean {
+  return branchKey !== null && branchKey !== "fahrrad" && config.templates[branchKey] === "werkstatt";
+}
+
 /** Text ohne Gedankenstriche (Christians Regel gilt auch hier). */
 const clean = (t: string) => t.replace(/\s*[–—]\s*/g, ", ").trim();
 
@@ -324,9 +329,12 @@ export async function buildPrototype(
     logo_vorhanden: Boolean(images.logo),
     google: places?.rating ? { sterne: places.rating, bewertungen: places.review_count } : null,
     audit_befunde: ((audit?.findings as Finding[] | undefined) ?? []).slice(0, 6).map((f) => f.title),
-    vorbilder: [...(inspiration[company.branch_key ?? ""] ?? []), ...(inspiration.alle ?? [])].flatMap(
-      (v) => v.merkmale,
-    ),
+    vorbilder: [
+      ...(inspiration[company.branch_key ?? ""] ?? []),
+      // Betriebe ohne Laden (Handwerk, Dienstleister): Vorbild Unternehmensseite.
+      ...(isCompanySite(company.branch_key, deps.config) ? (inspiration.unternehmen ?? []) : []),
+      ...(inspiration.alle ?? []),
+    ].flatMap((v) => v.merkmale),
   };
   const result = await deps.llm.structured({
     role: "prototype",

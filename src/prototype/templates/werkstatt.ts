@@ -12,6 +12,16 @@ const esc = (s: string) =>
 
 const telHref = (phone: string) => `tel:${phone.replace(/[^\d+]/g, "").replace(/^00/, "+")}`;
 
+/** Letztes Wort hervorheben (Vorbild fs-pbg: „DEIN NEUES BIKE BEGINNT *HIER.*“). */
+export function accentLast(text: string): string {
+  const m = /^(.*\s)(\S+)$/.exec(text.trim());
+  return m ? `${esc(m[1]!)}<em>${esc(m[2]!)}</em>` : esc(text);
+}
+
+/** Nummerierte Rubrik mit kurzer Linie (Vorbild HIWO-med: „02 — Warum …“). */
+const eyebrow = (n: number, label: string) =>
+  `<div class="eyebrow"><span class="n">${String(n).padStart(2, "0")}</span><span class="ln"></span>${label}</div>`;
+
 export function renderWerkstatt(c: SiteContent): string {
   const p = paletteFrom(c.primary);
   const sie = c.form === "sie";
@@ -38,7 +48,7 @@ export function renderWerkstatt(c: SiteContent): string {
   const gallery =
     c.gallery.length >= 2
       ? `<section class="work" id="arbeit"><div class="wrap">
-  <div class="head"><div class="eyebrow">Unsere Arbeit</div><h2>Ein Blick in unsere Arbeit</h2></div>
+  <div class="head">${eyebrow(2, "Unsere Arbeit")}<h2>Ein Blick in unsere Arbeit</h2></div>
   <div class="grid g${Math.min(c.gallery.length, 5)}">${c.gallery
     .slice(0, 5)
     .map((g, i) => `<img src="${esc(g)}" alt="Arbeit ${i + 1}">`)
@@ -59,6 +69,29 @@ export function renderWerkstatt(c: SiteContent): string {
   <div class="score"><div class="big">${c.reviews.rating.toFixed(1).replace(".", ",")}</div><div><div class="stars">★★★★★</div><div class="muted">${c.reviews.count} Bewertungen bei Google</div></div></div>
   ${quotes ? `<div class="quotes">${quotes}</div>` : ""}
 </div></section>`
+      : "";
+
+  // Faktenleiste unter dem Hero (Vorbild HIWO-med): nur was belegt ist.
+  const factCells = [
+    c.reviews.rating && c.reviews.count
+      ? [
+          "Bewertung",
+          `${c.reviews.rating.toFixed(1).replace(".", ",")} ★ · ${c.reviews.count} Google-Bewertungen`,
+        ]
+      : null,
+    c.contact.hours[0] ? ["Geöffnet", c.contact.hours.slice(0, 2).join(" · ")] : null,
+    c.contact.address ? ["Standort", c.contact.address] : null,
+    phone ? ["Telefon", phone] : null,
+  ].filter((x): x is string[] => x !== null);
+  const facts =
+    factCells.length > 0
+      ? `<section class="facts"><div class="wrap">${factCells
+          .map(([k, v]) => `<div><div class="k">${esc(k!)}</div><div class="v">${esc(v!)}</div></div>`)
+          .join("")}</div></section>`
+      : "";
+  const trustList =
+    c.trust.length > 0
+      ? `<ul class="trust">${c.trust.map((t) => `<li>${icon("check")}${esc(t)}</li>`).join("")}</ul>`
       : "";
 
   const brand = c.logo
@@ -114,10 +147,17 @@ nav.menu a:hover { opacity: 1; }
 .nophoto .stamp { position: absolute; right: 9%; bottom: 12%; background: #fff; color: var(--ink); border-radius: 50%; width: 170px; height: 170px;
   display: grid; place-content: center; text-align: center; transform: rotate(-8deg); box-shadow: 0 20px 40px rgba(0,0,0,.35); }
 .stamp b { font-size: 46px; line-height: 1; color: var(--primary); } .stamp span { color: #f2b01e; letter-spacing: 2px; } .stamp small { font-size: 12px; font-weight: 700; padding: 0 18px; line-height: 1.2; }
-.band { background: var(--primary); color: #fff; clip-path: polygon(0 0, 100% 0, 100% 78%, 0 100%); padding: 22px 0 38px; }
-.band ul { list-style: none; margin: 0; padding: 0; display: flex; flex-wrap: wrap; justify-content: center; gap: 12px 40px; font-weight: 800; }
-.band li { display: flex; align-items: center; gap: 10px; } .band svg { width: 22px; height: 22px; stroke-width: 2.6; }
 section { position: relative; }
+.eyebrow .n { margin-right: 10px; } .eyebrow .ln { display: inline-block; width: 34px; height: 2px; background: currentColor; vertical-align: middle; margin-right: 12px; opacity: .7; }
+.hero .benefit em { font-style: italic; color: #fff; }
+.facts { background: #fff; border-bottom: 1px solid rgba(0,0,0,.08); }
+.facts .wrap { display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); }
+.facts .wrap > div { padding: 22px 24px 22px 0; border-right: 1px solid rgba(0,0,0,.08); margin-right: 24px; }
+.facts .wrap > div:last-child { border-right: 0; }
+.facts .k { text-transform: uppercase; letter-spacing: .16em; font-size: 12px; font-weight: 800; color: var(--primary); }
+.facts .v { font-size: 15px; font-weight: 600; margin-top: 4px; }
+ul.trust { list-style: none; margin: -12px 0 28px; padding: 0; display: flex; flex-wrap: wrap; gap: 10px 26px; font-weight: 700; }
+ul.trust li { display: flex; align-items: center; gap: 8px; } ul.trust svg { width: 20px; height: 20px; color: var(--primary); stroke-width: 2.6; }
 .eyebrow { text-transform: uppercase; letter-spacing: .2em; font-size: 13px; font-weight: 800; color: var(--primary); }
 h2 { font-size: clamp(30px, 3.4vw, 46px); line-height: 1.08; letter-spacing: -.025em; margin: 10px 0 30px; font-weight: 800; }
 .services { padding: 70px 0 80px; }
@@ -173,6 +213,7 @@ footer .wrap { display: flex; justify-content: space-between; gap: 20px; flex-wr
   .nophoto .stamp { width: 120px; height: 120px; } .stamp b { font-size: 32px; } .nophoto .mark svg { width: 200px; height: 200px; }
   .hero .text { padding: 40px 20px 60px; }
   .svcs { grid-template-columns: 1fr; }
+  .facts .wrap > div { border-right: 0; border-bottom: 1px solid rgba(0,0,0,.08); padding: 14px 0; margin: 0; }
   .svc { grid-template-columns: 48px 1fr; padding: 18px; } .svc .ic { width: 48px; height: 48px; } .svc .ic svg { width: 26px; height: 26px; }
   .work .grid, .work .g4 { grid-template-columns: 1fr 1fr; grid-auto-rows: 160px; }
   .about .wrap, .contact .wrap { grid-template-columns: 1fr; gap: 36px; }
@@ -194,7 +235,7 @@ footer .wrap { display: flex; justify-content: space-between; gap: 20px; flex-wr
   <div class="text">
     <div class="claim">${icon(c.services[0]?.icon ?? "wrench")}${esc(c.claim)}</div>
     <h1>${esc(c.name)}</h1>
-    <p class="benefit">${esc(c.hero.headline)}</p>
+    <p class="benefit">${accentLast(c.hero.headline)}</p>
     <p class="lead">${esc(c.hero.text)}</p>
     <div class="actions"><a class="btn" href="${ctaHref}">${icon("phone")}${esc(c.cta)}</a>${rating}</div>
   </div>
@@ -209,10 +250,11 @@ footer .wrap { display: flex; justify-content: space-between; gap: 20px; flex-wr
   }
 </section>
 
-<section class="band"><div class="wrap"><ul>${c.trust.map((t) => `<li>${icon("check")}${esc(t)}</li>`).join("")}</ul></div></section>
+${facts}
 
 <section class="services" id="leistungen"><div class="wrap">
-  <div class="eyebrow">Leistungen</div><h2>${sie ? "Was wir für Sie machen" : "Was wir für dich machen"}</h2>
+  ${eyebrow(1, "Leistungen")}<h2>${sie ? "Was wir für Sie machen" : "Was wir für dich machen"}</h2>
+  ${trustList}
   <div class="svcs">${services}</div>
 </div></section>
 
@@ -220,11 +262,11 @@ ${gallery}
 
 <section class="about" id="ueber-uns"><div class="wrap">
   <div class="photo">${c.about.image ? `<img src="${esc(c.about.image)}" alt="${esc(c.name)}">` : `<div class="ph">${esc(c.name.slice(0, 1))}</div>`}</div>
-  <div><div class="eyebrow">Über uns</div><h2>${esc(c.about.title)}</h2><p>${esc(c.about.text)}</p></div>
+  <div>${eyebrow(c.gallery.length >= 2 ? 3 : 2, "Über uns")}<h2>${esc(c.about.title)}</h2><p>${esc(c.about.text)}</p></div>
 </div></section>
 
 <section class="steps" id="ablauf"><div class="wrap">
-  <div class="eyebrow">So läuft's</div><h2>${sie ? "In drei Schritten zu Ihrem Auftrag" : "In drei Schritten zu deinem Auftrag"}</h2>
+  ${eyebrow(c.gallery.length >= 2 ? 4 : 3, "So läuft's")}<h2>${sie ? "In drei Schritten zu Ihrem Auftrag" : "In drei Schritten zu deinem Auftrag"}</h2>
   <ol>${steps}</ol>
 </div></section>
 
@@ -232,7 +274,7 @@ ${reviews}
 
 <section class="contact" id="kontakt"><div class="wrap">
   <div>
-    <div class="eyebrow">Kontakt</div><h2>${sie ? "Wir freuen uns auf Ihre Anfrage." : "Wir freuen uns auf deine Anfrage."}</h2>
+    ${eyebrow(c.gallery.length >= 2 ? 5 : 4, "Kontakt")}<h2>${sie ? "Wir freuen uns auf Ihre Anfrage." : "Wir freuen uns auf deine Anfrage."}</h2>
     <dl>
       ${c.contact.address ? `<div><dt>${icon("map-pin")}Adresse</dt><dd>${c.contact.mapsUrl ? `<a href="${esc(c.contact.mapsUrl)}" target="_blank" rel="noopener">${esc(c.contact.address)}</a>` : esc(c.contact.address)}</dd></div>` : ""}
       ${phone ? `<div><dt>${icon("phone")}Telefon</dt><dd><a href="${telHref(phone)}">${esc(phone)}</a></dd></div>` : ""}

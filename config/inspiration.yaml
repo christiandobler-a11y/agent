@@ -1,6 +1,7 @@
 # Inspiration: Websites, die Christian als Vorbild für eine Branche gefallen. Schlüssel "alle" = Gestaltungs-Elemente,
 # die branchenübergreifend passen. Grundlage für das Creative-Briefing
-# und den Prototype-Agenten (Phase 3, ARCHITECTURE.md 14). Sonstige Schlüssel = Branche aus config/branches.yaml.
+# und den Prototype-Agenten (Phase 3, ARCHITECTURE.md 14). Sonstige Schlüssel = Branche aus config/branches.yaml;
+# "unternehmen" gilt für Betriebe ohne Laden (Handwerk, Dienstleister), siehe src/prototype/run.ts.
 # Neue Einträge: url, warum (Christians Worte), merkmale (was wir uns abschauen), gespeichert (Datum).
 
 gastro:
@@ -23,6 +24,32 @@ gastro:
       - klare Kategorien (Vorspeisen, Suppen, Pho, Bun, Reis, Desserts) mit Preisen je Gericht
       - Anruf- und Reservieren-Button direkt erreichbar
       - nur das Speisekarten-Konzept übernehmen, nicht die Gestaltung insgesamt
+    gespeichert: 2026-10-03
+
+fahrrad:
+  - url: https://fs-pbg.netlify.app/
+    name: Fahrrad-Shop Peißenberg (Christians eigener Prototyp)
+    warum: Unser Prototyp, gerne als Vorbild für Fahrradseiten.
+    merkmale:
+      - zweigeteilter Hero, links dunkle Fläche mit großer, fetter Versal-Überschrift, rechts echtes Foto aus dem Laden
+      - ein Akzentwort in Markenfarbe und kursiv („DEIN NEUES BIKE BEGINNT HIER.“), kurzer Untertitel mit Leistungen
+      - Kategorie-Kacheln mit Foto und Überschrift auf dem Bild (E-Bike, Mountainbike, Gravel, Rennrad)
+      - nummerierte Abschnitte („01 Bike Worlds“, „02 Dienstrad-Leasing“), Wechsel aus dunklen und cremefarbenen Flächen
+      - Leasing als eigener Abschnitt mit drei Schritten (aussuchen, Leasing nutzen, losfahren) und laufendem Partner-Band
+      - Markenleiste unter dem Hero (Giant, Liv, Kalkhoff …), Adresse und Telefon immer sichtbar
+    gespeichert: 2026-10-03
+
+unternehmen:
+  - url: https://hiwomed.de/
+    name: HIWO-med (medizinischer Fachhandel, Uffing)
+    warum: Gerne als Vorbild, wenn es Unternehmensseiten sind.
+    merkmale:
+      - Hero mit echtem Foto (Inhaber am eigenen Lieferwagen), Claim in zwei Tonstufen, persönlicher Satz in Anführungszeichen
+      - Faktenleiste direkt unter dem Hero (Gegründet, Erreichbar, Lager) mit feinen Trennlinien
+      - nummerierte Abschnitte mit kurzer Linie vor der Rubrik („02 — Warum HIWO-med“)
+      - Gründe als nummerierte Liste mit Titel, zwei Sätzen und „Mehr zu …“-Link
+      - dunkler Abschnitt „Eigenes Lager. Eigene Fahrzeuge. Eigene Leute.“ mit Tabelle der Liefergebiete
+      - viel Weißraum, ruhige Typografie, Akzentfarbe nur für Linien und Links
     gespeichert: 2026-10-03
 
 physiotherapie:
