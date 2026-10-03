@@ -2,13 +2,7 @@ import { z } from "zod";
 import type { Db } from "../db/client.js";
 import type { Company } from "../db/companies.js";
 import { insertDraft, takenSlots } from "../db/drafts.js";
-import {
-  contactsOf,
-  latestAudit,
-  latestOkSnapshotId,
-  latestPlacesSnapshot,
-  type LatestPlaces,
-} from "../db/leads.js";
+import { latestAudit, latestOkSnapshotId, latestPlacesSnapshot, type LatestPlaces } from "../db/leads.js";
 import { loadPrompt } from "../llm/config.js";
 import type { LlmGateway } from "../llm/gateway.js";
 import type { Finding } from "../pipeline/audit/schema.js";
@@ -18,16 +12,16 @@ import { proposeSlots, seedOf } from "./slots.js";
 import { duToIhr, lowerFirst, subjectFor, type Form } from "./form.js";
 
 /**
- * Kontakt-Entwurf per E-Mail (Phase 2, Stufe 2): Das LLM schreibt nur Anrede und Mittelteil (Einstieg, ein Befund,
- * Kompliment). Betreff, Terminvorschläge, Kontaktweg, Gruß und Signatur setzt der Code, damit sie stimmen und
- * gegen Spamfilter abwechseln. Avelio verschickt nichts; Christian sendet selbst.
+ * Kontakt-Entwurf per E-Mail (Phase 2, Stufe 2): Das LLM schreibt nur den Mittelteil (Einstieg, ein starker oder
+ * zwei bis drei auffallende Befunde, Kompliment). Grußzeile (aus dem Impressum), Betreff, Terminvorschläge,
+ * Kontaktweg, Gruß und Signatur setzt der Code, damit sie stimmen und gegen Spamfilter abwechseln. Avelio verschickt
+ * nichts; Christian sendet selbst.
  */
 
-export const CONTACT_PROMPT_VERSION = "v1";
+export const CONTACT_PROMPT_VERSION = "v2";
 
 export const contactOutputSchema = z.object({
-  anrede: z.string().min(3).max(80),
-  absatz: z.string().min(40).max(900),
+  absatz: z.string().min(40).max(1000),
 });
 
 export interface OutreachDeps {
@@ -51,15 +45,52 @@ export interface EmailDraft {
 }
 
 const SEVERITY = { high: 0, medium: 1, low: 2 } as const;
-const CATEGORY = { mobile: 0, conversion: 1, trust: 2, design: 3, content: 4, technical: 5 } as const;
+// Christian überzeugt vor allem über den Gesamteindruck (Desktop); Handy-Mängel zählen, stehen aber nicht vorne.
+const CATEGORY = { design: 0, conversion: 1, content: 2, trust: 3, mobile: 4, technical: 5 } as const;
 
-/** Der eine Befund für die Mail: schwerster zuerst, bei Gleichstand das, was ein Kunde am Handy am ehesten merkt. */
-export function pickFinding(findings: readonly Finding[]): Finding | null {
-  return (
-    [...findings].sort(
-      (a, b) => SEVERITY[a.severity] - SEVERITY[b.severity] || CATEGORY[a.category] - CATEGORY[b.category],
-    )[0] ?? null
+/**
+ * Befunde für die Mail: ein wirklich starker (schwer) oder sonst die zwei bis drei auffälligsten. Sortiert nach
+ * Schwere, bei Gleichstand nach dem, was den ersten Eindruck am meisten prägt.
+ */
+export function pickFindings(findings: readonly Finding[]): Finding[] {
+  const sorted = [...findings].sort(
+    (a, b) => SEVERITY[a.severity] - SEVERITY[b.severity] || CATEGORY[a.category] - CATEGORY[b.category],
   );
+  return sorted[0]?.severity === "high" ? sorted.slice(0, 1) : sorted.slice(0, 3);
+}
+
+/** Wie der Betrieb im Alltag heißt: "Hotel Ariadne GmbH | Rosenheim" → "Hotel Ariadne". */
+export function shortCompanyName(name: string): string {
+  const parts = name
+    .replace(/["„“”]/g, "")
+    .split(/\s+[|–—-]\s+|\s*\|\s*|,|:/)
+    .map((p) => p.trim())
+    .filter(Boolean);
+  // Nur ein Gattungswort vorne ("Gasthof - Hotel Alt-Fürstätt") → den nächsten Teil dazunehmen.
+  let n = parts[0] ?? name.trim();
+  if (!/\s/.test(n) && parts[1]) n = `${n} ${parts[1]}`;
+  n = n
+    .replace(
+      /\s+(?:GmbH(?:\s*&\s*Co\.?\s*KG)?|UG(?:\s*\(haftungsbeschränkt\))?|KG|OHG|AG|e\.\s?K\.|GbR)\.?$/i,
+      "",
+    )
+    .trim();
+  const words = n.split(/\s+/);
+  return words.length > 4 ? words.slice(0, 4).join(" ") : n;
+}
+
+/** Grußzeile aus den Impressum-Daten; das Geschlecht wird nie geraten. */
+export function salutationLine(
+  form: Form,
+  contact: { name: string | null; salutation: "Herr" | "Frau" | null },
+  companyName: string,
+): string {
+  const name = contact.name?.trim();
+  if (!name) return `Hallo Team ${shortCompanyName(companyName)},`;
+  const parts = name.split(/\s+/);
+  if (form === "du") return `Hallo ${parts[0]},`;
+  if (contact.salutation) return `Hallo ${contact.salutation} ${parts.at(-1)},`;
+  return `Hallo ${name},`;
 }
 
 /** Kompliment mit Fakt, nur wenn die Bewertung wirklich gut ist. */
@@ -97,14 +128,29 @@ export function mailtoLink(to: string | null, subject: string, body: string): st
 
 const pick = <T>(list: readonly T[], seed: number, shift: number): T => list[(seed >>> shift) % list.length]!;
 
-async function recipient(db: Db, companyId: string): Promise<{ email: string | null; name: string | null }> {
-  const contacts = await contactsOf(db, companyId);
+interface Recipient {
+  email: string | null;
+  name: string | null;
+  salutation: "Herr" | "Frau" | null;
+}
+
+async function recipient(db: Db, companyId: string): Promise<Recipient> {
+  const { rows: contacts } = await db.query<{
+    name: string | null;
+    salutation: "Herr" | "Frau" | null;
+    email: string | null;
+    source: string;
+  }>("select name, salutation, email, source from contacts where company_id = $1 order by created_at", [
+    companyId,
+  ]);
   const email =
     contacts.find((c) => c.email && c.source === "impressum")?.email ??
     contacts.find((c) => c.email)?.email ??
     null;
-  const name = contacts.find((c) => c.name && c.source === "impressum")?.name ?? null;
-  if (email) return { email, name };
+  const person = contacts.find((c) => c.name && c.source === "impressum");
+  const name = person?.name ?? null;
+  const salutation = person?.salutation ?? null;
+  if (email) return { email, name, salutation };
   // Notfalls die erste mailto-Adresse der Website.
   const snapshotId = await latestOkSnapshotId(db, companyId);
   if (snapshotId) {
@@ -113,9 +159,9 @@ async function recipient(db: Db, companyId: string): Promise<{ email: string | n
       [snapshotId],
     );
     const mail = rows[0]?.facts?.mailto_links?.[0]?.replace(/^mailto:/i, "").split("?")[0] ?? null;
-    return { email: mail || null, name };
+    return { email: mail || null, name, salutation };
   }
-  return { email: null, name };
+  return { email: null, name, salutation };
 }
 
 export async function draftEmail(
@@ -126,11 +172,11 @@ export async function draftEmail(
   const { db, outreach: o } = deps;
   const now = deps.now();
   const audit = await latestAudit(db, company.id);
-  const finding = pickFinding((audit?.findings as Finding[] | undefined) ?? []);
+  const findings = pickFindings((audit?.findings as Finding[] | undefined) ?? []);
   if (!audit && company.segment !== "NO_WEBSITE") return { kind: "no_audit" };
 
   const places = await latestPlacesSnapshot(db, company.id);
-  const { email, name } = await recipient(db, company.id);
+  const { email, name, salutation } = await recipient(db, company.id);
   const duBranch = company.branch_key !== null && o.du_branchen.includes(company.branch_key);
   const form: Form = !duBranch ? "sie" : name ? "du" : "ihr";
   const du = form !== "sie";
@@ -147,18 +193,21 @@ export async function draftEmail(
   const branch = company.branch_key ? deps.branches[company.branch_key] : undefined;
   const input = {
     betrieb: { name: company.name, ort: company.city, branche: branch?.label ?? company.category },
-    ansprechpartner: name,
     anrede: form,
     einstiegssatz: intro,
-    befund: finding
-      ? { titel: finding.title, detail: finding.detail, beleg: finding.evidence }
-      : company.segment === "NO_WEBSITE"
-        ? {
-            titel: "Keine eigene Website",
-            detail: "Wer den Betrieb googelt, findet nur den Maps-Eintrag.",
-            beleg: "",
-          }
-        : null,
+    befunde:
+      findings.length > 0
+        ? findings.map((f) => ({ titel: f.title, detail: f.detail, beleg: f.evidence, schwere: f.severity }))
+        : company.segment === "NO_WEBSITE"
+          ? [
+              {
+                titel: "Keine eigene Website",
+                detail: "Wer den Betrieb googelt, findet nur den Maps-Eintrag.",
+                beleg: "",
+                schwere: "high",
+              },
+            ]
+          : [],
     kompliment_fakt: complimentFact(places),
   };
 
@@ -204,7 +253,7 @@ export async function draftEmail(
   const signature = [o.absender_name, o.absender_zusatz, deps.contact.phone].filter(Boolean).join("\n");
 
   const body = [
-    sanitizeDraftText(result.output.anrede).text,
+    salutationLine(form, { name, salutation }, company.name),
     lowerFirst(clean.text),
     [prepared, slotSentence].filter(Boolean).join(" "),
     cta,

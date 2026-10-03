@@ -69,7 +69,9 @@ function withoutCompanyName(data: ImpressumData, companyName: string): Impressum
   if (!data.person) return data;
   const person = normalizeName(data.person);
   const company = normalizeName(companyName);
-  return person === company || company.includes(person) ? { ...data, person: null, role: null } : data;
+  return person === company || company.includes(person)
+    ? { ...data, person: null, role: null, salutation: null }
+    : data;
 }
 
 export function buildFacts(
@@ -225,7 +227,13 @@ export async function crawlCompany(deps: CrawlDeps, company: Company): Promise<C
   if (facts.impressum) {
     const imp = facts.impressum;
     await replaceImpressumContacts(db, company.id, [
-      { name: imp.person, role: imp.role, email: imp.emails[0] ?? null, phone: imp.phones[0] ?? null },
+      {
+        name: imp.person,
+        salutation: imp.salutation ?? null,
+        role: imp.role,
+        email: imp.emails[0] ?? null,
+        phone: imp.phones[0] ?? null,
+      },
     ]);
   }
   return { kind: "ok", snapshot, facts, psi, psiError };

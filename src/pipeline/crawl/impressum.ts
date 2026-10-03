@@ -5,6 +5,8 @@
 
 export interface ImpressumData {
   person: string | null;
+  /** "Herr"/"Frau", nur wenn es so im Impressum steht (nie aus dem Vornamen geraten). */
+  salutation: "Herr" | "Frau" | null;
   /** Wie die Person im Impressum geführt wird, z. B. "Inhaber", "Geschäftsführer". */
   role: string | null;
   emails: string[];
@@ -25,10 +27,21 @@ const ROLES: [RegExp, string][] = [
 
 /** Wörter aus Firmennamen, die in Personennamen praktisch nie vorkommen. */
 const BUSINESS_WORDS =
-  /\b(?:rad(?:haus|sport|laden|l)?|fahrr[aä]d\w*|bikes?\w*|e-?bikes?|zweir[aä]d\w*|shop|store|sport\w*|service|werkstatt|center|zentrum|team|markt|handel|studio|salon|praxis|technik|betrieb|gruppe|verwaltung|holding)\b/i;
+  /\b(?:rad(?:haus|sport|laden|l)?|fahrr[aä]d\w*|bikes?\w*|e-?bikes?|zweir[aä]d\w*|shop|store|sport\w*|service|werkstatt|center|zentrum|team|markt|handel|studio|salon|praxis|technik|betrieb|gruppe|verwaltung|holding|hotel\w*|gasthof|gasthaus|wirtshaus|restaurant|caf[eé]|pension|bistro|pizzeria|physio\w*|therapie\w*|kosmetik\w*|beauty|wellness|massage\w*|\w{4,}ei)\b/i;
 
 const NOT_A_NAME =
-  /gmbh|\bag\b|\bkg\b|\bug\b|e\.\s?k\.|e\.\s?v\.|straße|str\.|\d|@|http|www\.|telefon|tel\.|fax|e-mail|inhalt|gemäß|§|rstv|mstv|ddg|tmg|siehe|oben|impressum/i;
+  /gesellschafter|geschäftsf|inhaber|vertret|verantwortl|betreiber|eigentümer|gmbh|\bag\b|\bkg\b|\bug\b|e\.\s?k\.|e\.\s?v\.|straße|str\.|\d|@|http|www\.|telefon|tel\.|fax|e-mail|inhalt|gemäß|§|rstv|mstv|ddg|tmg|siehe|oben|impressum/i;
+
+/** Berufsbezeichnungen vor dem Namen ("Malermeister Kai Ernst", "Physiotherapeutin Anna Berg"). */
+const TRADE_PREFIX =
+  /^(?:(?:staatl\.?\s*)?(?:gepr\.?|geprüfte?r?)\s+)?(?:maler|schreiner|tischler|elektro(?:techniker)?|installateur|zimmerer|zweiradmechaniker|kfz-?\w*|friseur|konditor|bäcker|metzger|physiotherapeut|heilpraktiker|masseur|kosmetiker|hotelier|gastronom|koch|küchenchef|bodenleger|fliesenleger|dachdecker)(?:meister)?(?:in)?\s+/i;
+
+/** "Herr"/"Frau" aus einer Zeile wie "Inhaberin: Frau Anna Berg". */
+export function salutationOf(raw: string): "Herr" | "Frau" | null {
+  if (/(?:^|\s)(?:Frau|Fr\.)\s+\S/.test(raw)) return "Frau";
+  if (/(?:^|\s)(?:Herrn?|Hr\.)\s+\S/.test(raw)) return "Herr";
+  return null;
+}
 
 /** "Thomas Müller", "Dipl.-Ing. Anna-Lena von Berg", "Max Mustermann (Inhaber)" → Name ohne Zusätze. */
 export function cleanPersonName(raw: string): string | null {
@@ -40,6 +53,7 @@ export function cleanPersonName(raw: string): string | null {
     .replace(/\s+/g, " ")
     .trim();
   s = s.replace(/^[-–\s]+|[-–\s.]+$/g, "");
+  for (let i = 0; i < 2 && TRADE_PREFIX.test(s); i++) s = s.replace(TRADE_PREFIX, "");
   if (!s || NOT_A_NAME.test(s) || BUSINESS_WORDS.test(s)) return null;
   const words = s.split(" ");
   if (words.length < 2 || words.length > 5) return null;
@@ -47,7 +61,9 @@ export function cleanPersonName(raw: string): string | null {
   return capitalized >= 2 ? s : null;
 }
 
-function findPerson(lines: string[]): { person: string; role: string } | null {
+function findPerson(
+  lines: string[],
+): { person: string; role: string; salutation: "Herr" | "Frau" | null } | null {
   for (let i = 0; i < lines.length; i++) {
     const line = lines[i]!;
     const role = ROLES.find(([re]) => re.test(line));
@@ -59,7 +75,15 @@ function findPerson(lines: string[]): { person: string; role: string } | null {
       // Mehrere Namen ("Max Muster, Erika Muster" oder "und") → der erste zählt.
       const first = c.split(/,| und | & /)[0] ?? "";
       const person = cleanPersonName(first);
-      if (person) return { person, role: role[1] };
+      if (person) return { person, role: role[1], salutation: salutationOf(first) };
+    }
+  }
+  // Ohne Rollen-Angabe: Einzelunternehmer stehen meist direkt unter "Angaben gemäß § 5 …".
+  for (let i = 0; i < lines.length; i++) {
+    if (!/angaben gem(ä|ae)ß|^impressum$/i.test(lines[i]!)) continue;
+    for (const c of lines.slice(i + 1, i + 4)) {
+      const person = cleanPersonName(c);
+      if (person) return { person, role: "Inhaber", salutation: salutationOf(c) };
     }
   }
   return null;
@@ -111,6 +135,7 @@ export function parseImpressum(text: string): ImpressumData {
 
   return {
     person: person?.person ?? null,
+    salutation: person?.salutation ?? null,
     role: person?.role ?? null,
     emails,
     phones: [...new Set(phones)].slice(0, 3),

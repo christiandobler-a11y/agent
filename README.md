@@ -205,3 +205,7 @@ Gesendet wird von Christians eigenem Postfach (Stufe 2): Adresse, Betreff und Te
 (oder „In Mail-App öffnen“, wenn Telegram den Link zulässt), danach **📤 Gesendet, kontaktiert** → Nachfass-Erinnerung.
 Avelio verschickt nichts selbst. Regeln, Texte und Zeitfenster: `config/outreach.yaml`; Prompt: `prompts/contact.v1.md`;
 Nummern in der `.env` (`OUTREACH_WHATSAPP`, `OUTREACH_PHONE`). Ein Entwurf kostet etwa 0,3–0,6 Cent.
+
+Die Grußzeile setzt der Code aus dem Impressum: „Hallo Frau Späth,“ (nur wenn „Frau/Herr“ dort steht), sonst „Hallo
+Monika Späth,“, bei Du-Branchen „Hallo Monika,“, ohne Namen „Hallo Team Hotel Ariadne,“. Impressum-Daten bestehender
+Leads auffrischen (ohne KI-Kosten): `npm run cli -- crawl --leads`.

@@ -2,6 +2,7 @@ import { withTransaction, type Db } from "./client.js";
 
 export interface ContactInput {
   name: string | null;
+  salutation?: "Herr" | "Frau" | null;
   role: string | null;
   email: string | null;
   phone: string | null;
@@ -21,8 +22,9 @@ export async function replaceImpressumContacts(
     for (const c of contacts) {
       if (!c.name && !c.email && !c.phone) continue;
       await tx.query(
-        `insert into contacts (company_id, name, role, email, phone, source) values ($1, $2, $3, $4, $5, 'impressum')`,
-        [companyId, c.name, c.role, c.email, c.phone],
+        `insert into contacts (company_id, name, salutation, role, email, phone, source)
+         values ($1, $2, $3, $4, $5, $6, 'impressum')`,
+        [companyId, c.name, c.salutation ?? null, c.role, c.email, c.phone],
       );
     }
   });

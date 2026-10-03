@@ -259,8 +259,10 @@ export async function setFailed(
   detail: string,
   recheckAfter: Date | null,
 ): Promise<void> {
+  // Qualifizierte Leads und Leads im Vertrieb bleiben, was sie sind (z. B. Website beim Neu-Crawlen kurz weg).
   await db.query(
-    `update companies set status = 'FAILED', skip_detail = $2, recheck_after = $3, updated_at = now() where id = $1`,
+    `update companies set status = 'FAILED', skip_detail = $2, recheck_after = $3, updated_at = now()
+      where id = $1 and status in ('NEW', 'RESEARCHED', 'AUDITED', 'SKIPPED', 'FAILED')`,
     [companyId, detail, recheckAfter],
   );
 }

@@ -32,11 +32,13 @@ export function parseResearchArgs(args: string[]): {
 }
 
 const CRAWL_USAGE =
-  "Verwendung: avelio crawl <Firmen-ID|Place-ID|Domain> | avelio crawl --pending [-n <Anzahl>]";
+  "Verwendung: avelio crawl <Firmen-ID|Place-ID|Domain> | avelio crawl --pending [-n <Anzahl>] | avelio crawl --leads";
 
 export type CrawlArgs = { mode: "one"; ref: string } | { mode: "pending"; limit: number };
 
-export function parseCrawlArgs(args: string[]): CrawlArgs {
+/** `--leads`: alle qualifizierten Leads und Leads im Vertrieb neu crawlen (frische Impressum-Daten, Screenshots). */
+export function parseCrawlArgs(args: string[]): CrawlArgs | { mode: "leads" } {
+  if (args.length === 1 && args[0] === "--leads") return { mode: "leads" };
   return parseTargetArgs(args, CRAWL_USAGE);
 }
 

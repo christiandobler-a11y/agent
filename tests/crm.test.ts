@@ -288,7 +288,7 @@ describeDb("CRM mit Datenbank", () => {
     await bot.handleUpdate(callbackUpdate(crmCallback({ kind: "email", companyId: c.id })));
     const msg = calls.filter((x) => x.method === "sendMessage").at(-1)!.payload;
     expect(String(msg.text)).toContain("✍️ <b>E-Mail-Entwurf für Physio Entwurf</b>");
-    expect(String(msg.text)).toContain("<pre>Hallo zusammen,\n\nich heiße Christian.");
+    expect(String(msg.text)).toContain("<pre>Hallo Team Physio Entwurf,\n\nich heiße Christian.");
     expect(String(msg.text)).not.toContain("mailto:");
     expect(String(msg.text)).toContain("keine Adresse gefunden");
     const buttons = (

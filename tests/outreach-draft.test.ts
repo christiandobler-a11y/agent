@@ -8,7 +8,9 @@ import {
   complimentFact,
   draftEmail,
   mailtoLink,
-  pickFinding,
+  pickFindings,
+  salutationLine,
+  shortCompanyName,
   sanitizeDraftText,
   whatsappLink,
 } from "../src/outreach/draft.js";
@@ -30,15 +32,38 @@ const finding = (
 });
 
 describe("Entwurf (rein)", () => {
-  it("wählt den schwersten Befund, bei Gleichstand den, den man am Handy merkt", () => {
+  it("ein starker Befund allein, sonst bis zu drei; Gesamteindruck vor Handy-Mängeln", () => {
     expect(
-      pickFinding([
+      pickFindings([
         finding("medium", "mobile", "a"),
-        finding("high", "technical", "b"),
-        finding("high", "mobile", "c"),
-      ])?.title,
-    ).toBe("c");
-    expect(pickFinding([])).toBeNull();
+        finding("high", "mobile", "b"),
+        finding("high", "design", "c"),
+      ]).map((f) => f.title),
+    ).toEqual(["c"]);
+    expect(
+      pickFindings([
+        finding("medium", "mobile", "a"),
+        finding("medium", "design", "b"),
+        finding("low", "technical", "c"),
+        finding("low", "design", "d"),
+      ]).map((f) => f.title),
+    ).toEqual(["b", "a", "d"]);
+    expect(pickFindings([])).toEqual([]);
+  });
+
+  it("Grußzeile aus dem Impressum, ohne Namen an das Team", () => {
+    expect(salutationLine("sie", { name: "Monika Späth", salutation: "Frau" }, "x")).toBe(
+      "Hallo Frau Späth,",
+    );
+    expect(salutationLine("sie", { name: "Kai Ernst", salutation: null }, "x")).toBe("Hallo Kai Ernst,");
+    expect(salutationLine("du", { name: "Josef Kerscher", salutation: "Herr" }, "x")).toBe("Hallo Josef,");
+    expect(salutationLine("sie", { name: null, salutation: null }, "Hotel Ariadne GmbH | Rosenheim")).toBe(
+      "Hallo Team Hotel Ariadne,",
+    );
+    expect(shortCompanyName("Physio Aicher | Rosenheim")).toBe("Physio Aicher");
+    expect(shortCompanyName("RADsyndikat GmbH")).toBe("RADsyndikat");
+    expect(shortCompanyName('Gasthof - Hotel "Alt- Fürstätt"')).toBe("Gasthof Hotel Alt- Fürstätt");
+    expect(shortCompanyName("Hotel Ariadne")).toBe("Hotel Ariadne");
   });
 
   it("Kompliment nur bei wirklich guter Bewertung", () => {
@@ -134,7 +159,7 @@ describeDb("E-Mail-Entwurf (Datenbank)", () => {
   const fakeLlm = (absatz: string) => {
     const structured = vi.fn((_req: StructuredRequest<never>) =>
       Promise.resolve({
-        output: { anrede: "Hallo Elisabeth Kagerer,", absatz },
+        output: { absatz },
         agentRunId: "r",
         costUsd: 0.004,
         model: "m",
@@ -161,8 +186,7 @@ describeDb("E-Mail-Entwurf (Datenbank)", () => {
     const input = JSON.parse(structured.mock.calls[0]![0].input as string) as Record<string, unknown>;
     expect(input).toMatchObject({
       anrede: "sie",
-      ansprechpartner: "Elisabeth Kagerer",
-      befund: { titel: "Telefonnummer nicht antippbar" },
+      befunde: [{ titel: "Telefonnummer nicht antippbar", schwere: "high" }],
       kompliment_fakt: "4,8 Sterne bei 170 Google-Bewertungen",
       einstiegssatz: outreach.einstieg,
     });
@@ -173,7 +197,7 @@ describeDb("E-Mail-Entwurf (Datenbank)", () => {
     expect(d.body).not.toMatch(/[–—]/);
     expect(d.body).toMatch(/(Hätten Sie|Passt Ihnen) \w+/);
     expect(d.body).toContain("https://wa.me/4915112345678?text=");
-    expect(d.body).toMatch(/Christian Dobler\nAvelio, Rosenheim\n0151 12345678$/);
+    expect(d.body).toMatch(/Christian Dobler\nAvelio, Peißenberg\n0151 12345678$/);
     expect(d.slots).toHaveLength(4);
     expect(d.warnings).toEqual([]);
     const { rows } = await db().query<{ type: string; meta: { slots: string[]; subject: string } }>(

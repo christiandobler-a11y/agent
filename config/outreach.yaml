@@ -7,7 +7,7 @@ positionierung: >-
   Direkt nach dem Befund kommt ein Kompliment mit Fakt, damit "zeitgemäß" nicht nach "veraltet" klingt.
 
 absender_name: Christian Dobler
-absender_zusatz: Avelio, Rosenheim
+absender_zusatz: Avelio, Peißenberg
 # Du für diese Branchen, sonst Sie.
 du_branchen: [fahrrad, gastro, friseur, kosmetik]
 
@@ -49,7 +49,7 @@ spamschutz:
     - Ich hab Ihnen dazu etwas vorbereitet und würde es gern kurz mit Ihnen durchgehen, 5 bis 10 Minuten reichen. Wann passt es Ihnen diese Woche am besten?
     - Dazu hab ich schon was vorbereitet. Hätten Sie diese Woche 10 Minuten, damit ich es Ihnen kurz zeigen kann?
     - Ich hab mir dazu schon Gedanken gemacht und etwas vorbereitet. Wann hätten Sie diese Woche kurz 5 bis 10 Minuten?
-  gruesse: [Viele Grüße, Beste Grüße, Grüße aus Rosenheim, Liebe Grüße]
+  gruesse: [Viele Grüße, Beste Grüße, Grüße aus Peißenberg, Liebe Grüße]
   regeln:
     - reiner Text, keine Bilder, kein HTML-Layout, kein Tracking-Pixel, keine Link-Kürzer
     - höchstens ein Link (WhatsApp-Business-Link oder Kalender), keine Anhänge in der ersten Mail

@@ -15,6 +15,7 @@ E-Mail: info@radlmeier.com
 Umsatzsteuer-Identifikationsnummer gemäß § 27 a UStG: DE 123 456 789`;
     expect(parseImpressum(text)).toEqual({
       person: "Thomas Meier",
+      salutation: null,
       role: "Inhaber",
       emails: ["info@radlmeier.com"],
       phones: ["08061 / 93 67 396"],
@@ -53,6 +54,7 @@ Kontakt: shop [at] bikestore-ob [dot] de`;
   it("ohne verwertbare Angaben: leeres Ergebnis statt Fehler", () => {
     expect(parseImpressum("Seite nicht gefunden")).toEqual({
       person: null,
+      salutation: null,
       role: null,
       emails: [],
       phones: [],
@@ -75,12 +77,43 @@ describe("Hilfsfunktionen Impressum", () => {
     expect(deobfuscate("info [ät] firma [punkt] de")).toBe("info@firma.de");
   });
 
+  it("Anrede nur, wenn sie dasteht; Berufsbezeichnungen und Rollenwörter sind keine Namen", () => {
+    expect(parseImpressum("Inhaberin: Frau Monika Späth\nTel. 08051 1234")).toMatchObject({
+      person: "Monika Späth",
+      salutation: "Frau",
+      role: "Inhaber",
+    });
+    expect(parseImpressum("Verantwortlich: Malermeister Kai Ernst")).toMatchObject({
+      person: "Kai Ernst",
+      salutation: null,
+    });
+    expect(parseImpressum("Vertreten durch:\nGeschäftsführender Gesellschafter")).toMatchObject({
+      person: null,
+    });
+    expect(parseImpressum("Geschäftsführer: Herrn Josef Kerscher")).toMatchObject({
+      person: "Josef Kerscher",
+      salutation: "Herr",
+    });
+  });
+
+  it("Einzelunternehmer ohne Rollen-Angabe direkt unter „Angaben gemäß § 5“", () => {
+    expect(
+      parseImpressum(
+        "Impressum\nAngaben gemäß § 5 DDG\nPhysiotherapie Aicher\nAnna Aicher\nHauptstr. 3\n83022 Rosenheim",
+      ),
+    ).toMatchObject({ person: "Anna Aicher", role: "Inhaber" });
+  });
+
   it("cleanPersonName", () => {
     expect(cleanPersonName("Frau Dr. Eva Maria Schmidt (Inhaberin)")).toBe("Eva Maria Schmidt");
     expect(cleanPersonName("Hauptstraße 5")).toBeNull();
     expect(cleanPersonName("Thomas")).toBeNull();
     expect(cleanPersonName("siehe oben")).toBeNull();
     expect(cleanPersonName("Wasserburger Radhaus")).toBeNull();
+    expect(cleanPersonName("Schreinerei Senega")).toBeNull();
+    expect(cleanPersonName("Hotel Ariadne")).toBeNull();
+    expect(cleanPersonName("Thomas Frei")).toBe("Thomas Frei");
+    expect(cleanPersonName("Kai Ernst")).toBe("Kai Ernst");
     expect(cleanPersonName("Fahrradwelt Huber")).toBeNull();
     expect(cleanPersonName("Bike Point Rosenheim")).toBeNull();
     expect(cleanPersonName("Martin Huber")).toBe("Martin Huber");

@@ -224,7 +224,15 @@ async function crawl(args: string[]): Promise<number> {
     const companies =
       parsed.mode === "one"
         ? [await findCompany(db, parsed.ref)].filter((c): c is Company => c !== null)
-        : await companiesToCrawl(db, parsed.limit);
+        : parsed.mode === "leads"
+          ? (
+              await db.query<Company>(
+                `select * from companies where segment is distinct from 'NO_WEBSITE' and website_url is not null
+                   and status in ('QUALIFIED', 'READY_FOR_CONTACT', 'CONTACTED', 'REPLIED', 'INTERESTED', 'PROTOTYPE')
+                 order by current_score desc nulls last`,
+              )
+            ).rows
+          : await companiesToCrawl(db, parsed.limit);
     if (companies.length === 0) {
       console.log(parsed.mode === "one" ? `Keine Firma gefunden für "${parsed.ref}".` : "Nichts zu crawlen.");
       return parsed.mode === "one" ? 1 : 0;
