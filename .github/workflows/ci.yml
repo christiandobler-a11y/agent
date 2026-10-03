@@ -8,6 +8,10 @@ on:
 jobs:
   verify:
     runs-on: ubuntu-latest
+    # 22 = .nvmrc, 24 = Server-Image und aktueller Mac (Node 24 ist z. B. bei AbortSignal strenger)
+    strategy:
+      matrix:
+        node: [22, 24]
     services:
       postgres:
         image: postgres:16-alpine
@@ -28,7 +32,7 @@ jobs:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
         with:
-          node-version-file: .nvmrc
+          node-version: ${{ matrix.node }}
           cache: npm
       - run: npm ci
       # Echter Browser für die Crawl-Tests (tests/crawl-browser.test.ts)

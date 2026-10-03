@@ -61,15 +61,27 @@ export function describeFetchError(err: unknown): string {
 }
 
 /**
+ * grammY erzeugt Signale mit dem Paket "abort-controller". Das fetch von Node 24 akzeptiert nur echte AbortSignal
+ * ("Expected signal to be an instance of AbortSignal"), daher wird der Abbruch auf ein eingebautes Signal übertragen.
+ */
+function nativeSignal(signal: AbortSignal | Pick<AbortSignal, "aborted" | "addEventListener">): AbortSignal {
+  if (signal instanceof AbortSignal) return signal;
+  const controller = new AbortController();
+  if (signal.aborted) controller.abort();
+  else signal.addEventListener("abort", () => controller.abort(), { once: true });
+  return controller.signal;
+}
+
+/**
  * fetch für grammY: das eingebaute fetch von Node (nutzt wie check-env die Netzwerk-Einstellungen der Umgebung).
- * grammY gibt node-fetch-Optionen mit (agent, compress), die hier entfernt werden. Netzwerkfehler wiederholt grammY
+ * grammY gibt node-fetch-Optionen mit (agent, compress), die hier entfernt werden, und Signale aus einem Polyfill. Netzwerkfehler wiederholt grammY
  * still; deshalb werden sie hier protokolliert (ohne URL, sie enthält den Token).
  */
 export function telegramFetch(fetchFn: typeof globalThis.fetch) {
   return async (url: string | URL, init?: RequestInit & { agent?: unknown; compress?: unknown }) => {
-    const { agent: _agent, compress: _compress, ...rest } = init ?? {};
+    const { agent: _agent, compress: _compress, signal, ...rest } = init ?? {};
     try {
-      return await fetchFn(url, rest);
+      return await fetchFn(url, { ...rest, ...(signal ? { signal: nativeSignal(signal) } : {}) });
     } catch (err) {
       if (!(err instanceof Error && err.name === "AbortError")) {
         log("warn", "Telegram nicht erreichbar, neuer Versuch folgt", { error: describeFetchError(err) });

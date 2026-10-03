@@ -188,6 +188,18 @@ describe("Telegram-Verbindung", () => {
     });
     expect(inner.mock.calls[0]![1]).toEqual({ method: "POST" });
 
+    // Signal aus grammYs Polyfill (wie im echten Betrieb) → eingebautes AbortSignal, Abbruch wird weitergereicht
+    const { AbortController: PolyfillController } = await import("abort-controller");
+    const polyfill = new PolyfillController();
+    await telegramFetch(inner as unknown as typeof fetch)("https://api.telegram.org/x", {
+      signal: polyfill.signal as unknown as AbortSignal,
+    });
+    const passed = inner.mock.calls[1]![1]!.signal!;
+    expect(passed).toBeInstanceOf(AbortSignal);
+    expect(passed.aborted).toBe(false);
+    polyfill.abort();
+    expect(passed.aborted).toBe(true);
+
     const warn = vi.spyOn(console, "warn").mockImplementation(() => undefined);
     const failing = () => Promise.reject(new TypeError("fetch failed", { cause: { code: "ECONNRESET" } }));
     await expect(
