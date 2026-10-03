@@ -337,7 +337,7 @@ export function createBot(options: BotOptions): Bot {
           followUpDays: crmConfig().follow_up_days,
         });
         await ctx.answerCallbackQuery({
-          text: `${SALES_LABELS[crm.status]}${reminder ? ` · Nachfassen in ${crmConfig().follow_up_days} Tagen` : ""}`,
+          text: `Vermerkt: ${SALES_LABELS[crm.status]} (es wurde nichts verschickt)${reminder ? ` · Nachfassen in ${crmConfig().follow_up_days} Tagen` : ""}`,
         });
       } else if (crm.kind === "remind") {
         await addReminder(pipeline.db, company.id, {

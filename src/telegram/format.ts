@@ -249,6 +249,7 @@ export function leadCrmCard(
       [btn("CONTACTED"), btn("REPLIED")],
       [btn("INTERESTED"), btn("PROTOTYPE")],
       [btn("WON"), btn("LOST")],
+      [btn("READY_FOR_CONTACT")],
       [{ text: "✍️ E-Mail-Entwurf", callback_data: crmCallback({ kind: "email", companyId: c.id }) }],
       [
         { text: "⏰ in 3 Tagen", callback_data: crmCallback({ kind: "remind", days: 3, companyId: c.id }) },

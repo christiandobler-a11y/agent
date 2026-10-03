@@ -58,6 +58,14 @@ export async function setSalesStatus(
         now: opts.now,
       });
     }
+    // Zurück auf "vorgemerkt" (z. B. versehentlich "kontaktiert"): automatische Nachfass-Erinnerung entfällt.
+    if (status === "READY_FOR_CONTACT") {
+      await tx.query(
+        `update interactions set done_at = $2
+          where company_id = $1 and type = 'reminder' and done_at is null and created_by = 'system'`,
+        [companyId, opts.now],
+      );
+    }
     // Abgeschlossene Leads brauchen keine offenen Erinnerungen mehr.
     if (status === "WON" || status === "LOST") {
       await tx.query(

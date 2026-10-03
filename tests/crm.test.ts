@@ -121,6 +121,19 @@ describeDb("CRM mit Datenbank", () => {
     expect(await openReminders(db(), c.id)).toEqual([]);
   });
 
+  it("versehentlich kontaktiert → zurück auf vorgemerkt schließt die automatische Erinnerung", async () => {
+    const c = await lead();
+    await setSalesStatus(db(), c.id, "CONTACTED", { by: "test", now: NOW, followUpDays: 5 });
+    expect(await openReminders(db(), c.id)).toHaveLength(1);
+    const { company } = await setSalesStatus(db(), c.id, "READY_FOR_CONTACT", {
+      by: "test",
+      now: NOW,
+      followUpDays: 5,
+    });
+    expect(company.status).toBe("READY_FOR_CONTACT");
+    expect(await openReminders(db(), c.id)).toEqual([]);
+  });
+
   it("Erinnerungen: fällig, zugestellt nur außerhalb der Ruhezeit, je einmal; verschieben stellt erneut zu", async () => {
     await db().query("delete from interactions");
     const c = await lead();
@@ -180,7 +193,9 @@ describeDb("CRM mit Datenbank", () => {
     const contacted = keyboard.flat().find((b) => b.text.includes("kontaktiert"))!;
 
     await bot.handleUpdate(callbackUpdate(contacted.callback_data));
-    expect(last("answerCallbackQuery")).toMatchObject({ text: "kontaktiert · Nachfassen in 5 Tagen" });
+    expect(last("answerCallbackQuery")).toMatchObject({
+      text: "Vermerkt: kontaktiert (es wurde nichts verschickt) · Nachfassen in 5 Tagen",
+    });
     expect(String(last("editMessageText").text)).toContain("Status: 📤 kontaktiert");
     expect(String(last("editMessageText").text)).toContain("⏰ Nachfassen: noch keine Antwort?");
 
