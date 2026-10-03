@@ -96,7 +96,7 @@ describe("Terminvorschläge", () => {
     }
   });
 
-  it("ein Termin geht höchstens an 2 Leads gleichzeitig", () => {
+  it("ein Termin geht höchstens an max_leads_je_termin Leads gleichzeitig", () => {
     const first = proposeSlots({
       now: NOW,
       config: cfg.termine,
@@ -105,7 +105,7 @@ describe("Terminvorschläge", () => {
       taken: new Map(),
       seed: 7,
     })!;
-    const taken = new Map(first.slots.map((s) => [s, 2]));
+    const taken = new Map(first.slots.map((s) => [s, cfg.termine.max_leads_je_termin]));
     const second = proposeSlots({
       now: NOW,
       config: cfg.termine,

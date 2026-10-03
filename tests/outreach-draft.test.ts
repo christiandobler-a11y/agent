@@ -199,7 +199,7 @@ describeDb("E-Mail-Entwurf (Datenbank)", () => {
     expect(d.warnings).toContain("WhatsApp-Nummer fehlt (OUTREACH_WHATSAPP in der .env)");
   });
 
-  it("schon angebotene Termine gehen nicht an einen dritten Lead", async () => {
+  it("ein Termin geht nie an mehr Leads als erlaubt (hier: höchstens 2)", async () => {
     const leads = [
       await lead("Praxis A", "physiotherapie", "A A"),
       await lead("Praxis B", "physiotherapie", "B B"),
@@ -208,7 +208,10 @@ describeDb("E-Mail-Entwurf (Datenbank)", () => {
     const counts = new Map<string, number>();
     for (const c of leads) {
       const d = await draftEmail(
-        deps(fakeLlm("Ich heiße Christian. Befund. Kompliment mit Fakt und mehr Text.").llm),
+        {
+          ...deps(fakeLlm("Ich heiße Christian. Befund. Kompliment mit Fakt und mehr Text.").llm),
+          outreach: { ...outreach, termine: { ...outreach.termine, max_leads_je_termin: 2 } },
+        },
         c,
         "test",
       );

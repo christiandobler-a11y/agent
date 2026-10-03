@@ -104,7 +104,7 @@ termine:
   uhrzeiten_je_tag: 2
   fruehestens_in_tagen: 2 # Vorlauf, damit die Antwort noch rechtzeitig kommt
   spaetestens_in_tagen: 9
-  max_leads_je_termin: 2
+  max_leads_je_termin: 5 # Antwortquote ~5–10 %, Doppelzusagen also selten; bei 2 wären die Termine nach ~7 Mails weg
   formulierungen_du:
     - Hättest du {tag1} um {zeit1a} oder {zeit1b} Uhr kurz Zeit? Sonst ginge noch {tag2} um {zeit2a} oder {zeit2b} Uhr.
     - Passt dir {tag1} um {zeit1a} oder {zeit1b} Uhr? Alternativ hätte ich {tag2} um {zeit2a} oder {zeit2b} Uhr noch was frei.
