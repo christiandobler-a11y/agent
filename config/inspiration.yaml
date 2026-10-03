@@ -1,5 +1,6 @@
-# Inspiration: Websites, die Christian als Vorbild für eine Branche gefallen. Grundlage für das Creative-Briefing
-# und den Prototype-Agenten (Phase 3, ARCHITECTURE.md 14). Schlüssel = Branche aus config/branches.yaml.
+# Inspiration: Websites, die Christian als Vorbild für eine Branche gefallen. Schlüssel "alle" = Gestaltungs-Elemente,
+# die branchenübergreifend passen. Grundlage für das Creative-Briefing
+# und den Prototype-Agenten (Phase 3, ARCHITECTURE.md 14). Sonstige Schlüssel = Branche aus config/branches.yaml.
 # Neue Einträge: url, warum (Christians Worte), merkmale (was wir uns abschauen), gespeichert (Datum).
 
 gastro:
@@ -22,4 +23,28 @@ gastro:
       - klare Kategorien (Vorspeisen, Suppen, Pho, Bun, Reis, Desserts) mit Preisen je Gericht
       - Anruf- und Reservieren-Button direkt erreichbar
       - nur das Speisekarten-Konzept übernehmen, nicht die Gestaltung insgesamt
+    gespeichert: 2026-10-03
+
+physiotherapie:
+  - url: https://www.mediana-zentrum.de/
+    name: MEDIANA Gesundheitszentrum (Stephanskirchen, Rosenheim, Prien)
+    warum: Meiner Meinung nach eine sehr, sehr starke Website; die Übergänge zwischen den Sections sind super geworden.
+    merkmale:
+      - Hero mit großem Trainingsfoto, kurzer Claim in Versalien („Moderne Methoden. Menschlich umgesetzt.“) und ein klarer Button „Jetzt Termin buchen“
+      - Section-Übergänge statt harter Kanten (Bergsilhouette, Papier-Risskanten), siehe Eintrag unter "alle"
+      - eine starke Markenfarbe (Magenta) konsequent mit Schwarz, Weiß und Grau kombiniert, Handschrift-Claim „wir.mit.Dir.“
+      - Leistungen als vier Kacheln mit Icon, Titel und einem Satz Nutzen
+      - echte Teamfotos und Video statt Stockfotos, Mission und Vision kurz und persönlich
+      - Kontakt-Section über einem Teamfoto mit allen drei Standorten und Telefonnummern
+    gespeichert: 2026-10-03
+
+alle:
+  - url: https://www.mediana-zentrum.de/
+    name: Section-Übergang Bergsilhouette (MEDIANA)
+    warum: Den Bergübergang mit drei Farben und Mustern finde ich brutal gut, er leitet perfekt in eine neue Section. Unbedingt merken.
+    merkmale:
+      - Hero-Foto endet unten in drei gestaffelten Bergkämmen (hellgrau, mittelgrau, Markenfarbe), die vorderste Ebene geht nahtlos in den Hintergrund der nächsten Section über
+      - kleine Figur auf einem Gipfel als Blickfang, regionaler Bezug (Alpen, Chiemgau) passt ideal zu Kunden im Landkreis Rosenheim
+      - weitere Übergänge als unregelmäßige Papier-Risskante (z. B. Magenta → Weiß, Weiß → Teamfoto)
+      - umsetzbar mit gestapelten SVG-Pfaden (je Ebene eine Farbe) bzw. einer SVG-Maske, ohne Bilddateien
     gespeichert: 2026-10-03
