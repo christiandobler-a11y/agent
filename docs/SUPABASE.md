@@ -66,6 +66,10 @@ späteren Migrationen** brauchen ebenfalls `alter table … enable row level sec
 
 - **Free-Plan pausiert** Projekte nach rund einer Woche ohne Aktivität. Wieder starten: Dashboard → „Restore“.
   Für den Dauerbetrieb (ab Schritt 9) ist der Pro-Plan mit täglichen Backups vorgesehen (ARCHITECTURE.md 13).
+- **Logs → Postgres** zeigt rote Einträge `3F000 schema "pg_pgrst_no_exposed_schemas" does not exist`. Das ist
+  harmlos und die Folge der abgeschalteten Data API: PostgREST läuft weiter, hat aber kein Schema mehr
+  freigegeben und setzt diesen Platzhalter. Die Zeile `SET statement_timeout … count_estimate` stammt vom Table
+  Editor im Dashboard.
 - **Tests** laufen nie gegen Supabase, sondern gegen ein lokales Postgres (`TEST_DATABASE_URL`).
 - **Schritt 9 (Deploy):** eigene Datenbank-Rolle für die App mit nur DML-Rechten; Migrationen laufen dann
   getrennt mit der Eigentümer-Rolle (ARCHITECTURE.md 12.1).
