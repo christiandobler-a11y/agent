@@ -1,12 +1,23 @@
 import { Bot, type Context } from "grammy";
 import type { UserFromGetMe } from "grammy/types";
+import { setRating } from "../db/calibration.js";
 import { findCompany } from "../db/companies.js";
 import { raiseBudgetToday } from "../llm/budget.js";
 import { askManager, type ManagerDeps } from "../manager/agent.js";
 import { runTool } from "../manager/tools.js";
 import { explainStoredLead } from "../pipeline/audit/explainStored.js";
+import { loadGoldenEntries, nextRatingCard } from "../pipeline/calibration.js";
+import { evaluateGoldenSet, formatCalibrationReport } from "../pipeline/scoring/calibration.js";
 import { releaseBudgetDeferredJobs } from "../queue/pipeline.js";
-import { callbackData, chunk, HELP_TEXT, markdownToTelegramHtml, parseCallback } from "./format.js";
+import {
+  callbackData,
+  chunk,
+  HELP_TEXT,
+  markdownToTelegramHtml,
+  parseCallback,
+  parseGradeCallback,
+  ratingCardMessage,
+} from "./format.js";
 
 /**
  * Telegram-Bot (ARCHITECTURE.md 5.1, 12.1): Long Polling, reagiert nur auf erlaubte Chat-IDs. Freitext geht an den
@@ -96,7 +107,50 @@ export function createBot(options: BotOptions): Bot {
     );
   });
 
+  // Kalibrierung (ARCHITECTURE.md 7.4): eine Firma nach der anderen mit A/B/C bewerten, ohne den Score zu sehen.
+  const sendRatingCard = async (ctx: Context) => {
+    const card = await nextRatingCard(pipeline.db);
+    if (!card) {
+      await ctx.reply(
+        "Keine unbewertete Firma mit Score mehr. Neue Firmen kommen mit der nächsten Suche dazu. Auswertung: /auswertung",
+      );
+      return;
+    }
+    const branch = card.company.branch_key ? pipeline.lead.branches[card.company.branch_key] : undefined;
+    const { text, keyboard } = ratingCardMessage(card, branch?.label ?? null);
+    await ctx.reply(text, { parse_mode: "HTML", reply_markup: { inline_keyboard: keyboard } });
+  };
+
+  bot.command(["kalibrieren", "bewerten"], sendRatingCard);
+  bot.command(["auswertung", "kalibrierung"], async (ctx) => {
+    const entries = await loadGoldenEntries({ ...pipeline.lead, db: pipeline.db, now: pipeline.now });
+    if (entries.length === 0) {
+      await ctx.reply("Noch keine Firma bewertet. Los geht's mit /kalibrieren");
+      return;
+    }
+    const report = evaluateGoldenSet(entries, pipeline.lead.scoring);
+    await replyLong(ctx, formatCalibrationReport(report, pipeline.lead.scoring.version));
+  });
+
   bot.on("callback_query:data", async (ctx) => {
+    const graded = parseGradeCallback(ctx.callbackQuery.data);
+    if (graded) {
+      const company = await findCompany(pipeline.db, graded.companyId);
+      if (!company) {
+        await ctx.answerCallbackQuery({ text: "Firma nicht gefunden" });
+        return;
+      }
+      await setRating(pipeline.db, {
+        companyId: company.id,
+        grade: graded.grade,
+        chatId: ctx.chat?.id ?? null,
+      });
+      const label = graded.grade === "X" ? "übersprungen" : graded.grade;
+      await ctx.answerCallbackQuery({ text: `${label} gespeichert` });
+      await ctx.editMessageText(`${company.name}: ${label}`).catch(() => undefined);
+      await sendRatingCard(ctx);
+      return;
+    }
     const cb = parseCallback(ctx.callbackQuery.data);
     const chatId = ctx.chat?.id;
     if (!cb || chatId === undefined) {

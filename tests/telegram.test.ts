@@ -2,6 +2,8 @@ import type Anthropic from "@anthropic-ai/sdk";
 import type { Update, UserFromGetMe } from "grammy/types";
 import { describe, expect, it, vi } from "vitest";
 import { upsertCompany } from "../src/db/companies.js";
+import { loadBranches } from "../src/pipeline/research/branches.js";
+import { loadScoringConfig } from "../src/pipeline/scoring/config.js";
 import { NO_BUDGET } from "../src/llm/budget.js";
 import type { LlmGateway, ToolStepRequest } from "../src/llm/gateway.js";
 import { askManager, historyToMessages } from "../src/manager/agent.js";
@@ -351,6 +353,70 @@ describeDb("Telegram-Bot und Manager mit Datenbank", () => {
     } as unknown as LlmGateway;
     const reply = await askManager({ ctx: ctx(), llm }, ALLOWED, "Hallo");
     expect(reply.text).toContain("Budget für heute erreicht");
+  });
+
+  it("Kalibrierung: /kalibrieren zeigt Firmen ohne Score, A/B/C speichert und zeigt die nächste", async () => {
+    const scored = async (name: string) => {
+      const { company } = await upsertCompany(db(), { name, placeId: `k-${name}`, city: "Kolbermoor" });
+      await db().query("update companies set segment = 'NO_WEBSITE', branch_key = 'gastro' where id = $1", [
+        company.id,
+      ]);
+      await db().query(
+        `insert into places_snapshots (company_id, raw, rating, review_count, business_status)
+         values ($1, '{}', 4.6, 80, 'OPERATIONAL')`,
+        [company.id],
+      );
+      const { rows } = await db().query<{ id: string }>(
+        `insert into lead_scores (company_id, scoring_version, total, breakdown) values ($1, 'v1', 70, '{}') returning id`,
+        [company.id],
+      );
+      await db().query("update companies set current_score_id = $2, current_score = 70 where id = $1", [
+        company.id,
+        rows[0]!.id,
+      ]);
+      return company;
+    };
+    await scored("Gasthaus <Post>");
+    await scored("Café Mühle");
+    const pctx = {
+      ...ctx(),
+      lead: { branches: loadBranches(), scoring: loadScoringConfig(), crawl: {}, recheck: {}, llm: {} },
+    } as unknown as PipelineContext;
+    const toolStep = vi.fn();
+    const { bot, sent, calls } = testBot(pctx, { toolStep } as unknown as LlmGateway);
+    const lastCard = () => {
+      const msg = calls.filter((c) => c.method === "sendMessage").at(-1)!.payload;
+      const kb = (msg.reply_markup as { inline_keyboard: { callback_data: string }[][] }).inline_keyboard;
+      return { text: String(msg.text), ids: kb[0]!.map((b) => b.callback_data) };
+    };
+
+    await bot.handleUpdate(textUpdate(ALLOWED, "/kalibrieren"));
+    const first = lastCard();
+    expect(first.text).toContain("Kalibrierung · 0 bewertet");
+    expect(first.text).toContain("Restaurant, Gasthaus, Café · Kolbermoor");
+    expect(first.text).toContain("Google: 4,6★ (80 Bewertungen)");
+    expect(first.text).not.toContain("70"); // kein Score auf der Karte
+    expect(first.ids.map((d) => d.slice(0, 2))).toEqual(["gA", "gB", "gC", "gX"]);
+
+    await bot.handleUpdate(callbackUpdate(ALLOWED, first.ids[0]!));
+    expect(calls.filter((c) => c.method === "answerCallbackQuery").at(-1)!.payload).toMatchObject({
+      text: "A gespeichert",
+    });
+    const second = lastCard();
+    expect(second.text).toContain("1 bewertet (A 1 · B 0 · C 0)");
+    expect(second.ids[0]).not.toBe(first.ids[0]);
+
+    await bot.handleUpdate(callbackUpdate(ALLOWED, second.ids[2]!));
+    expect(sent().at(-1)).toContain("Keine unbewertete Firma");
+    const { rows } = await db().query<{ grade: string }>(
+      "select grade from calibration_ratings order by grade",
+    );
+    expect(rows.map((r) => r.grade)).toEqual(["A", "C"]);
+
+    await bot.handleUpdate(textUpdate(ALLOWED, "/auswertung"));
+    expect(sent().at(-1)).toContain("Golden Set: 2 Firmen");
+    expect(sent().at(-1)).toContain("noch nicht bestanden");
+    expect(toolStep).not.toHaveBeenCalled();
   });
 
   it("findLead: Kurz-ID, Domain, Namensteil, mehrdeutig", async () => {

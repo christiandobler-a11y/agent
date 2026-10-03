@@ -17,6 +17,8 @@ ausprobieren kann. Nach Schritt 6 ist ein Abstimmungstermin (Kalibrierung) vorge
 - `npm run worker` (Betrieb: `npm start` nach `npm run build`): Worker für alle Queues; `npm run cli -- search
 "<Begriff>" <region> -n N [--wait]`, `runs`, `failed`
 - `npm run cli -- chat "…"`: Manager-Agent ohne Telegram befragen (gleicher Verlauf wie der Chat)
+- `npm run cli -- calibrate [export|--file|rate <firma> <A|B|C|X>]`: Golden Set (Telegram `/kalibrieren`,
+  `/auswertung`); `tests/golden/golden.json` ist Regressionstest für Gewichte und Prompts (`tests/golden.test.ts`)
 - `npm run costs`: Ausgaben heute/Monat gegen das Budget, letzte 7 Tage je Rolle bzw. Dienst
 - `npm run db-status`: Migrationen, Tabellen, Zeilen, RLS/Data-API-Schutz der Datenbank aus `DATABASE_URL`
 - `npm run cli -- <befehl>`: einzelne Pipeline-Schritte ausführen (Debugging), z. B.

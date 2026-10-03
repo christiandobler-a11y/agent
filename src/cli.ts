@@ -23,6 +23,7 @@ import { crawlCompany, type CrawlOutcome } from "./pipeline/crawl/run.js";
 import { mapLimit } from "./util/mapLimit.js";
 import { audit, explain, score } from "./cliLeads.js";
 import { chat, failed, runs, search, worker } from "./cliQueue.js";
+import { calibrate } from "./cliCalibrate.js";
 
 const ICONS = { ok: "✔", missing: "–", error: "✘" } as const;
 
@@ -266,6 +267,7 @@ const commands: Record<string, (args: string[]) => Promise<number>> = {
   audit,
   score,
   explain,
+  calibrate,
   crawl,
   costs: showCosts,
   "check-env": checkEnv,

@@ -3,7 +3,7 @@
 Internes System für Avelio: lokale Unternehmen finden, Websites auditieren, Leads mit dem
 Avelio Lead Score bewerten und über Telegram berichten.
 
-Plan: [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md). Stand: Schritt 8 (Telegram-Bot mit Manager-Agent) umgesetzt. Nächster Schritt: 9 (Deploy auf einen Server).
+Plan: [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md). Stand: Schritt 8 (Telegram-Bot mit Manager-Agent) und Kalibrier-Werkzeug umgesetzt. Nächster Schritt: 9 (Deploy auf einen Hetzner-Server).
 
 Datenbank im Betrieb: Supabase, Einrichtung in [docs/SUPABASE.md](docs/SUPABASE.md).
 
@@ -148,3 +148,16 @@ eine Antwort kostet etwa 1–2 Cent. Ohne Telegram testen: `npm run cli -- chat 
 
 Wichtig: Der Bot darf nur in **einem** Prozess laufen (Telegram erlaubt nur einen Abrufer pro Bot). Läuft er später
 auf dem Server, auf dem Mac nur `npm run cli -- …` verwenden, nicht `npm run worker`.
+
+## Kalibrierung (Golden Set, ARCHITECTURE.md 7.4)
+
+1. Firmen aus verschiedenen Branchen suchen lassen, z. B. je 8 Fahrradläden, Schreiner, Restaurants, Hotels,
+   Physiotherapeuten, Friseure, Kosmetikstudios.
+2. In Telegram `/kalibrieren`: Der Bot zeigt eine Firma nach der anderen (Name, Branche, Google-Bewertung, Website,
+   **ohne** Score). Du tippst A (sofort ansprechen), B (vielleicht), C (eher nicht) oder „Weiß nicht“. Die Branche
+   mit den wenigsten Bewertungen kommt zuerst dran. Ziel: mindestens 20, besser 30.
+3. `/auswertung` (oder `npm run cli -- calibrate`) vergleicht deine Noten mit dem Score: Rangliste, Durchschnitt je
+   Note und Abnahmekriterium 10 (deine Top-A-Firmen in den System-Top-8, keine C-Firma ab 80 Punkten).
+4. `npm run cli -- calibrate export` schreibt `tests/golden/golden.json`. Ins Repo eingecheckt, prüft
+   `tests/golden.test.ts` bei jeder Änderung von Gewichten oder Prompts, dass das Golden Set weiter besteht.
+   Gewichte ausprobieren ohne Datenbank: `npm run cli -- calibrate --file`.

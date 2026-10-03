@@ -17,6 +17,7 @@ describeDb("migrate", () => {
       "api_usage",
       "app_state",
       "audits",
+      "calibration_ratings",
       "companies",
       "contacts",
       "lead_scores",

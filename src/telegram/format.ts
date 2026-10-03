@@ -1,4 +1,6 @@
 import type { InlineKeyboardButton } from "grammy/types";
+import type { Grade } from "../db/calibration.js";
+import type { RatingCard } from "../pipeline/calibration.js";
 import type { RunSummary } from "../queue/notifier.js";
 
 /** Texte und Buttons für Telegram (HTML-Modus). Alles Fremde wird escaped. */
@@ -45,6 +47,52 @@ export function parseCallback(data: string): { action: LeadAction; companyId: st
   return m ? { action: m[1] as LeadAction, companyId: m[2]! } : null;
 }
 
+/** Kalibrier-Buttons: Note + Firmen-ID (z. B. "gA:<uuid>"). */
+export const gradeCallback = (grade: Grade, companyId: string) => `g${grade}:${companyId}`;
+
+export function parseGradeCallback(data: string): { grade: Grade; companyId: string } | null {
+  const m = /^g([ABCX]):([0-9a-f-]{36})$/.exec(data);
+  return m ? { grade: m[1] as Grade, companyId: m[2]! } : null;
+}
+
+const decimal = (n: number) => n.toFixed(1).replace(".", ",");
+
+/** Karte zum Bewerten: bewusst ohne Score, damit das Bauchgefühl unbeeinflusst bleibt. */
+export function ratingCardMessage(
+  card: RatingCard,
+  branchLabel: string | null,
+): { text: string; keyboard: InlineKeyboardButton[][] } {
+  const { company: c, places: p, counts } = card;
+  const rated = counts.A + counts.B + counts.C;
+  const where = [branchLabel ?? c.category, c.city].filter(Boolean).join(" · ");
+  const google =
+    p?.rating != null
+      ? `Google: ${decimal(p.rating)}★ (${p.review_count ?? 0} Bewertungen)`
+      : "Google: keine Bewertung";
+  const lines = [
+    `<i>Kalibrierung · ${rated} bewertet (A ${counts.A} · B ${counts.B} · C ${counts.C})</i>`,
+    "",
+    `<b>${escapeHtml(c.name)}</b>`,
+    ...(where ? [escapeHtml(where)] : []),
+    google,
+    c.website_url ? escapeHtml(c.website_url) : "keine Website",
+    "",
+    "Würdest du die Firma als Kunden ansprechen?",
+    "A = ja, sofort · B = vielleicht · C = eher nicht",
+  ];
+  return {
+    text: lines.join("\n"),
+    keyboard: [
+      [
+        { text: "A", callback_data: gradeCallback("A", c.id) },
+        { text: "B", callback_data: gradeCallback("B", c.id) },
+        { text: "C", callback_data: gradeCallback("C", c.id) },
+        { text: "Weiß nicht", callback_data: gradeCallback("X", c.id) },
+      ],
+    ],
+  };
+}
+
 const STATUS_LABEL: Record<string, string> = {
   QUALIFIED: "qualifiziert",
   SKIPPED: "aussortiert",
@@ -89,4 +137,5 @@ export const HELP_TEXT = [
   "• Was hat das diese Woche gekostet?",
   "",
   "Schnellbefehle: /status · /kosten · /fehler · /budget (z. B. /budget +5)",
+  "Kalibrierung: /kalibrieren (Firmen mit A/B/C bewerten) · /auswertung",
 ].join("\n");

@@ -60,3 +60,42 @@ physiotherapie:
   places_types: [physiotherapist]
   value: 3
   chains: []
+
+kosmetik:
+  label: Kosmetik, Nagelstudio, Massage
+  aliases: [Kosmetik, Kosmetikstudio, Kosmetikerin, Nagelstudio, Massage, Massagepraxis, Beautysalon]
+  places_types: [beauty_salon, nail_salon, spa, massage]
+  value: 2
+  chains: [nails & beauty, wellnessbaum]
+
+gastro:
+  label: Restaurant, Gasthaus, Café
+  aliases: [Restaurant, Gasthaus, Wirtshaus, Gaststätte, Café, Cafe, Biergarten, Pizzeria]
+  places_types: [restaurant, cafe, bar]
+  value: 3
+  chains:
+    [
+      mcdonald,
+      burger king,
+      kfc,
+      subway,
+      vapiano,
+      l osteria,
+      starbucks,
+      nordsee,
+      dean und david,
+      hans im glück,
+      block house,
+      backwerk,
+      pizza hut,
+      domino,
+      call a pizza,
+    ]
+
+hotel:
+  label: Hotel, Pension, Gasthof
+  aliases: [Hotel, Pension, Gasthof, Gästehaus, Ferienwohnung, Ferienwohnungen, Unterkunft]
+  places_types: [lodging, hotel, guest_house, bed_and_breakfast]
+  value: 4
+  chains:
+    [ibis, b und b hotel, motel one, holiday inn, best western, novotel, nh hotel, a und o hostel, mercure]
