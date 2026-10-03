@@ -11,7 +11,7 @@ import { findLead } from "../src/manager/leads.js";
 import { runTool, toolDefinitions } from "../src/manager/tools.js";
 import type { PipelineContext } from "../src/queue/pipeline.js";
 import type { RunSummary } from "../src/queue/notifier.js";
-import { createBot } from "../src/telegram/bot.js";
+import { createBot, telegramFetch } from "../src/telegram/bot.js";
 import {
   callbackData,
   chunk,
@@ -175,6 +175,28 @@ describe("Formatierung", () => {
     await n.budgetExceeded("Budget für heute erreicht");
     expect(sendMessage.mock.calls.map((c) => c[0])).toEqual([2, 1, 2, 1, 2]);
     expect(sendMessage.mock.calls.at(-1)![1]).toContain("/budget +5");
+  });
+});
+
+describe("Telegram-Verbindung", () => {
+  it("entfernt node-fetch-Optionen und protokolliert Netzwerkfehler ohne Token", async () => {
+    const inner = vi.fn((_url: string | URL, _init?: RequestInit) => Promise.resolve(new Response("{}")));
+    await telegramFetch(inner as unknown as typeof fetch)("https://api.telegram.org/bot123:GEHEIM/getMe", {
+      method: "POST",
+      agent: {},
+      compress: true,
+    });
+    expect(inner.mock.calls[0]![1]).toEqual({ method: "POST" });
+
+    const warn = vi.spyOn(console, "warn").mockImplementation(() => undefined);
+    const failing = () => Promise.reject(new TypeError("fetch failed", { cause: { code: "ECONNRESET" } }));
+    await expect(
+      telegramFetch(failing as unknown as typeof fetch)("https://api.telegram.org/bot123:GEHEIM/getMe"),
+    ).rejects.toThrow("fetch failed");
+    const line = String(warn.mock.calls.at(-1)![0]);
+    expect(line).toContain("fetch failed (ECONNRESET)");
+    expect(line).not.toContain("GEHEIM");
+    warn.mockRestore();
   });
 });
 

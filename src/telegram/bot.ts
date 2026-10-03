@@ -30,6 +30,7 @@ export interface BotOptions {
   manager: ManagerDeps;
   /** Für Tests: Bot-Infos vorgeben (kein getMe-Aufruf). */
   botInfo?: UserFromGetMe;
+  fetch?: typeof globalThis.fetch;
 }
 
 const log = (level: "info" | "warn" | "error", msg: string, extra: Record<string, unknown> = {}) =>
@@ -51,11 +52,37 @@ async function replyFormatted(ctx: Context, text: string) {
   }
 }
 
+/** Fehlerursache ohne URL (die URL enthält den Bot-Token). */
+export function describeFetchError(err: unknown): string {
+  if (!(err instanceof Error)) return String(err);
+  const cause = err.cause as { code?: string; message?: string } | undefined;
+  const detail = cause?.code ?? cause?.message;
+  return detail ? `${err.message} (${detail})` : err.message;
+}
+
+/**
+ * fetch für grammY: das eingebaute fetch von Node (nutzt wie check-env die Netzwerk-Einstellungen der Umgebung).
+ * grammY gibt node-fetch-Optionen mit (agent, compress), die hier entfernt werden. Netzwerkfehler wiederholt grammY
+ * still; deshalb werden sie hier protokolliert (ohne URL, sie enthält den Token).
+ */
+export function telegramFetch(fetchFn: typeof globalThis.fetch) {
+  return async (url: string | URL, init?: RequestInit & { agent?: unknown; compress?: unknown }) => {
+    const { agent: _agent, compress: _compress, ...rest } = init ?? {};
+    try {
+      return await fetchFn(url, rest);
+    } catch (err) {
+      if (!(err instanceof Error && err.name === "AbortError")) {
+        log("warn", "Telegram nicht erreichbar, neuer Versuch folgt", { error: describeFetchError(err) });
+      }
+      throw err;
+    }
+  };
+}
+
 export function createBot(options: BotOptions): Bot {
   const bot = new Bot(options.token, {
     ...(options.botInfo ? { botInfo: options.botInfo } : {}),
-    // Globales fetch: nutzt Proxy-Einstellungen der Umgebung (node-fetch täte das nicht).
-    client: { fetch: globalThis.fetch as never },
+    client: { fetch: telegramFetch(options.fetch ?? globalThis.fetch) as never },
   });
   const { ctx: pipeline } = options.manager;
   const tool = (name: string, input: unknown, chatId: number) =>
