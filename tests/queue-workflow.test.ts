@@ -305,7 +305,7 @@ describeDb("Workflow über pg-boss", () => {
     expect((await companies())[2]!.skip_detail).toContain("unreachable");
     // c: erster Versuch + 1 Wiederholung (retry_limit 1), danach endgültig FAILED – der Lauf läuft trotzdem durch.
     expect(h.crawl.mock.calls.filter(([url]) => String(url).includes("kaputt"))).toHaveLength(2);
-    expect(await count("pitches")).toBe(1); // nur a erreicht ≥ 80
+    expect(await count("pitches")).toBe(2); // a und b (ohne Website, volle Website-Chance) erreichen die Pitch-Schwelle
     expect(h.notified).toHaveLength(1);
     expect(h.notified[0]!.topLeads[0]).toMatchObject({ name: "Radhaus Alt", mainOpportunity: "Chance" });
     expect(h.notified[0]!.counts.FAILED).toBe(1);

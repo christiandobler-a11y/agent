@@ -1,5 +1,6 @@
 import { z } from "zod";
 import { loadYamlConfig } from "../../config/files.js";
+import { RUBRIC_CRITERIA } from "../audit/schema.js";
 
 const pts = z.number().min(0);
 
@@ -37,6 +38,8 @@ export const scoringConfigSchema = z.object({
       }),
       outdated_builders: z.array(z.string()),
       rubric_max: pts,
+      /** Gewichte je Rubrik-Kriterium (relativ, fehlend = 1). Ohne Angabe zählen alle Kriterien gleich. */
+      rubric_weights: z.partialRecord(z.enum(RUBRIC_CRITERIA), z.number().min(0)).default({}),
       no_website_points: pts,
     }),
     potential: z.object({
@@ -61,7 +64,10 @@ export const scoringConfigSchema = z.object({
 
 export type ScoringConfig = z.infer<typeof scoringConfigSchema>;
 
-export function loadScoringConfig(version = "v1"): ScoringConfig {
+/** Aktive Score-Version (config/scoring.<version>.yaml). v2 = kalibriert am Golden Set vom 03.10.2026. */
+export const ACTIVE_SCORING_VERSION = "v2";
+
+export function loadScoringConfig(version = ACTIVE_SCORING_VERSION): ScoringConfig {
   const config = loadYamlConfig(`scoring.${version}.yaml`, scoringConfigSchema);
   const d = config.dimensions;
   const sum = d.business.max + d.website.max + d.potential.max + d.gap.max + d.reach.max;

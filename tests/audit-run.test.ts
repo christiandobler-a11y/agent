@@ -211,7 +211,7 @@ describeDb("Audit → Score → Pitch", () => {
     });
 
     const text = await explainStoredLead(db(), await row(c.id));
-    expect(text).toMatch(/^Radhaus \d+ – \d+\/100 \(Scoring v1/);
+    expect(text).toMatch(/^Radhaus \d+ – \d+\/100 \(Scoring v2/);
     expect(text).toContain("audit (claude-sonnet-5-5");
     expect(text).toContain("Hauptchance (claude-opus-5-5): Starke Bewertungen, schwache Website.");
   });
@@ -261,7 +261,7 @@ describeDb("Audit → Score → Pitch", () => {
     const nw = await row(c.id);
     expect(await auditCompany(deps(llm), nw)).toEqual({ kind: "no_website" });
     const r = await scoreCompany(deps(llm), nw);
-    expect(r.result.dimensions.find((d) => d.key === "website")!.points).toBe(30);
+    expect(r.result.dimensions.find((d) => d.key === "website")!.points).toBe(45); // v2: volle Website-Chance
     expect(structured).not.toHaveBeenCalled();
   });
 

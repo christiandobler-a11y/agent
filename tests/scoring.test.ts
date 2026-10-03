@@ -4,7 +4,7 @@ import { loadScoringConfig } from "../src/pipeline/scoring/config.js";
 import { explainFull, explainScore } from "../src/pipeline/scoring/explain.js";
 import { scoreLead, type ScoreInput } from "../src/pipeline/scoring/score.js";
 
-const config = loadScoringConfig();
+const config = loadScoringConfig("v1"); // Briefing-Beispiele sind mit den Startgewichten (v1) gerechnet
 const NOW = new Date("2026-10-02T12:00:00Z");
 
 const rubric = (score: number) => ({ score, evidence: `Beleg ${score}` });
@@ -202,5 +202,42 @@ describe("explain", () => {
     expect(full).toContain("[rubrik]");
     expect(full).toContain("[objektiv]");
     expect(full).toContain("Kappung objektive Punkte");
+  });
+});
+
+describe("Score v2 (kalibriert)", () => {
+  const v2 = loadScoringConfig();
+
+  it("ist die aktive Version und vergibt 100 Punkte", () => {
+    expect(v2.version).toBe("v2");
+    const max = v2.dimensions;
+    expect(max.business.max + max.website.max + max.potential.max + max.gap.max + max.reach.max).toBe(100);
+  });
+
+  it("gewichtet die Rubrik je Kriterium: altes Design zählt mehr als eine schwache Hero-Botschaft", () => {
+    const only = (key: keyof AuditOutput["rubric"]) => {
+      const a = audit(5);
+      a.rubric[key] = rubric(1);
+      return scoreLead({ ...firmaA, audit: a }, v2);
+    };
+    const rubricPoints = (r: ReturnType<typeof scoreLead>) =>
+      r.dimensions[1]!.items.filter((i) => i.source === "rubrik").reduce((s, i) => s + i.points, 0);
+    expect(rubricPoints(only("design_age"))).toBeCloseTo((33 * 3) / 6.5, 0);
+    expect(rubricPoints(only("hero_message"))).toBeCloseTo((33 * 0.5) / 6.5, 0);
+  });
+
+  it("kleine Betriebe vor großen Häusern", () => {
+    const withTeam = (team_size: AuditOutput["commercial"]["team_size"]) =>
+      scoreLead(
+        { ...firmaA, audit: { ...firmaA.audit!, commercial: { ...firmaA.audit!.commercial, team_size } } },
+        v2,
+      ).total;
+    expect(withTeam("small")).toBeGreaterThan(withTeam("large"));
+  });
+
+  it("Firma A aus dem Briefing bleibt ein Top-Lead (Pitch-Schwelle)", () => {
+    const r = scoreLead(firmaA, v2);
+    expect(r.qualified).toBe(true);
+    expect(r.total).toBeGreaterThanOrEqual(v2.pitch_min_total);
   });
 });

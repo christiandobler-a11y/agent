@@ -1,0 +1,70 @@
+# Avelio Lead Score v2: kalibriert am Golden Set vom 03.10.2026 (93 Firmen, Christians A/B/C; tests/golden/golden.json).
+# Gegenüber v1 (ARCHITECTURE.md 7.4):
+# - Website-Chance zählt mehr (45 statt 30). Sie trennt A von B/C am stärksten, vor allem das Design-Alter.
+# - Business-Gesundheit zählt weniger (15 statt 25), denn gute Bewertungen haben fast alle Firmen im Set.
+# - Potenzial (10 statt 20): kleine und mittlere Betriebe vor großen Häusern. Große Hotels, Resorts und
+#   Ketten-ähnliche Betriebe hat Christian meist mit C bewertet. Hochpreisige Leistungen zählen kaum noch.
+# - Lücke "starke Firma, schwache Website" zählt mehr (20 statt 15).
+# Qualify-Schwelle und Knock-out wurden für die neue Verteilung neu gesetzt.
+version: v2
+
+qualify_min_total: 55
+pitch_min_total: 75
+
+knockouts:
+  min_rating_with_reviews: { rating: 3.5, reviews: 10 }
+  min_reviews: 5
+  # Website schon gut: Website-Chance unter diesem Wert (von 45).
+  min_website_chance: 11
+
+dimensions:
+  business: # A: Business-Gesundheit (objektiv)
+    max: 15
+    rating: { max: 7, from: 4.0, full: 4.7 }
+    reviews: { max: 6, full: 150 }
+    photos: { max: 2, full: 10 }
+
+  website: # B: Website-Chance (12 objektiv + 33 Rubrik)
+    max: 45
+    objective_max: 12
+    objective:
+      psi_performance_below_50: 4
+      psi_performance_below_30: 2
+      no_https: 3
+      invalid_certificate: 3
+      no_viewport: 3
+      mobile_too_wide: 2
+      no_tel_link: 1
+      no_contact_form: 1
+      copyright_older_than_years: { years: 4, points: 2 }
+      layout_tables: 1
+      outdated_builder: 2
+    outdated_builders: [IONOS MyWebsite, Strato Homepage-Baukasten, Weebly, Webnode, Jimdo]
+    rubric_max: 33 # Rubrik 1 (sehr schwach) = volle Punkte, 5 (sehr gut) = 0
+    # Design-Alter ist das stärkste Signal für Christians Urteil, danach klare Handlungsaufforderung und Mobil.
+    rubric_weights:
+      design_age: 3
+      cta_clarity: 1
+      mobile_ux: 1
+      trust_signals: 0.5
+      services_visibility: 0.5
+      hero_message: 0.5
+    no_website_points: 45
+
+  potential: # C: Wirtschaftliches Potenzial
+    max: 10
+    branch_value: 5
+    high_value_services: { per_service: 0.5, max: 1 }
+    team_size: { solo: 4, small: 4, medium: 2, large: 0, unknown: 3 }
+
+  gap: # D: Reputations-Website-Lücke
+    max: 20
+    gap_max: 15
+    explainable: { min_findings: 3, points: 5, partial_findings: 2, partial_points: 2.5 }
+
+  reach: # E: Erreichbarkeit
+    max: 10
+    owner_named: 4
+    email: 3
+    phone: 2
+    contact_form: 1

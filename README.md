@@ -98,7 +98,8 @@ npm run cli -- score --all              # alle neu bewerten nach Gewichtsänderu
   und eine Rubrik 1–5 für Design, Mobil, Handlungsaufforderung, Leistungen, Vertrauen und ersten Bildschirm. Ca.
   4 Cent je Firma. Unveränderte Websites werden nicht erneut auditiert (Inhalts-Hash).
 - **Score (Code):** fünf Dimensionen (Business 25, Website-Chance 30, Potenzial 20, Lücke 15, Erreichbarkeit 10)
-  und Knock-outs; alle Gewichte in `config/scoring.v1.yaml`. Ab 60 Punkten `QUALIFIED`, sonst `SKIPPED` mit Grund.
+  und Knock-outs; alle Gewichte in `config/scoring.v2.yaml` (am Golden Set kalibriert, v1 = Startwerte). Ab 55 Punkten
+  `QUALIFIED`, sonst `SKIPPED` mit Grund; Pitch ab 75.
 - **Pitch (Opus):** ab 80 Punkten Hauptchance, drei Argumente und ein Einstiegssatz für das Gespräch (ca. 3 Cent).
 
 ## Automatischer Ablauf (Schritt 7)

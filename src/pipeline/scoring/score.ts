@@ -169,9 +169,11 @@ function website(input: ScoreInput, c: ScoringConfig["dimensions"]["website"]): 
 
   const rubric: ScoreItem[] = [];
   if (input.audit) {
-    const per = c.rubric_max / RUBRIC_CRITERIA.length;
+    const weight = (k: (typeof RUBRIC_CRITERIA)[number]) => c.rubric_weights[k] ?? 1;
+    const totalWeight = RUBRIC_CRITERIA.reduce((sum, k) => sum + weight(k), 0);
     for (const key of RUBRIC_CRITERIA) {
       const item = input.audit.rubric[key];
+      const per = totalWeight > 0 ? (c.rubric_max * weight(key)) / totalWeight : 0;
       rubric.push({
         label: RUBRIC_LABELS[key],
         points: round1(((5 - item.score) / 4) * per),

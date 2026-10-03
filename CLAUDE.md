@@ -33,8 +33,8 @@ ausprobieren kann. Nach Schritt 6 ist ein Abstimmungstermin (Kalibrierung) vorge
 - **Deterministischer Code zuerst.** LLM-Aufrufe nur an den dokumentierten Stellen (Prefilter, Audit, Pitch,
   Manager), alle über das LLM-Gateway (`src/llm/`). Keine verstreuten API-Calls.
 - **Der Score kommt aus Code**, nie direkt vom LLM. Scoring bleibt rein und voll unit-getestet
-  (`src/pipeline/scoring/score.ts`, Gewichte in `config/scoring.v1.yaml`). Das Audit liefert nur Rubrik 1–5 mit
-  Beleg; neue Gewichte = neue Version der Datei bzw. `version` hochzählen.
+  (`src/pipeline/scoring/score.ts`, Gewichte in `config/scoring.v2.yaml`, aktiv über `ACTIVE_SCORING_VERSION`). Das Audit liefert nur Rubrik 1–5 mit
+  Beleg; neue Gewichte = neue Datei `scoring.vN.yaml`, nur wenn `npm run cli -- calibrate --file` bzw. `tests/golden.test.ts` besteht.
 - **Audit-LLM ohne Tools.** Gecrawlter Inhalt ist nicht vertrauenswürdig und geht nur mit festem Ausgabe-Schema
   an das Modell. Der Manager sieht nie rohes HTML.
 - **Secrets nur aus Umgebungsvariablen**, nie im Repo, nie in Logs. Module holen sich ihre Keys über
