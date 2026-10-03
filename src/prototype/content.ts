@@ -85,6 +85,8 @@ export interface SiteContent {
     mapsUrl: string | null;
   };
   cta: string;
+  /** Übergänge zwischen Sections (src/prototype/transitions.ts); Standard "waves". */
+  transition?: "waves" | "curve";
   /** Hinweis oben auf der Seite, dass es ein Entwurf ist (nie weglassen). */
   previewNote: string;
 }

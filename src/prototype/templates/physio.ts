@@ -1,5 +1,6 @@
 import { paletteFrom } from "../color.js";
 import { icon, type SiteContent } from "../content.js";
+import { curveSvg, edgeSvg, wavesSvg } from "../transitions.js";
 
 /**
  * Vorlage Physiotherapie (Vorbild MEDIANA, config/inspiration.yaml): großes Foto im Hero mit Claim in Versalien,
@@ -12,29 +13,11 @@ const esc = (s: string) =>
 
 const telHref = (phone: string) => `tel:${phone.replace(/[^\d+]/g, "").replace(/^00/, "+")}`;
 
-/** Drei Bergkämme: hinten hell, Mitte Markenfarbe, vorne Hintergrund der nächsten Section. */
-function mountains(back: string, middle: string, front: string): string {
-  return `<svg class="ridge" viewBox="0 0 1440 170" preserveAspectRatio="none" aria-hidden="true">
-<path fill="${back}" d="M0 92 L90 70 L170 84 L260 38 L330 62 L410 30 L500 74 L590 52 L690 90 L780 46 L860 20 L930 48 L1020 34 L1110 70 L1200 40 L1290 64 L1370 44 L1440 58 V170 H0 Z"/>
-<path fill="${middle}" d="M0 124 L110 98 L200 116 L300 76 L380 102 L470 86 L560 112 L650 80 L740 106 L830 70 L900 94 L990 82 L1080 112 L1180 84 L1270 104 L1360 88 L1440 100 V170 H0 Z"/>
-<path fill="${front}" d="M0 150 L130 132 L240 146 L360 120 L470 140 L590 126 L700 148 L820 124 L940 142 L1060 128 L1180 146 L1300 130 L1440 140 V170 H0 Z"/>
-</svg>`;
-}
-
-/** Unregelmäßige Risskante (Papier) als Übergang; `flip` für die Unterkante. */
-function tornEdge(fill: string, flip = false): string {
-  const pts: string[] = [];
-
-  for (let x = 0; x <= 1440; x += 40) {
-    const y = 10 + ((x * 37) % 23) + (x % 120 === 0 ? 6 : 0);
-    pts.push(`${x} ${y}`);
-  }
-  const d = `M0 40 L${pts.join(" L")} L1440 40 Z`;
-  return `<svg class="torn${flip ? " flip" : ""}" viewBox="0 0 1440 40" preserveAspectRatio="none" aria-hidden="true"><path fill="${fill}" d="${d}"/></svg>`;
-}
-
 export function renderPhysio(c: SiteContent): string {
   const p = paletteFrom(c.primary);
+  const style = c.transition ?? "waves";
+  const band = (back: string, middle: string, front: string) =>
+    style === "waves" ? wavesSvg(back, middle, front) : curveSvg(middle, front);
   const sie = c.form === "sie";
   const phone = c.contact.phone;
   const ctaHref = phone ? telHref(phone) : "#kontakt";
@@ -158,7 +141,7 @@ nav.menu a:hover { opacity: 1; color: var(--primary); }
 .hero .actions { display: flex; gap: 14px; flex-wrap: wrap; }
 .hand { font-family: Hand, cursive; font-weight: 600; }
 .hero .hand { font-size: clamp(30px, 3vw, 40px); color: ${p.soft}; transform: rotate(-4deg); display: inline-block; margin-top: 26px; }
-.ridge { position: absolute; left: 0; right: 0; bottom: -1px; width: 100%; height: 150px; }
+.ridge { position: absolute; left: 0; right: 0; bottom: -1px; width: 100%; height: 120px; }
 .trust { background: var(--paper); padding: 6px 0 30px; }
 .trust ul { list-style: none; margin: 0; padding: 0; display: flex; flex-wrap: wrap; justify-content: center; gap: 14px 34px;
   font-weight: 700; }
@@ -190,8 +173,8 @@ h2 { font-size: clamp(30px, 3.4vw, 46px); line-height: 1.1; letter-spacing: -.02
 .about p { color: var(--muted); white-space: pre-line; }
 .about .hand { font-size: 38px; color: var(--primary); transform: rotate(-3deg); display: inline-block; }
 .steps { background: var(--primary); color: #fff; padding: 90px 0; }
-.torn { position: absolute; left: 0; width: 100%; height: 40px; top: -39px; }
-.torn.flip { top: auto; bottom: -39px; transform: scaleY(-1); }
+.edge { position: absolute; left: 0; width: 100%; height: 48px; top: -47px; }
+.edge.flip { top: auto; bottom: -47px; transform: scaleY(-1); }
 .steps .eyebrow { color: ${p.soft}; }
 .steps ol { list-style: none; margin: 40px 0 0; padding: 0; display: grid; grid-template-columns: repeat(3, 1fr); gap: 34px; }
 .steps .num { display: inline-grid; place-items: center; width: 52px; height: 52px; border-radius: 50%; background: #fff;
@@ -212,8 +195,8 @@ h2 { font-size: clamp(30px, 3.4vw, 46px); line-height: 1.1; letter-spacing: -.02
 .gallery .grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 14px; }
 .gallery img { width: 100%; height: 260px; object-fit: cover; border-radius: 14px; }
 .gallery .mosaic img:nth-child(1) { grid-row: span 2; height: 534px; }
-.contact { background: var(--ink); color: #fff; padding: 40px 0 70px; margin-top: 150px; }
-.contact .ridge { position: absolute; top: -149px; bottom: auto; }
+.contact { background: var(--ink); color: #fff; padding: 40px 0 70px; margin-top: 120px; }
+.contact .ridge { position: absolute; top: -119px; bottom: auto; }
 .contact .wrap { display: grid; grid-template-columns: 1.1fr 1fr; gap: 60px; align-items: start; }
 .contact h2 { color: #fff; }
 .contact .eyebrow { color: ${p.soft}; }
@@ -238,9 +221,9 @@ footer .wrap { display: flex; justify-content: space-between; gap: 20px; flex-wr
   .gallery img { height: 200px; }
   .hero { padding: 60px 0 130px; min-height: 0; height: auto; max-height: none; }
   .hero .rating { margin: 6px 0 0; flex-wrap: wrap; }
-  .ridge { height: 90px; }
-  .contact .ridge { top: -89px; }
-  .contact { margin-top: 90px; }
+  .ridge { height: 70px; }
+  .contact .ridge { top: -69px; }
+  .contact { margin-top: 70px; }
   .card { display: grid; grid-template-columns: 48px 1fr; gap: 4px 16px; padding: 20px; }
   .card .ic { width: 48px; height: 48px; margin: 0; grid-row: span 2; }
   .card h3 { font-size: 18px; margin: 2px 0 0; }
@@ -275,7 +258,7 @@ footer .wrap { display: flex; justify-content: space-between; gap: 20px; flex-wr
       }
     </div>
   </div>
-  ${mountains(p.soft, p.primary, p.paper)}
+  ${band(p.soft, p.primary, p.paper)}
 </section>
 
 <section class="trust"><div class="wrap"><ul>${c.trust.map((t) => `<li>${icon("check")}${esc(t)}</li>`).join("")}</ul></div></section>
@@ -297,20 +280,20 @@ footer .wrap { display: flex; justify-content: space-between; gap: 20px; flex-wr
 </div></section>
 
 <section class="steps" id="ablauf">
-  ${tornEdge(p.primary)}
+  ${edgeSvg(style, p.primary)}
   <div class="wrap">
     <div class="eyebrow">So einfach geht's</div>
     <h2>${sie ? "In drei Schritten zu Ihrem Termin" : "In drei Schritten zu deinem Termin"}</h2>
     <ol>${steps}</ol>
   </div>
-  ${tornEdge(p.primary, true)}
+  ${edgeSvg(style, p.primary, true)}
 </section>
 
 ${reviews}
 ${gallery}
 
 <section class="contact" id="kontakt">
-  ${mountains(p.soft, p.primary, p.ink)}
+  ${band(p.soft, p.primary, p.ink)}
   <div class="wrap">
     <div>
       <div class="eyebrow">Kontakt</div>
