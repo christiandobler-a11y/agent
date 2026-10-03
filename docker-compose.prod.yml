@@ -1,0 +1,39 @@
+# Betrieb auf dem Server (Schritt 9, Anleitung: docs/DEPLOY.md).
+#   docker compose -f docker-compose.prod.yml up -d --build     starten bzw. nach "git pull" aktualisieren
+#   docker compose -f docker-compose.prod.yml logs -f app        Logs ansehen
+#   docker compose -f docker-compose.prod.yml run --rm backup    Datenbank-Sicherung nach ./backups
+services:
+  app:
+    build: .
+    image: avelio:latest
+    env_file: .env
+    environment:
+      NODE_ENV: production
+    restart: unless-stopped
+    init: true
+    # Chromium braucht mehr Shared Memory als die Docker-Vorgabe (64 MB).
+    shm_size: 1gb
+    volumes:
+      - app-data:/app/data
+    logging:
+      driver: json-file
+      options:
+        max-size: 10m
+        max-file: "5"
+
+  # Tägliche Sicherung der Avelio-Tabellen (Schema public) per Cron, siehe docs/DEPLOY.md.
+  backup:
+    image: postgres:17-alpine
+    profiles: [backup]
+    env_file: .env
+    environment:
+      PGSSLMODE: verify-full
+      PGSSLROOTCERT: /certs/supabase-prod-ca-2021.crt
+    volumes:
+      - ./backups:/backups
+      - ./config/certs:/certs:ro
+      - ./docker/backup.sh:/backup.sh:ro
+    entrypoint: ["sh", "/backup.sh"]
+
+volumes:
+  app-data:

@@ -38,3 +38,11 @@ jobs:
       - run: npm run typecheck
       - run: npm test
       - run: npm run build
+
+  # Server-Image (Schritt 9): baut und startet den Healthcheck-Code einmal, ohne Keys und ohne Datenbank.
+  docker:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - run: docker build -t avelio:ci .
+      - run: docker run --rm --entrypoint node avelio:ci -e "import('playwright').then(async ({ chromium }) => { const b = await chromium.launch(); await b.close(); console.log('Chromium ok'); })"

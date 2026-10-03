@@ -24,6 +24,9 @@ ausprobieren kann. Nach Schritt 6 ist ein Abstimmungstermin (Kalibrierung) vorge
 - `npm run cli -- <befehl>`: einzelne Pipeline-Schritte ausführen (Debugging), z. B.
   `npm run cli -- research "Fahrradladen" rosenheim -n 5`
 - `docker compose up -d db`: lokales Postgres 16
+- Betrieb: `docker-compose.prod.yml` auf Hetzner (Anleitung `docs/DEPLOY.md`, Update `scripts/deploy.sh`). Bei einem
+  Playwright-Update den Image-Tag im `Dockerfile` mitziehen. In Cloud-Sessions braucht `docker build` das
+  Proxy-Zertifikat (`NODE_EXTRA_CA_CERTS` in einer Test-Kopie des Dockerfiles, nie im echten Dockerfile)
 
 ## Grundsätze
 

@@ -30,6 +30,8 @@ const envSchema = z.object({
   GOOGLE_API_KEY: optionalSecret,
   TELEGRAM_BOT_TOKEN: optionalSecret,
   TELEGRAM_ALLOWED_CHAT_IDS: chatIdList,
+  /** Optional: Ping-URL eines Uptime-Dienstes (z. B. Healthchecks.io). Enthält ein Token, nie loggen. */
+  HEALTHCHECK_URL: optionalSecret.pipe(z.url().optional()),
 });
 
 export type Env = z.infer<typeof envSchema>;

@@ -3,7 +3,7 @@
 Internes System für Avelio: lokale Unternehmen finden, Websites auditieren, Leads mit dem
 Avelio Lead Score bewerten und über Telegram berichten.
 
-Plan: [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md). Stand: Schritt 8 (Telegram-Bot mit Manager-Agent) und Kalibrier-Werkzeug umgesetzt. Nächster Schritt: 9 (Deploy auf einen Hetzner-Server).
+Plan: [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md). Stand: Schritte 1–9 umgesetzt (zuletzt Kalibrier-Werkzeug und Deploy auf Hetzner, Anleitung: [docs/DEPLOY.md](docs/DEPLOY.md)). Offen: Kalibrierung am Golden Set (Kriterium 10), 7 Tage stabiler Betrieb (Kriterium 12).
 
 Datenbank im Betrieb: Supabase, Einrichtung in [docs/SUPABASE.md](docs/SUPABASE.md).
 
@@ -161,3 +161,10 @@ auf dem Server, auf dem Mac nur `npm run cli -- …` verwenden, nicht `npm run w
 4. `npm run cli -- calibrate export` schreibt `tests/golden/golden.json`. Ins Repo eingecheckt, prüft
    `tests/golden.test.ts` bei jeder Änderung von Gewichten oder Prompts, dass das Golden Set weiter besteht.
    Gewichte ausprobieren ohne Datenbank: `npm run cli -- calibrate --file`.
+
+## Betrieb auf dem Server (Schritt 9)
+
+Avelio läuft auf einem Hetzner-Server in Docker (`Dockerfile`, `docker-compose.prod.yml`). Einrichtung Schritt für
+Schritt: [docs/DEPLOY.md](docs/DEPLOY.md). Neue Version einspielen: `ssh root@<IP> bash /opt/avelio/scripts/deploy.sh`.
+Lebenszeichen jede Minute (Docker-Healthcheck, optional Ausfall-Alarm über `HEALTHCHECK_URL`), tägliche Sicherung
+nach `/opt/avelio/backups/`.

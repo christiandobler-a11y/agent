@@ -1,4 +1,5 @@
 import { createApp } from "./app.js";
+import { createHeartbeat } from "./health.js";
 import { loadDotEnv, loadEnv } from "./config/env.js";
 import { combineNotifiers, logNotifier } from "./queue/notifier.js";
 import { startWorkers } from "./queue/workers.js";
@@ -31,6 +32,7 @@ if (env.TELEGRAM_BOT_TOKEN && env.TELEGRAM_ALLOWED_CHAT_IDS.length > 0) {
 }
 
 await startWorkers(app.ctx);
+const heartbeat = createHeartbeat({ db: app.ctx.db, pingUrl: env.HEALTHCHECK_URL });
 if (bot) {
   void bot.start({
     onStart: (info) =>
@@ -46,6 +48,7 @@ async function shutdown(signal: string) {
   if (stopping) return;
   stopping = true;
   console.log(JSON.stringify({ level: "info", msg: "avelio wird beendet", signal }));
+  heartbeat.stop();
   await bot?.stop().catch(() => undefined);
   await app.close();
   process.exit(0);
