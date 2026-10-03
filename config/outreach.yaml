@@ -50,8 +50,7 @@ spamschutz:
     - höchstens ein Link (WhatsApp-Business-Link oder Kalender), keine Anhänge in der ersten Mail
     - keine Spam-Wörter (kostenlos, gratis, Angebot, Rabatt, garantiert, jetzt zuschlagen), keine Großbuchstaben-Wörter, kein "!!!"
     - persönliche Anrede mit Namen aus dem Impressum, sonst "Hallo zusammen" bzw. "Hallo Team {firma}"
-    - von Christians privatem Postfach (Adresse nur in der .env: OUTREACH_FROM), höchstens 10 bis 15 neue Mails am Tag,
-      über den Tag verteilt
+    - "von Christians privatem Postfach (Adresse nur in der .env, OUTREACH_FROM), höchstens 10 bis 15 neue Mails am Tag, über den Tag verteilt"
     - avelio.digital hat SPF, DKIM (IONOS s1/s2) und DMARC p=none, wird aber bisher nicht zum Senden genutzt
 
 # Kontaktweg (03.10.2026): nicht auf die eigene Website verweisen (passt noch nicht zum Anspruch), sondern auf
