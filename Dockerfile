@@ -17,6 +17,7 @@ COPY --from=build /app/dist ./dist
 COPY package.json ./
 COPY config ./config
 COPY prompts ./prompts
+COPY assets ./assets
 COPY migrations ./migrations
 COPY docker/entrypoint.sh /usr/local/bin/avelio-entrypoint
 RUN mkdir -p /app/data/screenshots && chown -R pwuser:pwuser /app/data

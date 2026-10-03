@@ -27,7 +27,7 @@ import { fetchPlaceDetails, PLACE_DETAILS_COST_USD, type PlaceDetails } from "./
  * Screenshots für Nachrichten (Vorher/Nachher).
  */
 
-export const PROTOTYPE_PROMPT_VERSION = "v3";
+export const PROTOTYPE_PROMPT_VERSION = "v4";
 
 const configSchema = z.object({
   previews_dir: z.string(),
@@ -87,10 +87,20 @@ const slugify = (s: string) =>
 
 /** Unter dieser Breite wird ein Foto im Hero (volle Bildschirmbreite) sichtbar unscharf. */
 export const MIN_HERO_WIDTH = 1000;
+/** Breitere Bilder sind Werbestreifen; im Hero (Querformat-Ausschnitt) würden sie unscharf vergrößert. */
+export const MAX_HERO_RATIO = 2.6;
+/** Dateinamen von Werbegrafiken mit Text (Slider, Aktionen), die das LLM trotz Anweisung gern als Hero nimmt. */
+const BANNERISH =
+  /slider|banner|aktion|angebot|gutschein|flyer|plakat|sale|rabatt|opening|eroeffnung|er%C3%B6ffnung/i;
+
+function heroWorthy(p: { url: string; w: number; h: number }): boolean {
+  const file = p.url.split("?")[0]?.split("/").pop() ?? "";
+  return p.w >= MIN_HERO_WIDTH && p.w / p.h <= MAX_HERO_RATIO && !BANNERISH.test(file);
+}
 
 /**
  * Fotowahl des LLM (hat die Vorschaubilder gesehen) in Adressen übersetzen. Ungültige Nummern werden ignoriert, ein zu
- * kleines Hero-Foto ersetzt der Code durch das größte gute Querformat (aus den vom LLM gebilligten Fotos, falls es
+ * kleines Hero-Foto (oder ein Werbestreifen bzw. Slider) ersetzt der Code durch das größte gute Querformat (aus den vom LLM gebilligten Fotos, falls es
  * welche gebilligt hat).
  */
 export function pickPhotos(
@@ -111,10 +121,10 @@ export function pickPhotos(
   // Größtes scharfes Querformat, zuerst unter den gebilligten Fotos, notfalls unter allen: ein Hero ohne Bild wirkt
   // schwächer als z. B. eine Landschaft der Region.
   const widest = (list: SiteImages["photos"]) =>
-    list.filter((p) => p.w >= MIN_HERO_WIDTH && p.w / p.h >= 1.3).sort((a, b) => b.w * b.h - a.w * a.h)[0];
+    list.filter((p) => heroWorthy(p) && p.w / p.h >= 1.3).sort((a, b) => b.w * b.h - a.w * a.h)[0];
   const landscape =
     widest(approved) ?? widest(photos.filter((p): p is SiteImages["photos"][number] => p !== null));
-  const hero = (chosen && chosen.w >= MIN_HERO_WIDTH ? chosen : landscape)?.url ?? null;
+  const hero = (chosen && heroWorthy(chosen) ? chosen : landscape)?.url ?? null;
   const aboutPick = at(out.ueber_uns_foto)?.url ?? null;
   const about = aboutPick === hero ? null : aboutPick;
   const gallery = [...new Set(out.galerie_fotos.map(at).map((p) => p?.url))].filter(
@@ -191,6 +201,13 @@ export function toSiteContent(
         (address ? `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(address)}` : null),
     },
     cta: clean(out.cta),
+    heroLines: out.hero_zeilen.slice(0, 3).map(clean),
+    brands: out.marken.slice(0, 10).map(clean),
+    range: out.sortiment
+      .slice(0, 6)
+      .map((r) => ({ kind: r.art, title: clean(r.titel), text: clean(r.text) })),
+    leasing: { offered: out.leasing, partners: out.leasing_partner.slice(0, 10).map(clean) },
+    city: c.city,
     previewNote: "",
   };
 }

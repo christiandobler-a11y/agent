@@ -54,6 +54,19 @@ export type IconName = (typeof ICONS)[number];
 
 const hex = z.string().regex(/^#[0-9a-fA-F]{6}$/);
 
+export const SORTIMENT = [
+  "ebike",
+  "mtb",
+  "gravel",
+  "rennrad",
+  "trekking",
+  "city",
+  "kinder",
+  "lasten",
+  "sonstiges",
+] as const;
+export type SortimentArt = (typeof SORTIMENT)[number];
+
 /** Ausgabe des LLM: nur Texte und Gestaltungs-Entscheidungen, keine Fakten. */
 /** Längen großzügig: Modelle halten sie nicht exakt ein, die Vorlage kürzt selbst (toSiteContent). */
 export const prototypeOutputSchema = z.object({
@@ -82,6 +95,14 @@ export const prototypeOutputSchema = z.object({
   galerie_fotos: z.array(z.number().int()).max(12),
   /** Untaugliche Fotos (Banner, Grafiken): nie verwenden, auch nicht als Ersatz. */
   abgelehnte_fotos: z.array(z.number().int()).max(12),
+  /** Große Kopf-Überschrift in 2–3 Zeilen, letzte = Akzent (Vorlage "fahrrad", Vorbild fs-pbg). */
+  hero_zeilen: z.array(z.string().min(1).max(60)).min(2).max(4),
+  marken: z.array(z.string().max(60)).max(16),
+  sortiment: z
+    .array(z.object({ art: z.enum(SORTIMENT), titel: z.string().min(2).max(60), text: z.string().max(200) }))
+    .max(8),
+  leasing: z.boolean(),
+  leasing_partner: z.array(z.string().max(60)).max(12),
 });
 export type PrototypeOutput = z.infer<typeof prototypeOutputSchema>;
 
@@ -111,6 +132,12 @@ export interface SiteContent {
   cta: string;
   /** Übergänge zwischen Sections (src/prototype/transitions.ts); Standard "curve" (Christians Wahl, 03.10.2026). */
   transition?: "waves" | "curve";
+  /** Zusätze für die Vorlage "fahrrad" (optional, andere Vorlagen ignorieren sie). */
+  heroLines?: string[];
+  brands?: string[];
+  range?: { kind: SortimentArt; title: string; text: string }[];
+  leasing?: { offered: boolean; partners: string[] };
+  city?: string | null;
   /** Hinweis oben auf der Seite, dass es ein Entwurf ist (nie weglassen). */
   previewNote: string;
 }

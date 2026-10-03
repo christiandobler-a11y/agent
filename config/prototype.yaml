@@ -9,7 +9,7 @@ templates:
   physiotherapie: physio
   kosmetik: physio
   friseur: physio
-  fahrrad: werkstatt
+  fahrrad: fahrrad
   maler: werkstatt
   schreiner: werkstatt
   sanitaer: werkstatt

@@ -1,6 +1,7 @@
-import { copyFile, mkdir, writeFile } from "node:fs/promises";
+import { copyFile, cp, mkdir, writeFile } from "node:fs/promises";
 import { createRequire } from "node:module";
 import { join } from "node:path";
+import { fileURLToPath } from "node:url";
 import sharp from "sharp";
 import type { SiteContent } from "./content.js";
 import { renderTemplate } from "./templates/index.js";
@@ -120,6 +121,14 @@ export interface BuildResult {
   images: number;
 }
 
+/** Vorlagen mit eigenem Ordner unter assets/prototype/. */
+const TEMPLATE_ASSETS = new Set(["fahrrad"]);
+
+/** Aus src/prototype und dist/prototype gleichermaßen <root>/assets/prototype/<name>. */
+function templateAssetDir(template: string): string {
+  return fileURLToPath(new URL(`../../assets/prototype/${template}/`, import.meta.url));
+}
+
 /**
  * Seite bauen. Bild-Adressen in `content` sind Original-URLs; im Ergebnis zeigen sie auf die lokalen Dateien.
  */
@@ -133,6 +142,8 @@ export async function buildSite(
   await mkdir(join(dir, "fonts"), { recursive: true });
   for (const [file, pkg] of Object.entries(FONTS))
     await copyFile(require.resolve(pkg), join(dir, "fonts", file));
+  // Vorlagen mit eigenem Stil (z. B. "fahrrad") bringen CSS, Schriften und Ersatzbilder aus assets/prototype/<name>/ mit.
+  if (TEMPLATE_ASSETS.has(template)) await cp(templateAssetDir(template), dir, { recursive: true });
 
   const cache = new Map<string, Promise<string | null>>();
   let n = 0;

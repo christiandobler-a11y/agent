@@ -18,6 +18,7 @@ import {
   siteForm,
   toSiteContent,
 } from "../src/prototype/run.js";
+import { renderFahrrad } from "../src/prototype/templates/fahrrad.js";
 import { renderPhysio } from "../src/prototype/templates/physio.js";
 import { crmCallback, parseCrmCallback, prototypeMessage } from "../src/telegram/format.js";
 import { loadOutreachConfig } from "../src/outreach/config.js";
@@ -53,6 +54,11 @@ const output: PrototypeOutput = {
   ueber_uns_foto: null,
   galerie_fotos: [1, 3],
   abgelehnte_fotos: [],
+  hero_zeilen: ["Wieder", "beweglich", "im Alltag."],
+  marken: [],
+  sortiment: [],
+  leasing: false,
+  leasing_partner: [],
 };
 
 const company = {
@@ -129,6 +135,20 @@ describe("Prototyp (rein)", () => {
       { text: "Tolles Team, sehr kompetent und freundlich, immer wieder gern.", author: "Anna M." },
     ]);
     expect(d.mapsUrl).toBe("https://maps.google.com/?cid=1");
+  });
+
+  it("Hero: keine Werbestreifen oder Slider, stattdessen echtes Querformat", () => {
+    const shop = [
+      { url: "https://x.de/Slider_Opening-Aktion_1920.jpg", alt: "", w: 1440, h: 768 },
+      { url: "https://x.de/streifen.jpg", alt: "", w: 1440, h: 315 },
+      { url: "https://x.de/AQ9I9301.jpg", alt: "", w: 1440, h: 900 },
+    ];
+    expect(pickPhotos({ hero_foto: 1, ueber_uns_foto: null, galerie_fotos: [3] }, shop).hero).toBe(
+      "https://x.de/AQ9I9301.jpg",
+    );
+    expect(
+      pickPhotos({ hero_foto: 2, ueber_uns_foto: null, galerie_fotos: [] }, shop.slice(0, 2)).hero,
+    ).toBeNull();
   });
 
   it("Fotowahl und Inhalt: gültige Nummern, Rest in die Galerie, keine Gedankenstriche, Maps-Link aus Adresse", () => {
@@ -239,6 +259,52 @@ const jpeg = (w: number, h: number) =>
   sharp({ create: { width: w, height: h, channels: 3, background: "#88aacc" } })
     .jpeg()
     .toBuffer();
+
+describe("Vorlage fahrrad (wie fs-pbg)", () => {
+  const bike = (over: Partial<SiteContent> = {}) =>
+    content({
+      name: "Radl Huber",
+      heroLines: ["Dein Bike.", "Dein Weg.", "Dein Laden."],
+      brands: ["Cube", "Trek", "Haibike"],
+      range: [{ kind: "ebike", title: "E-Bikes", text: "Probefahrt jederzeit." }],
+      leasing: { offered: true, partners: ["JobRad"] },
+      ...over,
+    });
+
+  it("nutzt Stil und Aufbau von fs-pbg, letzte Hero-Zeile als Akzent, keine Skripte", () => {
+    const html = renderFahrrad(bike());
+    expect(html).toContain('href="style.css"');
+    expect(html).toContain("--color-magenta:");
+    expect(html).toContain("Radl");
+    expect(html).toMatch(/italic[^"]*text-magenta-bright[^"]*">Dein Laden\.</);
+    expect(html).toContain("JobRad");
+    expect(html).toContain("Cube");
+    expect(html).toContain('name="robots" content="noindex');
+    expect(html).not.toContain("<script");
+  });
+
+  it("ohne eigenes Foto: Produktbild der Kategorie als Hero", () => {
+    const html = renderFahrrad(bike({ hero: { ...content().hero, image: null } }));
+    expect(html).toContain("img/cat-ebike.webp");
+  });
+
+  it("buildSite kopiert CSS, Schriften und Ersatzbilder", async () => {
+    const dir = mkdtempSync(join(tmpdir(), "avelio-bike-"));
+    await buildSite(
+      bike({
+        hero: { ...content().hero, image: null },
+        gallery: [],
+        about: { ...content().about, image: null },
+      }),
+      dir,
+      () => Promise.resolve(null),
+      "fahrrad",
+    );
+    expect(existsSync(join(dir, "style.css"))).toBe(true);
+    expect(existsSync(join(dir, "img/cat-ebike.webp"))).toBe(true);
+    expect(existsSync(join(dir, "fonts/archivo-latin-400-normal-C81ewxNO.woff2"))).toBe(true);
+  });
+});
 
 describe("Prototyp bauen (Dateien)", () => {
   it("erkennt helle (weiße) Logos auf durchsichtigem Grund", async () => {
