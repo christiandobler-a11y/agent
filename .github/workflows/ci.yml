@@ -39,7 +39,7 @@ jobs:
       - run: npm test
       - run: npm run build
 
-  # Server-Image (Schritt 9): baut und startet den Healthcheck-Code einmal, ohne Keys und ohne Datenbank.
+  # Server-Image (Schritt 9): baut es und startet Chromium darin einmal, ohne Keys und ohne Datenbank.
   docker:
     runs-on: ubuntu-latest
     steps:
