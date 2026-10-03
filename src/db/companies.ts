@@ -252,8 +252,8 @@ export async function setResearchOutcome(
   return rows[0];
 }
 
-/** Crawl fehlgeschlagen: FAILED mit Meldung, erneuter Versuch ab `recheckAfter` (config/recheck.yaml → failed). */
-export async function setCrawlFailed(
+/** Schritt fehlgeschlagen: FAILED mit Meldung, erneuter Versuch ab `recheckAfter` (config/recheck.yaml → failed). */
+export async function setFailed(
   db: DbClient,
   companyId: string,
   detail: string,

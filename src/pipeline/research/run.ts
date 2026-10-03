@@ -1,11 +1,12 @@
 import { z } from "zod";
 import { loadYamlConfig } from "../../config/files.js";
 import type { Db } from "../../db/client.js";
-import { setResearchOutcome, upsertCompany, type Company } from "../../db/companies.js";
+import { setFailed, setResearchOutcome, upsertCompany, type Company } from "../../db/companies.js";
 import { insertPlacesSnapshot } from "../../db/placesSnapshots.js";
 import {
   createSearchRun,
   finishSearchRun,
+  getSearchRun,
   updateSearchRunStats,
   type SearchRun,
 } from "../../db/searchRuns.js";
@@ -53,6 +54,8 @@ export interface ResearchDeps {
   config: ResearchConfig;
   /** Wird vor jeder Places-Anfrage geprüft; der Prefilter prüft über das LLM-Gateway selbst. */
   budget: BudgetGuard;
+  /** Wird für jede Firma aufgerufen, die Gate und Prefilter bestanden hat (Queue: nächsten Job anlegen). */
+  onPassed?: (company: Company) => Promise<void>;
   now?: () => Date;
   onProgress?: (message: string) => void;
 }
@@ -63,6 +66,13 @@ export interface ResearchRequest {
   /** Gewünschte Zahl an Leads; gesucht wird bis Ziel × oversearch_factor Firmen Gate und Prefilter bestehen. */
   target: number;
   requestedBy: string;
+  /** Bestehenden Lauf fortsetzen (Queue nach Neustart), statt einen neuen anzulegen. */
+  searchRunId?: string;
+  /**
+   * `true` (Standard, CLI): Lauf am Ende abschließen. `false` (Queue): nur Statistik schreiben; abgeschlossen
+   * wird der Lauf, wenn alle Folge-Jobs fertig sind.
+   */
+  finish?: boolean;
 }
 
 export type StopReason = "goal_reached" | "tiles_exhausted" | "request_limit" | "budget_exceeded";
@@ -86,6 +96,8 @@ export interface ResearchStats {
   llm_cost_usd: number;
   passed: number;
   stopped_because: StopReason | null;
+  /** Recherche fertig (Folge-Jobs können noch laufen). */
+  research_done?: boolean;
   error?: string;
 }
 
@@ -123,11 +135,16 @@ export async function runResearch(deps: ResearchDeps, req: ResearchRequest): Pro
   const queries = tileQueries(req.region, req.term);
   const goal = Math.ceil(req.target * config.oversearch_factor);
 
-  const run = await createSearchRun(db, {
-    requestedBy: req.requestedBy,
-    query: { term: req.term, region: req.region.key, branch_key: branch?.key ?? null },
-    targetCount: req.target,
-  });
+  const existing = req.searchRunId ? await getSearchRun(db, req.searchRunId) : null;
+  if (req.searchRunId && !existing) throw new Error(`Suchlauf ${req.searchRunId} nicht gefunden`);
+  const run =
+    existing ??
+    (await createSearchRun(db, {
+      requestedBy: req.requestedBy,
+      query: { term: req.term, region: req.region.key, branch_key: branch?.key ?? null },
+      targetCount: req.target,
+    }));
+  const finish = req.finish ?? true;
 
   const stats: ResearchStats = {
     goal,
@@ -149,6 +166,15 @@ export async function runResearch(deps: ResearchDeps, req: ResearchRequest): Pro
     passed: 0,
     stopped_because: null,
   };
+  if (existing) {
+    // Wiederaufnahme: Was vor dem Abbruch schon bestanden hat, zählt weiter.
+    const { rows } = await db.query<{ n: number }>(
+      `select count(*)::int as n from companies
+        where first_search_run_id = $1 and status in ('RESEARCHED', 'AUDITED', 'QUALIFIED')`,
+      [run.id],
+    );
+    stats.passed = rows[0]!.n;
+  }
   const passed: Company[] = [];
   const seenPlaces = new Set<string>();
   const seenCompanies = new Set<string>();
@@ -158,6 +184,9 @@ export async function runResearch(deps: ResearchDeps, req: ResearchRequest): Pro
     // Zwei Google-Einträge derselben Firma (z. B. gleiche Domain) nur einmal verarbeiten.
     if (seenCompanies.has(company.id)) return { kind: "duplicate" };
     seenCompanies.add(company.id);
+    // In diesem Lauf vor einem Abbruch schon verarbeitet.
+    if (!created && company.first_search_run_id === run.id && company.status !== "NEW")
+      return { kind: "duplicate" };
 
     await insertPlacesSnapshot(db, {
       companyId: company.id,
@@ -206,8 +235,16 @@ export async function runResearch(deps: ResearchDeps, req: ResearchRequest): Pro
         },
       );
     } catch (err) {
-      // Firma bleibt NEW und wird beim nächsten Lauf erneut geprüft; der Fehler steht in agent_runs.
-      if (err instanceof LlmError) return { kind: "prefilter_error" };
+      // Endzustand FAILED (ARCHITECTURE.md 18, Kriterium 2); erneuter Versuch nach recheck.failed Tagen.
+      if (err instanceof LlmError) {
+        await setFailed(
+          db,
+          company.id,
+          `Vorfilter: ${err.message.slice(0, 200)}`,
+          computeRecheckAfter(deps.recheck, "FAILED", null, now()),
+        );
+        return { kind: "prefilter_error" };
+      }
       if (err instanceof BudgetExceededError) return { kind: "budget_exceeded", error: err };
       throw err;
     }
@@ -231,6 +268,7 @@ export async function runResearch(deps: ResearchDeps, req: ResearchRequest): Pro
       { status: "RESEARCHED", branchKey: decision.branchKey ?? branch?.key ?? null },
       null,
     );
+    await deps.onPassed?.(updated);
     return { kind: "passed", company: updated, costUsd: decision.costUsd };
   }
 
@@ -319,17 +357,22 @@ export async function runResearch(deps: ResearchDeps, req: ResearchRequest): Pro
       }
     }
     stats.stopped_because ??= "tiles_exhausted";
-    await finishSearchRun(db, run.id, "COMPLETED", stats);
+    stats.research_done = true;
+    if (finish) await finishSearchRun(db, run.id, "COMPLETED", stats);
+    else await updateSearchRunStats(db, run.id, stats);
   } catch (err) {
     if (err instanceof BudgetExceededError) {
       // Kein Fehler des Laufs: sauber anhalten, Ergebnisse bis hierhin bleiben gültig.
       stats.stopped_because = "budget_exceeded";
       stats.error = err.message;
-      await finishSearchRun(db, run.id, "COMPLETED", stats);
+      if (finish) await finishSearchRun(db, run.id, "COMPLETED", stats);
+      else await updateSearchRunStats(db, run.id, stats);
       return { run: { ...run, status: "COMPLETED", stats: { ...stats } }, stats, passed };
     }
     stats.error = err instanceof Error ? err.message : String(err);
-    await finishSearchRun(db, run.id, "FAILED", stats);
+    // Queue: Der Job wird wiederholt; als FAILED markiert erst der letzte Versuch (src/queue/workers.ts).
+    if (finish) await finishSearchRun(db, run.id, "FAILED", stats);
+    else await updateSearchRunStats(db, run.id, stats);
     throw err;
   }
 

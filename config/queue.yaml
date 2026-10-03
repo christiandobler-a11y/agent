@@ -1,0 +1,42 @@
+# Job-Queue (pg-boss, ARCHITECTURE.md 5.1/11.2): ein Job = eine Firma × ein Schritt.
+# retry_limit: Wiederholungen nach dem ersten Versuch. retry_delay_s: erste Wartezeit, danach exponentiell
+# (retry_backoff) bis retry_delay_max_s. heartbeat_s: bleibt der Herzschlag eines Workers so lange aus (Absturz),
+# startet der Job neu. expire_s: harte Obergrenze je Versuch. concurrency: parallele Jobs je Prozess.
+queues:
+  research:
+    retry_limit: 2
+    retry_delay_s: 60
+    retry_backoff: true
+    retry_delay_max_s: 900
+    heartbeat_s: 30
+    expire_s: 3600
+    concurrency: 1
+  # Website nicht erreichbar: 2 Wiederholungen nach 5 min und 1 h (ARCHITECTURE.md 11.2).
+  crawl:
+    retry_limit: 2
+    retry_delay_s: 300
+    retry_backoff: true
+    retry_delay_max_s: 3600
+    heartbeat_s: 30
+    expire_s: 900
+    concurrency: 2
+  audit:
+    retry_limit: 2
+    retry_delay_s: 60
+    retry_backoff: true
+    retry_delay_max_s: 900
+    heartbeat_s: 30
+    expire_s: 900
+    concurrency: 3
+  pitch:
+    retry_limit: 2
+    retry_delay_s: 60
+    retry_backoff: true
+    retry_delay_max_s: 900
+    heartbeat_s: 30
+    expire_s: 600
+    concurrency: 2
+# Prüft offene Suchläufe auf Abschluss und holt liegengebliebene Firmen nach (Cron, Minuten).
+sweep_every_minutes: 2
+# Bei erschöpftem Budget: liegengebliebene Jobs am nächsten Tag um diese Uhrzeit (deutsche Zeit) fortsetzen.
+budget_resume_time: "06:00"

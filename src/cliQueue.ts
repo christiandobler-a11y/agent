@@ -1,0 +1,141 @@
+import { createApp } from "./app.js";
+import { parseResearchArgs } from "./cli-args.js";
+import { loadEnv, requireKeys } from "./config/env.js";
+import { createDb, type Db } from "./db/client.js";
+import { getSearchRun, type SearchRun } from "./db/searchRuns.js";
+import { pendingJobs, runSummary, startSearch, type PipelineContext } from "./queue/pipeline.js";
+import { startWorkers } from "./queue/workers.js";
+
+/** CLI für den Queue-Betrieb (Schritt 7): search, worker, runs, failed. */
+
+const usd = (n: number) => `${n.toFixed(2).replace(".", ",")} $`;
+const time = (d: Date) =>
+  d.toLocaleString("de-DE", { timeZone: "Europe/Berlin", dateStyle: "short", timeStyle: "short" });
+
+/** Für reine Lesebefehle reichen Datenbank und Schema-Name. */
+function readCtx(db: Db): PipelineContext {
+  return { db, bossSchema: "pgboss" } as PipelineContext;
+}
+
+function formatCounts(counts: Record<string, number>): string {
+  const order = ["QUALIFIED", "SKIPPED", "FAILED", "AUDITED", "RESEARCHED", "NEW"];
+  return order
+    .filter((s) => counts[s])
+    .map((s) => `${s} ${counts[s]}`)
+    .join(" · ");
+}
+
+async function printRun(ctx: PipelineContext, run: SearchRun) {
+  const s = await runSummary(ctx, run);
+  const q = run.query as { term?: string; region?: string };
+  const pending = run.status === "RUNNING" ? await pendingJobs(ctx, run.id).catch(() => 0) : 0;
+  console.log(
+    `${time(run.created_at)}  ${run.status.padEnd(9)} "${q.term}" ${q.region} (Ziel ${run.target_count})  ${run.id.slice(0, 8)}`,
+  );
+  console.log(
+    `   ${formatCounts(s.counts) || "noch keine Firmen"}${pending ? ` · ${pending} Jobs offen` : ""} · Kosten ${usd(s.costUsd)}`,
+  );
+  for (const l of s.topLeads)
+    console.log(`   ✔ ${String(l.score).padStart(3)}  ${l.name} (${l.city ?? "?"})`);
+}
+
+export async function search(argv: string[]): Promise<number> {
+  const wait = argv.includes("--wait");
+  let parsed;
+  try {
+    parsed = parseResearchArgs(argv.filter((a) => a !== "--wait"));
+  } catch (err) {
+    console.error(`${err instanceof Error ? err.message : String(err)} [--wait]`);
+    return 2;
+  }
+  const app = await createApp();
+  try {
+    const run = await startSearch(app.ctx, {
+      term: parsed.term,
+      regionKey: parsed.region,
+      target: parsed.target,
+      requestedBy: "cli",
+    });
+    console.log(`Suchlauf ${run.id} eingereiht. Er läuft im Worker (npm start bzw. npm run cli -- worker).`);
+    if (!wait) {
+      console.log("Stand abfragen: npm run cli -- runs");
+      return 0;
+    }
+    for (;;) {
+      await new Promise((r) => setTimeout(r, 15_000));
+      const current = (await getSearchRun(app.db, run.id))!;
+      const summary = await runSummary(app.ctx, current);
+      console.log(`  ${time(new Date())}  ${current.status}  ${formatCounts(summary.counts)}`);
+      if (current.status !== "RUNNING") {
+        await printRun(app.ctx, current);
+        return current.status === "COMPLETED" ? 0 : 1;
+      }
+    }
+  } finally {
+    await app.close();
+  }
+}
+
+export async function worker(): Promise<number> {
+  const app = await createApp({ worker: true });
+  await startWorkers(app.ctx);
+  console.log("Worker läuft (Strg+C beendet; laufende Jobs dürfen fertig werden).");
+  await new Promise<void>((resolve) => {
+    process.once("SIGINT", resolve);
+    process.once("SIGTERM", resolve);
+  });
+  await app.close();
+  return 0;
+}
+
+export async function runs(argv: string[]): Promise<number> {
+  const n = argv[0] === "-n" ? Number(argv[1]) : 5;
+  const { DATABASE_URL } = requireKeys(loadEnv(), ["DATABASE_URL"]);
+  const db = createDb(DATABASE_URL, { max: 2 });
+  try {
+    const { rows } = await db.query<SearchRun>(
+      "select * from search_runs order by created_at desc limit $1",
+      [Number.isInteger(n) && n > 0 ? n : 5],
+    );
+    if (rows.length === 0) console.log("Noch keine Suchläufe.");
+    for (const run of rows) await printRun(readCtx(db), run);
+    return 0;
+  } finally {
+    await db.end();
+  }
+}
+
+export async function failed(): Promise<number> {
+  const { DATABASE_URL } = requireKeys(loadEnv(), ["DATABASE_URL"]);
+  const db = createDb(DATABASE_URL, { max: 2 });
+  try {
+    const { rows } = await db.query<{
+      name: string;
+      city: string | null;
+      skip_detail: string | null;
+      updated_at: Date;
+      recheck_after: Date | null;
+    }>(
+      `select name, city, skip_detail, updated_at, recheck_after from companies
+        where status = 'FAILED' and updated_at > now() - interval '14 days'
+        order by updated_at desc limit 50`,
+    );
+    console.log(
+      rows.length === 0
+        ? "Keine fehlgeschlagenen Firmen in den letzten 14 Tagen."
+        : "Fehlgeschlagen (letzte 14 Tage):",
+    );
+    for (const r of rows) {
+      const again = r.recheck_after ? `, neuer Versuch ab ${time(r.recheck_after)}` : "";
+      console.log(`  ✘ ${r.name} (${r.city ?? "?"}) – ${r.skip_detail ?? "ohne Angabe"}${again}`);
+    }
+    const dead = await db
+      .query<{ n: number }>("select count(*)::int as n from pgboss.job where name = 'dead'")
+      .then((r) => r.rows[0]!.n)
+      .catch(() => 0);
+    if (dead > 0) console.log(`\n${dead} Job(s) endgültig gescheitert (Dead-Letter-Queue "dead").`);
+    return 0;
+  } finally {
+    await db.end();
+  }
+}

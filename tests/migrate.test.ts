@@ -15,6 +15,7 @@ describeDb("migrate", () => {
     expect(rows.map((r) => r.table_name)).toEqual([
       "agent_runs",
       "api_usage",
+      "app_state",
       "audits",
       "companies",
       "contacts",

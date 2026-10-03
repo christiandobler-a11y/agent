@@ -212,7 +212,7 @@ describeDb("runResearch", () => {
     expect(prefilter).toHaveBeenCalledTimes(1);
   });
 
-  it("Prefilter-Fehler: Firma bleibt NEW und wird beim nächsten Lauf fertig geprüft", async () => {
+  it("Prefilter-Fehler: Firma endet FAILED und wird nach recheck_after erneut geprüft", async () => {
     await db().query("truncate companies, search_runs cascade");
     const only = {
       "Fahrradladen in Rosenheim|": { places: [makePlace({ id: "z" })], invalid: 0, nextPageToken: null },
@@ -223,9 +223,15 @@ describeDb("runResearch", () => {
 
     const first = await runResearch(deps({ places: fakePlaces(only).client, prefilter: failing }), request);
     expect(first.stats).toMatchObject({ prefilter_errors: 1, passed: 0 });
-    expect((await companies())[0]).toMatchObject({ place_id: "z", status: "NEW" });
+    expect((await companies())[0]).toMatchObject({
+      place_id: "z",
+      status: "FAILED",
+      skip_detail: "Vorfilter: prefilter: overloaded",
+      recheck_after: new Date(T0.getTime() + 7 * DAY),
+    });
 
-    const second = await runResearch(deps({ places: fakePlaces(only).client }), request);
+    const later = new Date(T0.getTime() + 8 * DAY);
+    const second = await runResearch(deps({ places: fakePlaces(only).client, now: () => later }), request);
     expect(second.stats).toMatchObject({ known_companies: 1, known_not_due: 0, passed: 1 });
     expect((await companies())[0]).toMatchObject({ status: "RESEARCHED" });
   });

@@ -41,3 +41,8 @@ export async function finishSearchRun(
     JSON.stringify(stats),
   ]);
 }
+
+export async function getSearchRun(db: DbClient, id: string): Promise<SearchRun | null> {
+  const { rows } = await db.query<SearchRun>("select * from search_runs where id = $1", [id]);
+  return rows[0] ?? null;
+}

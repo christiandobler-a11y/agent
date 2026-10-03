@@ -2,7 +2,7 @@ import { createHash, randomUUID } from "node:crypto";
 import { join } from "node:path";
 import { recordApiUsage } from "../../db/apiUsage.js";
 import type { Db } from "../../db/client.js";
-import { clearCrawlFailure, markNoWebsite, setCrawlFailed, type Company } from "../../db/companies.js";
+import { clearCrawlFailure, markNoWebsite, setFailed, type Company } from "../../db/companies.js";
 import { replaceImpressumContacts } from "../../db/contacts.js";
 import { insertWebsiteSnapshot, type WebsiteSnapshot } from "../../db/websiteSnapshots.js";
 import { normalizeName } from "../research/identity.js";
@@ -137,7 +137,7 @@ export async function crawlCompany(deps: CrawlDeps, company: Company): Promise<C
       error: err.message.slice(0, 500),
       errorKind: err.kind,
     });
-    await setCrawlFailed(
+    await setFailed(
       db,
       company.id,
       `Crawl: ${err.kind} – ${err.message.slice(0, 200)}`,
