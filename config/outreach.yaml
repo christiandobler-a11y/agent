@@ -2,14 +2,15 @@
 # Entwurfs-Prompt (prompts/contact.v1.md). Stand 03.10.2026, mit Christian abgestimmt.
 
 positionierung: >-
-  Christian erkennt, was den ersten (und zweiten) Eindruck einer Website kaputt macht, und macht ihn so überzeugend
-  wie möglich. Die Website ist online das erste Bild eines Betriebs. Kein Berufsetikett wie "Webdesigner aus XY".
+  Christian macht Online-Auftritte zeitgemäß, damit der erste (und zweite) Eindruck so stark ist wie der Betrieb
+  selbst. Die Website ist online das erste Bild eines Betriebs. Kein Berufsetikett wie "Webdesigner aus XY".
+  Direkt nach dem Befund kommt ein Kompliment mit Fakt, damit "zeitgemäß" nicht nach "veraltet" klingt.
 
-einstiege: # werden abgewechselt, nie wortgleich kopieren
-  - Ich heiße Christian und kümmere mich darum, dass der erste Eindruck online stimmt.
-  - Mein Job ist, dass Betriebe online genauso gut rüberkommen wie in echt.
-  - Ich schau mir Websites mit den Augen eines neuen Kunden an. Was fällt in den ersten Sekunden auf, und was hält ihn davon ab anzurufen?
-  - Ich finde, wo eine Website Kunden verliert, und behebe das.
+# Gewählter Einstieg (Variante 2, 03.10.2026). Die anderen nur zur Abwechslung, damit nicht jede Mail gleich klingt.
+einstieg: Ich heiße Christian und mache Online-Auftritte zeitgemäß. Für die meisten Kunden ist die Website ja das Erste, was sie von einem sehen.
+einstiege_abwechslung:
+  - Ich bin Christian und bring Websites auf den Stand von heute, damit der erste Eindruck online genauso stark ist wie der Betrieb selbst.
+  - Ich bin Christian. Ich sorge dafür, dass ein guter Betrieb online auch so aussieht, zeitgemäß und auf dem Handy einfach zu bedienen.
 
 aufhaenger: >-
   Ich habe etwas vorbereitet und würde es gern in 5 bis 10 Minuten gemeinsam durchgehen. Wann passt es diese Woche am
