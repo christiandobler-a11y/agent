@@ -1,0 +1,10 @@
+# Prototypen (Phase 3, 03.10.2026): Avelio baut aus einer Branchen-Vorlage und den Inhalten der alten Website einen
+# Entwurf, den Christian zeigen kann. Gehostet auf dem eigenen Server (Caddy, docker-compose.prod.yml) unter
+# PREVIEW_BASE_URL (z. B. https://vorschau.avelio.digital), nicht indexiert, nach keep_days gelöscht.
+previews_dir: data/previews
+shots_dir: data/preview-shots
+keep_days: 60
+# Branche → Vorlage (src/prototype/templates). Branchen ohne eigene Vorlage nutzen "fallback".
+templates:
+  physiotherapie: physio
+fallback: physio

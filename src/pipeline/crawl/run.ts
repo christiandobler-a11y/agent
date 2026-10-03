@@ -10,6 +10,7 @@ import { computeRecheckAfter, type RecheckRules } from "../research/recheck.js";
 import type { BrowserCrawler, SiteCapture } from "./browser.js";
 import { CrawlError, detectUnusablePage, homepageUrl, isSocialOnly, normalizeSiteUrl } from "./classify.js";
 import type { CrawlConfig } from "./config.js";
+import { selectImages, type SiteImages } from "./images.js";
 import { extractFacts, htmlToText, textExcerpt, type PageFacts } from "./facts.js";
 import { parseImpressum, type ImpressumData } from "./impressum.js";
 import type { PageSpeedClient, PsiResult } from "./pagespeed.js";
@@ -38,6 +39,8 @@ export interface SiteFacts extends PageFacts {
   cookie_banner_clicked: boolean;
   impressum: (ImpressumData & { url: string }) | null;
   services_url: string | null;
+  /** Logo und größte Fotos der Startseite (für Prototypen). */
+  images?: SiteImages;
 }
 
 export type CrawlOutcome =
@@ -98,6 +101,7 @@ export function buildFacts(
     impressum,
     impressum_url: impressum?.url ?? facts.impressum_url,
     services_url: capture.services?.url ?? null,
+    images: selectImages(capture.images ?? []),
   };
 }
 

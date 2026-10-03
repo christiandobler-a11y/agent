@@ -4,6 +4,7 @@ import { chromium, type Browser, type BrowserContext, type Page } from "playwrig
 import { CrawlError, classifyNavigationError, isCertificateError } from "./classify.js";
 import type { CrawlConfig } from "./config.js";
 import { findLink } from "./facts.js";
+import { IMAGE_SCRIPT, type ImageCandidate } from "./images.js";
 import * as cheerio from "cheerio";
 
 /**
@@ -57,6 +58,8 @@ export interface SiteCapture {
   mobileScreenshot: string;
   impressum: SubpageCapture | null;
   services: SubpageCapture | null;
+  /** Bilder der Startseite (desktop) für Prototypen; fehlt bei älteren Erfassungen. */
+  images?: ImageCandidate[];
 }
 
 export interface BrowserCrawlerOptions {
@@ -244,6 +247,12 @@ export async function createBrowserCrawler(options: BrowserCrawlerOptions): Prom
       const finalUrl = page.url(); // nach readContent: eine JS-Weiterleitung ist dann abgeschlossen
       const title = (await page.title().catch(() => "")) || null;
       await screenshot(page, shots.desktop, "desktop");
+      // Nach dem Screenshot sind Lazy-Loading-Bilder geladen.
+      const images = await withDeadline(
+        page.evaluate(IMAGE_SCRIPT).then((v) => (Array.isArray(v) ? (v as ImageCandidate[]) : [])),
+        4000,
+        [] as ImageCandidate[],
+      );
 
       const mobilePage = await mobile.newPage();
       await open(mobilePage, finalUrl);
@@ -279,6 +288,7 @@ export async function createBrowserCrawler(options: BrowserCrawlerOptions): Prom
         mobileScreenshot: shots.mobile,
         impressum,
         services,
+        images,
       } satisfies SiteCapture;
     } finally {
       await desktop.close().catch(() => undefined);

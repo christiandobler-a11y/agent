@@ -164,6 +164,7 @@ export type CrmCallback =
   | { kind: "status"; status: SalesStatus; companyId: string }
   | { kind: "email"; companyId: string }
   | { kind: "letter"; companyId: string }
+  | { kind: "prototype"; companyId: string }
   | { kind: "remind"; days: number; companyId: string }
   | { kind: "done"; interactionId: string }
   | { kind: "snooze"; interactionId: string };
@@ -178,6 +179,8 @@ export function crmCallback(c: CrmCallback): string {
       return `dm:${c.companyId}`;
     case "letter":
       return `bl:${c.companyId}`;
+    case "prototype":
+      return `pt:${c.companyId}`;
     case "remind":
       return `sr:${c.days}:${c.companyId}`;
     case "done":
@@ -197,6 +200,8 @@ export function parseCrmCallback(data: string): CrmCallback | null {
   if (m) return { kind: "email", companyId: m[1]! };
   m = new RegExp(`^bl:(${UUID})$`).exec(data);
   if (m) return { kind: "letter", companyId: m[1]! };
+  m = new RegExp(`^pt:(${UUID})$`).exec(data);
+  if (m) return { kind: "prototype", companyId: m[1]! };
   m = new RegExp(`^sr:(\\d{1,2}):(${UUID})$`).exec(data);
   if (m) return { kind: "remind", days: Number(m[1]), companyId: m[2]! };
   m = new RegExp(`^r([dz]):(${UUID})$`).exec(data);
@@ -259,6 +264,7 @@ export function leadCrmCard(
         { text: "✍️ E-Mail-Entwurf", callback_data: crmCallback({ kind: "email", companyId: c.id }) },
         { text: "🖨️ Befund-Seite", callback_data: crmCallback({ kind: "letter", companyId: c.id }) },
       ],
+      [{ text: "🎨 Prototyp bauen", callback_data: crmCallback({ kind: "prototype", companyId: c.id }) }],
       [
         { text: "⏰ in 3 Tagen", callback_data: crmCallback({ kind: "remind", days: 3, companyId: c.id }) },
         { text: "⏰ in 7 Tagen", callback_data: crmCallback({ kind: "remind", days: 7, companyId: c.id }) },
@@ -390,6 +396,30 @@ export function letterMessages(
       ],
     ],
   };
+}
+
+/** Prototyp fertig: Link, Hinweise, Buttons (Öffnen, Neu bauen). */
+export function prototypeMessage(
+  company: Company,
+  p: { url: string | null; dir: string; warnings: string[]; costUsd: number },
+): { caption: string; keyboard: InlineKeyboardButton[][] } {
+  const lines = [
+    `🎨 <b>Prototyp für ${escapeHtml(company.name)}</b>`,
+    "",
+    p.url
+      ? `<b>Vorschau:</b> ${escapeHtml(p.url)}`
+      : "Noch keine Vorschau-Adresse eingerichtet (PREVIEW_BASE_URL), die Seite liegt nur auf dem Server.",
+    "Nicht öffentlich auffindbar, nur mit dem Link.",
+  ];
+  if (p.warnings.length > 0) lines.push("", `⚠️ ${escapeHtml(p.warnings.join(" · "))}`);
+  lines.push("", `<i>Kosten ${p.costUsd.toFixed(3).replace(".", ",")} $</i>`);
+  const row: InlineKeyboardButton[] = [];
+  if (p.url) row.push({ text: "🌐 Öffnen", url: p.url });
+  row.push({
+    text: "🔄 Neu bauen",
+    callback_data: crmCallback({ kind: "prototype", companyId: company.id }),
+  });
+  return { caption: lines.join("\n"), keyboard: [row] };
 }
 
 /** Liste der Top-Leads (Nummer, Name, Ort, Score, Vertriebsstatus). */

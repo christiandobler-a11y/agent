@@ -35,5 +35,27 @@ services:
       - ./docker/backup.sh:/backup.sh:ro
     entrypoint: ["sh", "/backup.sh"]
 
+  # Vorschau-Seiten der Prototypen (Phase 3) unter PREVIEW_DOMAIN. Läuft nur mit COMPOSE_PROFILES=preview in der
+  # .env (erst nach dem DNS-Eintrag einschalten, siehe docs/DEPLOY.md, Abschnitt "Vorschau-Seiten").
+  preview:
+    image: caddy:2-alpine
+    profiles: [preview]
+    restart: unless-stopped
+    env_file: .env
+    ports:
+      - "80:80"
+      - "443:443"
+      - "443:443/udp"
+    volumes:
+      - ./docker/Caddyfile:/etc/caddy/Caddyfile:ro
+      - app-data:/srv:ro
+      - caddy-data:/data
+    logging:
+      driver: json-file
+      options:
+        max-size: 10m
+        max-file: "3"
+
 volumes:
   app-data:
+  caddy-data:

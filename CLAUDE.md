@@ -20,6 +20,9 @@ ausprobieren kann. Nach Schritt 6 ist ein Abstimmungstermin (Kalibrierung) vorge
   bzw. „Such alle …“ = Komplett-Suche ohne Zielzahl (`src/pipeline/research/coverage.ts`, Tabelle `search_coverage`)
 - `npm run cli -- letter <firma>` (Telegram: Lead-Karte → „🖨️ Befund-Seite“): Befund-Seite als PDF für einen Brief
   nach `data/letters/`
+- `npm run cli -- prototype <firma>` (Telegram: Lead-Karte → „🎨 Prototyp bauen“): Website-Entwurf aus Branchen-Vorlage
+  (`src/prototype/templates/`), Texte/Farbe/Fotowahl per LLM (Rolle `prototype`), Seite unter `data/previews/<slug>/`,
+  ausgeliefert von Caddy unter `PREVIEW_BASE_URL` (docs/DEPLOY.md, Abschnitt 11)
 - `npm run cli -- chat "…"`: Manager-Agent ohne Telegram befragen (gleicher Verlauf wie der Chat)
 - `npm run cli -- calibrate [export|--file|rate <firma> <A|B|C|X>]`: Golden Set (Telegram `/kalibrieren`,
   `/auswertung`); `tests/golden/golden.json` ist Regressionstest für Gewichte und Prompts (`tests/golden.test.ts`)

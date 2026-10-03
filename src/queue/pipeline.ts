@@ -18,6 +18,8 @@ import type { QueueConfig, QueueName } from "./boss.js";
 import type { Notifier, RunSummary, TopLead } from "./notifier.js";
 import { dueReminders, markNotified } from "../db/crm.js";
 import { isQuietTime, loadCrmConfig, type CrmConfig } from "../crm/status.js";
+import { claimState } from "../db/appState.js";
+import { cleanupPrototypes, loadPrototypeConfig } from "../prototype/run.js";
 
 /**
  * Workflow (ARCHITECTURE.md 5.2): research → crawl → audit(+score) → pitch, je Firma ein Job.
@@ -370,6 +372,15 @@ export async function sweep(ctx: PipelineContext): Promise<void> {
   const { rows } = await ctx.db.query<{ id: string }>("select id from search_runs where status = 'RUNNING'");
   for (const r of rows) await maybeCompleteRun(ctx, r.id);
   await deliverDueReminders(ctx);
+  // Alte Prototyp-Vorschauen einmal am Tag aufräumen.
+  const day = ctx.now().toISOString().slice(0, 10);
+  if (await claimState(ctx.db, `prototype-cleanup:${day}`, true)) {
+    await cleanupPrototypes(ctx.db, loadPrototypeConfig(), ctx.now()).catch((err: unknown) =>
+      console.error(
+        JSON.stringify({ level: "error", msg: "Vorschauen aufräumen fehlgeschlagen", error: String(err) }),
+      ),
+    );
+  }
 }
 
 /** Fällige CRM-Erinnerungen melden, außerhalb der Ruhezeit. Gibt die Zahl der zugestellten zurück. */

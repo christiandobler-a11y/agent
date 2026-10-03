@@ -159,6 +159,35 @@ In Supabase unter **Database → Settings → Network Restrictions** nur noch di
 funktionieren `npm run cli -- …`-Befehle vom Mac aus nur, wenn du dort auch deine eigene IP einträgst. Diese wechselt
 bei den meisten Internetanschlüssen gelegentlich. Daher lieber erst, wenn alles stabil läuft.
 
+## 11. Vorschau-Seiten für Prototypen (vorschau.avelio.digital)
+
+Avelio baut auf Knopfdruck (Lead-Karte → „🎨 Prototyp bauen“) einen Website-Entwurf für einen Lead. Damit du ihn per
+Link zeigen kannst, liefert ein kleiner Webserver (Caddy) die Entwürfe unter `https://vorschau.avelio.digital/…` aus.
+Die Seiten sind nicht bei Google auffindbar und nur mit dem Link erreichbar (Zufallsteil im Pfad).
+
+1. **DNS bei IONOS:** Domains & SSL → avelio.digital → DNS → Eintrag hinzufügen: Typ **A**, Hostname **vorschau**,
+   Zeigt auf **167.233.61.90** (deine Server-IP). Gibt es für `vorschau` schon einen AAAA-Eintrag, diesen löschen.
+   Es dauert meist 5 bis 30 Minuten, bis der Eintrag gilt.
+2. **Firewall öffnen** (einmalig, auf dem Server):
+
+   ```sh
+   ufw allow 80/tcp && ufw allow 443
+   ```
+
+3. **.env ergänzen** (`nano /opt/avelio/.env`), unten anfügen:
+
+   ```
+   PREVIEW_DOMAIN=vorschau.avelio.digital
+   PREVIEW_BASE_URL=https://vorschau.avelio.digital
+   COMPOSE_PROFILES=preview
+   ```
+
+4. **Neu starten:** `bash /opt/avelio/scripts/deploy.sh`. Caddy holt sich beim ersten Aufruf selbst ein
+   HTTPS-Zertifikat. Test: `https://vorschau.avelio.digital/` zeigt „Nicht gefunden“ (gewollt, es gibt keine
+   Übersicht).
+
+Alte Entwürfe löscht Avelio nach 60 Tagen (`config/prototype.yaml`), außer der Lead ist im Gespräch.
+
 ## Betrieb
 
 | Was | Befehl (auf dem Server, nach `ssh root@<IP>`) |

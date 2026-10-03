@@ -15,6 +15,7 @@ import { loadCrmConfig, SALES_LABELS } from "../crm/status.js";
 import type { OutreachConfig } from "../outreach/config.js";
 import { draftEmail, mailtoLink, type OutreachDeps } from "../outreach/draft.js";
 import { draftLetter } from "../outreach/letter.js";
+import { buildPrototype, type PrototypeDeps } from "../prototype/run.js";
 import { chromiumLetterRenderer, type LetterRenderer } from "../outreach/letterPdf.js";
 import { raiseBudgetToday } from "../llm/budget.js";
 import { askManager, type ManagerDeps } from "../manager/agent.js";
@@ -31,6 +32,7 @@ import {
   markdownToTelegramHtml,
   emailDraftMessages,
   letterMessages,
+  prototypeMessage,
   leadButtons,
   topLeadsText,
   leadCrmCard,
@@ -60,6 +62,8 @@ export interface BotOptions {
     /** Befund-Seite als PDF; ohne Angabe Chromium (CHROMIUM_PATH). */
     renderLetter?: LetterRenderer;
   };
+  /** Prototypen (Phase 3); ohne Angabe zeigt der Button einen Hinweis. */
+  prototype?: Omit<PrototypeDeps, "db" | "llm" | "budget" | "branches" | "now" | "desktopScreenPx">;
 }
 
 const log = (level: "info" | "warn" | "error", msg: string, extra: Record<string, unknown> = {}) =>
@@ -341,6 +345,52 @@ export function createBot(options: BotOptions): Bot {
         };
         // mailto-Links akzeptiert nicht jede Telegram-Version; dann ohne Link senden.
         await sendBody(mailtoLink(draft.to, draft.subject, draft.body)).catch(() => sendBody(null));
+        return;
+      }
+      if (crm.kind === "prototype") {
+        if (!options.prototype) {
+          await ctx.answerCallbackQuery({
+            text: "Prototypen sind noch nicht eingerichtet",
+            show_alert: true,
+          });
+          return;
+        }
+        await ctx.answerCallbackQuery({ text: "Baue Prototyp, dauert 1 bis 2 Minuten …" });
+        await ctx.replyWithChatAction("upload_photo").catch(() => undefined);
+        const crawl = pipeline.crawl.config;
+        const built = await buildPrototype(
+          {
+            ...options.prototype,
+            db: pipeline.db,
+            llm: options.manager.llm,
+            budget: pipeline.budget,
+            branches: pipeline.lead.branches,
+            now: pipeline.now,
+            desktopScreenPx: crawl.desktop.height * crawl.desktop.scale,
+          },
+          company,
+          by(ctx.chat?.id),
+        ).catch((err: unknown) => {
+          log("error", "Prototyp fehlgeschlagen", {
+            error: err instanceof Error ? err.message : String(err),
+          });
+          return null;
+        });
+        if (!built) {
+          await ctx.reply("Der Prototyp hat gerade nicht geklappt. Versuch es bitte gleich noch einmal.");
+          return;
+        }
+        if ("kind" in built) {
+          await ctx.reply(`Für ${company.name} gibt es keinen Screenshot der Website. Erst neu crawlen.`);
+          return;
+        }
+        const m = prototypeMessage(company, built);
+        // Nur der erste Bildschirm: Er soll in einer Sekunde überzeugen, der Rest steht hinter dem Link.
+        await ctx.replyWithPhoto(new InputFile(built.shots.hero, "entwurf.jpg"), {
+          caption: m.caption,
+          parse_mode: "HTML",
+          reply_markup: { inline_keyboard: m.keyboard },
+        });
         return;
       }
       if (crm.kind === "letter") {

@@ -33,6 +33,9 @@ echo "==> Firewall: nur SSH von außen (der Telegram-Bot fragt selbst nach, brau
 ufw default deny incoming >/dev/null
 ufw default allow outgoing >/dev/null
 ufw allow OpenSSH >/dev/null
+# Vorschau-Seiten (Caddy, HTTPS); ohne laufenden Caddy-Dienst antwortet dort niemand.
+ufw allow 80/tcp >/dev/null
+ufw allow 443 >/dev/null
 ufw --force enable >/dev/null
 
 if ! swapon --show | grep -q .; then

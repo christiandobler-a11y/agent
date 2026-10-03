@@ -1,0 +1,16 @@
+# Vorschau-Seiten (Prototypen, Phase 3): nur statische Dateien aus data/previews, kein Index, keine Skripte.
+# Domain aus PREVIEW_DOMAIN (.env), HTTPS-Zertifikat holt Caddy selbst (DNS-Eintrag muss auf den Server zeigen).
+{$PREVIEW_DOMAIN} {
+	encode zstd gzip
+	header {
+		X-Robots-Tag "noindex, nofollow"
+		Referrer-Policy "no-referrer"
+		X-Content-Type-Options "nosniff"
+		Content-Security-Policy "default-src 'self'; img-src 'self' data:; style-src 'self' 'unsafe-inline'; font-src 'self'; script-src 'none'; frame-ancestors 'none'; base-uri 'none'; form-action 'none'"
+		-Server
+	}
+	@root path /
+	respond @root "Nicht gefunden" 404
+	root * /srv/previews
+	file_server
+}

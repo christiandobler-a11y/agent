@@ -37,6 +37,8 @@ const envSchema = z.object({
   OUTREACH_MAIL_ADDRESS: optionalSecret,
   OUTREACH_MAIL_PASSWORD: optionalSecret,
   OUTREACH_MAIL_PROVIDER: optionalSecret,
+  /** Öffentliche Adresse der Prototypen, z. B. https://vorschau.avelio.digital (ohne / am Ende). */
+  PREVIEW_BASE_URL: optionalSecret.pipe(z.url().optional()),
   /** Optional: Ping-URL eines Uptime-Dienstes (z. B. Healthchecks.io). Enthält ein Token, nie loggen. */
   HEALTHCHECK_URL: optionalSecret.pipe(z.url().optional()),
 });

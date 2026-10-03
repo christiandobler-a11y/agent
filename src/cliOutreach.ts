@@ -6,6 +6,7 @@ import { findLead } from "./manager/leads.js";
 import { loadOutreachConfig } from "./outreach/config.js";
 import { draftLetter } from "./outreach/letter.js";
 import { chromiumLetterRenderer } from "./outreach/letterPdf.js";
+import { buildPrototype, loadPrototypeConfig, type PrototypeDeps } from "./prototype/run.js";
 
 /** Befund-Seite als PDF: `avelio letter <Firma>` schreibt PDF und Vorschau nach data/letters/. */
 export async function letter(argv: string[]): Promise<number> {
@@ -63,4 +64,57 @@ export async function letter(argv: string[]): Promise<number> {
   } finally {
     await app.close();
   }
+}
+
+/** Prototyp bauen: `avelio prototype <Firma>` (Seite unter data/previews/, Screenshots unter data/preview-shots/). */
+export async function prototype(argv: string[]): Promise<number> {
+  const ref = argv.join(" ").trim();
+  if (!ref) {
+    console.error("Verwendung: avelio prototype <Firmen-ID|Domain|Name>");
+    return 2;
+  }
+  const env = loadEnv();
+  const app = await createApp();
+  try {
+    const found = await findLead(app.ctx.db, ref);
+    if (found.kind !== "found") {
+      console.log(
+        found.kind === "none"
+          ? `Keine Firma gefunden für "${ref}".`
+          : `Mehrere Treffer: ${found.candidates.map((c) => c.name).join(", ")}`,
+      );
+      return 1;
+    }
+    const result = await buildPrototype(prototypeDeps(app, env), found.company, "cli");
+    if ("kind" in result) {
+      console.log(`Für ${found.company.name} gibt es keinen Screenshot der Website (erst crawlen).`);
+      return 1;
+    }
+    console.log(`Prototyp: ${result.url ?? `${result.dir}/index.html`}`);
+    console.log(`Screenshots: ${result.shots.hero}, ${result.shots.full}, ${result.shots.mobile}`);
+    if (result.warnings.length) console.log(`⚠️ ${result.warnings.join(" · ")}`);
+    console.log(`Kosten ${result.costUsd.toFixed(3).replace(".", ",")} $`);
+    return 0;
+  } finally {
+    await app.close();
+  }
+}
+
+export function prototypeDeps(
+  app: Awaited<ReturnType<typeof createApp>>,
+  env: ReturnType<typeof loadEnv>,
+): PrototypeDeps {
+  const crawl = app.ctx.crawl.config;
+  return {
+    db: app.ctx.db,
+    llm: app.llm,
+    budget: app.ctx.budget,
+    branches: app.ctx.lead.branches,
+    config: loadPrototypeConfig(),
+    duBranches: loadOutreachConfig().du_branchen,
+    now: app.ctx.now,
+    googleApiKey: env.GOOGLE_API_KEY ?? null,
+    baseUrl: env.PREVIEW_BASE_URL?.replace(/\/$/, "") ?? null,
+    desktopScreenPx: crawl.desktop.height * crawl.desktop.scale,
+  };
 }
