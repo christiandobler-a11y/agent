@@ -67,11 +67,22 @@ kontaktweg:
 # Jede Nachricht schlägt 2 konkrete Tage mit je 2 Uhrzeiten vor, z. B. "Dienstag um 12 oder 18 Uhr, sonst Donnerstag
 # um 8 oder 19:30". Avelio merkt sich angebotene Termine und bietet denselben Termin höchstens 2 Leads gleichzeitig an.
 termine:
+  # Christian arbeitet im Hauptjob Mo bis Fr 09:00 bis 17:30. Termine (5 bis 10 Minuten) liegen deshalb davor, danach
+  # oder am Samstagvormittag; die Mittagspause nur ausnahmsweise (höchstens ein solcher Vorschlag je Nachricht).
+  arbeitszeit: { von: "09:00", bis: "17:30", tage: [montag, dienstag, mittwoch, donnerstag, freitag] }
   zeitfenster: # Wochentag → mögliche Uhrzeiten (deutsche Zeit)
-    dienstag: ["12:00", "18:00"]
-    mittwoch: ["08:30", "17:30"]
-    donnerstag: ["08:00", "19:30"]
-    freitag: ["11:00"]
+    montag: ["08:00", "18:00", "19:30"]
+    dienstag: ["07:45", "18:30"]
+    mittwoch: ["08:15", "17:45", "19:00"]
+    donnerstag: ["08:00", "18:00", "19:30"]
+    freitag: ["07:45", "17:45"]
+    samstag: ["10:00", "11:30"]
+  ausnahmen_mittagspause: # nur selten anbieten (max. 1 je Nachricht), z. B. wenn der Betrieb abends zu hat
+    dienstag: ["12:15"]
+    donnerstag: ["12:15"]
+  # Gastro hat abends Hochbetrieb: dort Morgen- und Samstagstermine bevorzugen.
+  branchen_bevorzugt:
+    gastro: ["07:45", "08:00", "08:15", "10:00", "11:30", "17:45"]
   tage_je_nachricht: 2
   uhrzeiten_je_tag: 2
   fruehestens_in_tagen: 2 # Vorlauf, damit die Antwort noch rechtzeitig kommt
