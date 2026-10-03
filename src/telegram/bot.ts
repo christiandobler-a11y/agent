@@ -17,7 +17,13 @@ import { draftEmail, mailtoLink, type OutreachDeps } from "../outreach/draft.js"
 import { draftLetter, type LetterDeps } from "../outreach/letter.js";
 import { loadMailConfig, type MailConfig, type Mailbox } from "../outreach/mail.js";
 import { berlinDate } from "../autopilot/plan.js";
-import { handlePlanCallback, sendPlanHeader, type PlanBotDeps } from "./plan.js";
+import {
+  handlePlanCallback,
+  sendMorningPackage,
+  sendNextCard,
+  sendPlanHeader,
+  type PlanBotDeps,
+} from "./plan.js";
 import { buildPrototype, type PrototypeDeps } from "../prototype/run.js";
 import { chromiumLetterRenderer, type LetterRenderer } from "../outreach/letterPdf.js";
 import { raiseBudgetToday } from "../llm/budget.js";
@@ -142,7 +148,12 @@ export const BOT_COMMANDS = [
   { command: "hilfe", description: "Was ich kann" },
 ];
 
-export function createBot(options: BotOptions): Bot {
+/** Bot mit Morgen-Paket, das er von sich aus schicken kann (ohne Befehl). */
+export type AvelioBot = Bot & {
+  sendMorning(date: string, nightReport: string[]): Promise<void>;
+};
+
+export function createBot(options: BotOptions): AvelioBot {
   const bot = new Bot(options.token, {
     ...(options.botInfo ? { botInfo: options.botInfo } : {}),
     client: { fetch: telegramFetch(options.fetch ?? globalThis.fetch) as never },
@@ -331,7 +342,16 @@ export function createBot(options: BotOptions): Bot {
       await ctx.reply("Das Morgen-Paket ist noch nicht eingerichtet.");
       return;
     }
-    await sendPlanHeader(ctx.api, pipeline.db, [ctx.chat.id], berlinDate(pipeline.now()));
+    const deps = planDeps()!;
+    await sendPlanHeader(
+      ctx.api,
+      pipeline.db,
+      [ctx.chat.id],
+      berlinDate(pipeline.now()),
+      undefined,
+      mailbox !== null,
+    );
+    await sendNextCard(ctx.api, ctx.chat.id, deps);
   });
 
   bot.on("callback_query:data", async (ctx) => {
@@ -580,5 +600,10 @@ export function createBot(options: BotOptions): Bot {
     void err.ctx.reply("Da ist etwas schiefgegangen. Versuch es bitte noch einmal.").catch(() => undefined);
   });
 
-  return bot;
+  const avelio = bot as AvelioBot;
+  avelio.sendMorning = async (date, nightReport) => {
+    const deps = planDeps();
+    if (deps) await sendMorningPackage(bot.api, options.allowedChatIds, deps, date, nightReport);
+  };
+  return avelio;
 }

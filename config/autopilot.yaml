@@ -20,3 +20,16 @@ prototyp_fuer_neue: true
 nachfassen:
   nach_tagen: 5 # nach der ersten Mail ohne Antwort
   hoechstens: 1 # einmal nachfassen, danach Ruhe
+
+# Nachtsuche (03.10.2026, Christians Wunsch: "der sucht das alles von alleine, ist er mit dem einen durch, geht er ans
+# nächste"): Ab `ab` startet Avelio die nächste noch nicht vollständig abgesuchte Kombination aus Region × Branche
+# als Komplett-Suche, höchstens `pro_nacht` je Nacht. Bricht eine Suche an der Kostenbremse ab, macht die nächste
+# Nacht dort weiter. Neue Firmen werden automatisch gecrawlt und geprüft und landen im Morgen-Paket.
+suche:
+  aktiv: true
+  ab: "22:00"
+  pro_nacht: 1 # eine Komplett-Suche kostet grob 1 bis 3 $ (Google) plus Audits
+  # Reihenfolge = Priorität. Regionen aus config/regions/, Branchen aus config/branches.yaml.
+  regionen: [weilheim-schongau, rosenheim]
+  branchen:
+    [physiotherapie, fahrrad, maler, schreiner, sanitaer, elektriker, kosmetik, friseur, gastro, hotel, kfz]

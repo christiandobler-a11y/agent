@@ -1,0 +1,25 @@
+# Landkreis Weilheim-Schongau (Christians Heimat, Peißenberg). Ortsmitten gerundet, größere Orte zuerst.
+# Zugehörigkeit siehe config/regions/rosenheim.yaml.
+name: Landkreis Weilheim-Schongau
+admin_areas: [Weilheim-Schongau]
+search_radius_km: 5
+fallback_max_km: 8
+tiles:
+  - { name: Weilheim in Oberbayern, lat: 47.8397, lng: 11.1428 }
+  - { name: Penzberg, lat: 47.7529, lng: 11.3769 }
+  - { name: Schongau, lat: 47.8118, lng: 10.8963 }
+  - { name: Peißenberg, lat: 47.7953, lng: 11.0606 }
+  - { name: Peiting, lat: 47.7942, lng: 10.9286 }
+  - { name: Hohenpeißenberg, lat: 47.8008, lng: 11.0006 }
+  - { name: Altenstadt, lat: 47.8167, lng: 10.8667 }
+  - { name: Polling, lat: 47.8094, lng: 11.1381 }
+  - { name: Seeshaupt, lat: 47.825, lng: 11.3 }
+  - { name: Iffeldorf, lat: 47.7667, lng: 11.3167 }
+  - { name: Bernried am Starnberger See, lat: 47.8667, lng: 11.2833 }
+  - { name: Pähl, lat: 47.9, lng: 11.1833 }
+  - { name: Wielenbach, lat: 47.8833, lng: 11.15 }
+  - { name: Huglfing, lat: 47.77, lng: 11.1667 }
+  - { name: Rottenbuch, lat: 47.7333, lng: 10.9667 }
+  - { name: Steingaden, lat: 47.7006, lng: 10.8636 }
+  - { name: Wessobrunn, lat: 47.8742, lng: 11.0233 }
+  - { name: Habach, lat: 47.7333, lng: 11.2833 }

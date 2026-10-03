@@ -3,21 +3,15 @@ import { countPlan, planItems, type PlanCounts } from "../db/plan.js";
 import { checkReplies } from "../outreach/send.js";
 import { PLAN_QUEUE } from "../queue/boss.js";
 import type { PipelineContext } from "../queue/pipeline.js";
-import { berlinDate, buildDailyPlan, type PlanBuildResult } from "./plan.js";
+import { berlinDate, berlinTime, buildDailyPlan, type PlanBuildResult } from "./plan.js";
+
+export { berlinTime };
+import { nightReport, searchTick } from "./search.js";
 
 /**
  * Takt des Morgen-Pakets (aus dem Sweep): Plan bauen ab `vorbereiten` (als eigener Job, darf lange dauern), Telegram
  * ab `morgens`, sobald der Plan fertig ist, Bilanz ab `abends`. Jeder Schritt höchstens einmal am Tag (app_state).
  */
-
-export function berlinTime(d: Date): string {
-  return new Intl.DateTimeFormat("de-DE", {
-    hour: "2-digit",
-    minute: "2-digit",
-    hour12: false,
-    timeZone: "Europe/Berlin",
-  }).format(d);
-}
 
 export interface EveningSummary {
   date: string;
@@ -29,6 +23,7 @@ export interface EveningSummary {
 export async function autopilotTick(ctx: PipelineContext): Promise<void> {
   const ap = ctx.autopilot;
   if (!ap) return;
+  await searchTick(ctx);
   const now = ctx.now();
   const date = berlinDate(now);
   const time = berlinTime(now);
@@ -49,7 +44,7 @@ export async function autopilotTick(ctx: PipelineContext): Promise<void> {
     ctx.notifier.planReady &&
     (await claimState(ctx.db, `plan-sent:${date}`, true))
   )
-    await ctx.notifier.planReady(date, built);
+    await ctx.notifier.planReady(date, built, await nightReport(ctx));
 
   if (
     built &&

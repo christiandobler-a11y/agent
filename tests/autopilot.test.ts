@@ -13,6 +13,10 @@ import {
   type AutopilotConfig,
 } from "../src/autopilot/plan.js";
 import { autopilotTick, berlinTime } from "../src/autopilot/schedule.js";
+import { nightOf, nightReport, searchTick } from "../src/autopilot/search.js";
+import { loadBranches } from "../src/pipeline/research/branches.js";
+import { loadResearchConfig } from "../src/pipeline/research/run.js";
+import { loadRegion } from "../src/pipeline/research/tiling.js";
 import { getState, setState } from "../src/db/appState.js";
 import { upsertCompany, type Company } from "../src/db/companies.js";
 import { insertDraft } from "../src/db/drafts.js";
@@ -193,17 +197,6 @@ describe("Morgen-Paket (rein)", () => {
 const ALLOWED = 4242;
 const BOT_INFO = { id: 1, is_bot: true, first_name: "Avelio", username: "avelio_test_bot" } as UserFromGetMe;
 let updateId = 1;
-const textUpdate = (text: string): Update => ({
-  update_id: updateId++,
-  message: {
-    message_id: updateId,
-    date: 0,
-    chat: { id: ALLOWED, type: "private", first_name: "X" },
-    from: { id: ALLOWED, is_bot: false, first_name: "X" },
-    text,
-    entities: [{ type: "bot_command", offset: 0, length: text.split(" ")[0]!.length }],
-  },
-});
 const callbackUpdate = (data: string): Update => ({
   update_id: updateId++,
   callback_query: {
@@ -443,11 +436,16 @@ describeDb("Morgen-Paket mit Datenbank", () => {
           : true,
       } as never);
     });
-    await bot.handleUpdate(textUpdate("/heute"));
-    const header = calls.find((c) => c.method === "sendMessage")!.payload;
+    // Morgens ohne Befehl: Kopf mit Nachtbericht und gleich die erste Karte.
+    await bot.sendMorning("2026-10-05", ["Physiotherapie · Landkreis Weilheim-Schongau: 12 neue Betriebe"]);
+    const sentMessages = calls.filter((c) => c.method === "sendMessage");
+    const header = sentMessages[0]!.payload;
     expect(String(header.text)).toContain("📧 Neue Mails: <b>0/1</b>");
-    await bot.handleUpdate(callbackUpdate("pl:n"));
-    const card = calls.filter((c) => c.method === "sendMessage").at(-1)!.payload;
+    expect(String(header.text)).toContain(
+      "🌙 <b>Heute Nacht:</b>\nPhysiotherapie · Landkreis Weilheim-Schongau",
+    );
+    expect(sentMessages).toHaveLength(2);
+    const card = sentMessages[1]!.payload;
     expect(String(card.text)).toContain("🔁 Nachfassen <b>1/3</b>");
     const buttons = (
       card.reply_markup as { inline_keyboard: { text: string; callback_data?: string }[][] }
@@ -474,7 +472,10 @@ describeDb("Morgen-Paket mit Datenbank", () => {
       boss: { send },
       now: () => now,
       notifier: { planReady },
-      autopilot: { config: loadAutopilotConfig(), planDeps: () => ({}) },
+      autopilot: {
+        config: { ...loadAutopilotConfig(), suche: { ...loadAutopilotConfig().suche, aktiv: false } },
+        planDeps: () => ({}),
+      },
     } as unknown as PipelineContext;
     await autopilotTick(ctx);
     expect(send).not.toHaveBeenCalled();
@@ -490,5 +491,106 @@ describeDb("Morgen-Paket mit Datenbank", () => {
     await autopilotTick(ctx);
     expect(planReady).toHaveBeenCalledTimes(1);
     expect(await getState(db(), "plan-sent:2026-10-05")).toBe(true);
+  });
+  it("Alle Mails senden: mit Rückfrage, jede einzeln übers Postfach", async () => {
+    await db().query("update companies set status = 'LOST'");
+    await db().query("delete from outreach_plan");
+    const date = "2026-10-05";
+    const box = fakeMailbox();
+    const a = await lead();
+    const b = await lead();
+    for (const c of [a, b]) {
+      const d = await emailDraft(c);
+      await db().query(
+        "insert into outreach_plan (plan_date, company_id, kind, channel, draft_id, position) values ($1, $2, 'new', 'email', $3, 1)",
+        [date, c.id, d.id],
+      );
+    }
+    const calls: { method: string; payload: Record<string, unknown> }[] = [];
+    const bot = createBot({
+      token: "123:test",
+      allowedChatIds: [ALLOWED],
+      manager: {
+        ctx: {
+          db: db(),
+          now: () => NOW,
+          crm: { follow_up_days: 5, quiet_hours: { start: "21:00", end: "08:00" } },
+          lead: { branches: {} },
+        } as unknown as PipelineContext,
+        llm: { structured: vi.fn(), toolStep: vi.fn() },
+      },
+      botInfo: BOT_INFO,
+      outreach: { config: loadOutreachConfig(), contact: { whatsapp: null, phone: null } },
+      mail: { mailbox: box, config: { ...mail, max_per_day: 50 } },
+    });
+    bot.api.config.use((_prev, method, payload) => {
+      calls.push({ method, payload: payload });
+      return Promise.resolve({
+        ok: true,
+        result: method.startsWith("send")
+          ? { message_id: calls.length, date: 0, chat: { id: ALLOWED, type: "private" } }
+          : true,
+      } as never);
+    });
+    await bot.sendMorning(date, []);
+    const header = calls.find((c) => c.method === "sendMessage")!.payload;
+    const headerButtons = (
+      header.reply_markup as { inline_keyboard: { text: string; callback_data?: string }[][] }
+    ).inline_keyboard.flat();
+    expect(headerButtons.map((x) => x.text)).toContain("📤 Alle 2 Mails senden");
+    await bot.handleUpdate(callbackUpdate("pl:a"));
+    expect(box.sent).toHaveLength(0); // erst die Rückfrage
+    expect(String(calls.filter((c) => c.method === "sendMessage").at(-1)!.payload.text)).toContain(
+      "Wirklich alle 2 Mails",
+    );
+    await bot.handleUpdate(callbackUpdate("pl:A"));
+    expect(box.sent).toHaveLength(2);
+    expect((await planItems(db(), date)).every((i) => i.status === "done")).toBe(true);
+  });
+
+  it("Nachtsuche: nächste offene Kombination, eine je Nacht, nie zwei gleichzeitig", async () => {
+    const send = vi.fn(() => Promise.resolve("job"));
+    let now = new Date("2026-10-05T18:00:00Z"); // 20:00 Berlin, noch nicht dran
+    const base = loadAutopilotConfig();
+    const ctx = {
+      db: db(),
+      boss: { send },
+      now: () => now,
+      loadRegion,
+      research: { branches: loadBranches(), config: loadResearchConfig() },
+      notifier: {},
+      autopilot: {
+        config: {
+          ...base,
+          suche: {
+            aktiv: true,
+            ab: "22:00",
+            pro_nacht: 1,
+            regionen: ["rosenheim"],
+            branchen: ["physiotherapie", "fahrrad"],
+          },
+        },
+        planDeps: () => ({}),
+      },
+    } as unknown as PipelineContext;
+    expect(await searchTick(ctx)).toBeNull();
+    now = new Date("2026-10-05T20:30:00Z"); // 22:30
+    expect(await searchTick(ctx)).toMatchObject({ regionKey: "rosenheim", branchKey: "physiotherapie" });
+    expect(send).toHaveBeenCalledTimes(1);
+    const { rows } = await db().query<{ requested_by: string; query: { complete: boolean } }>(
+      "select requested_by, query from search_runs order by created_at desc limit 1",
+    );
+    expect(rows[0]).toMatchObject({ requested_by: "autopilot", query: { complete: true } });
+    // Läuft noch → keine zweite; auch nach Ende nicht, weil pro_nacht = 1.
+    expect(await searchTick(ctx)).toBeNull();
+    await db().query("update search_runs set status = 'COMPLETED' where requested_by = 'autopilot'");
+    now = new Date("2026-10-06T01:00:00Z"); // 03:00, gleiche Nacht
+    expect(await searchTick(ctx)).toBeNull();
+    expect(nightOf(new Date("2026-10-06T01:00:00Z"), "22:00")).toBe("2026-10-05");
+    expect(nightOf(new Date("2026-10-06T10:00:00Z"), "22:00")).toBeNull();
+    // Bericht fürs Morgen-Paket
+    // Suchläufe tragen die echte Erstellungszeit, daher hier die echte Uhr.
+    const report = await nightReport({ ...ctx, now: () => new Date() });
+    expect(report[0]).toContain("Landkreis Rosenheim");
   });
 });

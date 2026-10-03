@@ -53,7 +53,7 @@ const WEEKDAY = new Intl.DateTimeFormat("de-DE", {
   timeZone: "Europe/Berlin",
 });
 
-export function planHeaderText(date: string, counts: PlanCounts): string {
+export function planHeaderText(date: string, counts: PlanCounts, night: readonly string[] = []): string {
   const line = (emoji: string, label: string, c: { done: number; total: number }) =>
     c.total > 0 ? `${emoji} ${label}: <b>${c.done}/${c.total}</b>${c.done === c.total ? " ✅" : ""}` : null;
   const lines = [
@@ -64,7 +64,8 @@ export function planHeaderText(date: string, counts: PlanCounts): string {
   const total = counts.email.total + counts.letter.total + counts.followup.total;
   const done = counts.email.done + counts.letter.done + counts.followup.done;
   const title = `☀️ <b>Morgen-Paket</b> · ${escapeHtml(WEEKDAY.format(new Date(`${date}T12:00:00Z`)))}`;
-  if (total === 0) return `${title}\n\nHeute ist nichts vorbereitet.`;
+  const nightBlock = night.length > 0 ? ["", "🌙 <b>Heute Nacht:</b>", ...night.map(escapeHtml)] : [];
+  if (total === 0) return [title, "", "Heute ist nichts vorbereitet.", ...nightBlock].join("\n");
   return [
     title,
     "",
@@ -73,10 +74,11 @@ export function planHeaderText(date: string, counts: PlanCounts): string {
     done === total
       ? "🎉 Alles erledigt für heute."
       : "Alles ist vorbereitet. Einmal drüberlesen, dann ein Knopf.",
+    ...nightBlock,
   ].join("\n");
 }
 
-export function planHeaderKeyboard(counts: PlanCounts): InlineKeyboardButton[][] {
+export function planHeaderKeyboard(counts: PlanCounts, canSend = false): InlineKeyboardButton[][] {
   const open =
     counts.email.total -
     counts.email.done +
@@ -84,7 +86,11 @@ export function planHeaderKeyboard(counts: PlanCounts): InlineKeyboardButton[][]
     counts.letter.done +
     counts.followup.total -
     counts.followup.done;
-  return open > 0 ? [[{ text: "▶️ Los geht's", callback_data: planCallback({ kind: "next" }) }]] : [];
+  const mails = counts.email.total - counts.email.done + counts.followup.total - counts.followup.done;
+  const rows: InlineKeyboardButton[][] = [];
+  if (open > 0) rows.push([{ text: "▶️ Weiter", callback_data: planCallback({ kind: "next" }) }]);
+  if (canSend && mails > 1) rows.push([{ text: `📤 Alle ${mails} Mails senden`, callback_data: "pl:a" }]);
+  return rows;
 }
 
 interface DraftRow {
@@ -170,6 +176,7 @@ export interface PlanBotDeps {
 }
 
 const HEADER_KEY = (date: string) => `plan-header:${date}`;
+const NIGHT_KEY = (date: string) => `plan-night:${date}`;
 type HeaderRef = { chatId: number; messageId: number }[];
 
 /** Kopf-Nachricht schicken und merken (für spätere Zähler-Updates). */
@@ -178,27 +185,32 @@ export async function sendPlanHeader(
   db: Db,
   chatIds: readonly number[],
   date: string,
+  nightReport?: string[],
+  canSend = false,
 ): Promise<void> {
+  if (nightReport) await setState(db, NIGHT_KEY(date), nightReport);
+  const night = (await getState<string[]>(db, NIGHT_KEY(date))) ?? [];
   const counts = countPlan(await planItems(db, date));
   const refs: HeaderRef = [];
   for (const chatId of chatIds) {
-    const m = await api.sendMessage(chatId, planHeaderText(date, counts), {
+    const m = await api.sendMessage(chatId, planHeaderText(date, counts, night), {
       parse_mode: "HTML",
-      reply_markup: { inline_keyboard: planHeaderKeyboard(counts) },
+      reply_markup: { inline_keyboard: planHeaderKeyboard(counts, canSend) },
     });
     refs.push({ chatId, messageId: m.message_id });
   }
   await setState(db, HEADER_KEY(date), refs);
 }
 
-async function refreshHeader(api: Api, db: Db, date: string): Promise<void> {
+async function refreshHeader(api: Api, db: Db, date: string, canSend: boolean): Promise<void> {
   const refs = (await getState<HeaderRef>(db, HEADER_KEY(date))) ?? [];
+  const night = (await getState<string[]>(db, NIGHT_KEY(date))) ?? [];
   const counts = countPlan(await planItems(db, date));
   for (const r of refs) {
     await api
-      .editMessageText(r.chatId, r.messageId, planHeaderText(date, counts), {
+      .editMessageText(r.chatId, r.messageId, planHeaderText(date, counts, night), {
         parse_mode: "HTML",
-        reply_markup: { inline_keyboard: planHeaderKeyboard(counts) },
+        reply_markup: { inline_keyboard: planHeaderKeyboard(counts, canSend) },
       })
       .catch(() => undefined); // "message is not modified" o. ä.
   }
@@ -211,13 +223,15 @@ async function draftOf(db: Db, id: string | null): Promise<DraftRow | null> {
 }
 
 /** Nächste offene Karte schicken; gibt `false` zurück, wenn nichts mehr offen ist. */
-async function showNext(ctx: Context, deps: PlanBotDeps): Promise<boolean> {
+/** Nächste offene Karte in den Chat schicken; gibt `false` zurück, wenn nichts mehr offen ist. */
+export async function sendNextCard(api: Api, chatId: number, deps: PlanBotDeps): Promise<boolean> {
   const date = berlinDate(deps.now());
   const items = await planItems(deps.db, date);
   const active = items.filter((i) => i.status !== "dropped" && i.status !== "later");
   const next = active.find((i) => i.status === "ready");
   if (!next) {
-    await ctx.reply(
+    await api.sendMessage(
+      chatId,
       items.length === 0
         ? "Für heute ist kein Morgen-Paket vorbereitet."
         : "🎉 Alles erledigt für heute. Antworten melde ich dir sofort.",
@@ -228,31 +242,48 @@ async function showNext(ctx: Context, deps: PlanBotDeps): Promise<boolean> {
   const draft = await draftOf(deps.db, next.draft_id);
   if (!draft) {
     await setPlanStatus(deps.db, next.id, "later", deps.now());
-    return showNext(ctx, deps);
+    return sendNextCard(api, chatId, deps);
   }
   if (next.channel === "letter") {
     const card = planLetterCard(next, draft, pos);
     if (draft.meta.pdf && existsSync(draft.meta.pdf)) {
-      await ctx.replyWithDocument(new InputFile(draft.meta.pdf), {
+      await api.sendDocument(chatId, new InputFile(draft.meta.pdf), {
         caption: card.caption,
         parse_mode: "HTML",
         reply_markup: { inline_keyboard: card.keyboard },
       });
     } else {
-      await ctx.reply(`${card.caption}\n\n⚠️ PDF fehlt, bitte „Neu erstellen“.`, {
+      await api.sendMessage(chatId, `${card.caption}\n\n⚠️ PDF fehlt, bitte „Neu erstellen“.`, {
         parse_mode: "HTML",
         reply_markup: { inline_keyboard: card.keyboard },
       });
     }
   } else {
     const card = planEmailCard(next, draft, pos, deps.mailbox !== null);
-    await ctx.reply(card.text, {
+    await api.sendMessage(chatId, card.text, {
       parse_mode: "HTML",
       link_preview_options: { is_disabled: true },
       reply_markup: { inline_keyboard: card.keyboard },
     });
   }
   return true;
+}
+
+const showNext = (ctx: Context, deps: PlanBotDeps) =>
+  ctx.chat ? sendNextCard(ctx.api, ctx.chat.id, deps) : Promise.resolve(false);
+
+/**
+ * Morgens ohne Zutun: Kopf (mit Nachtbericht) und gleich die erste Karte. Danach führt jeder Knopf zur nächsten.
+ */
+export async function sendMorningPackage(
+  api: Api,
+  chatIds: readonly number[],
+  deps: PlanBotDeps,
+  date: string,
+  nightReport: string[] = [],
+): Promise<void> {
+  await sendPlanHeader(api, deps.db, chatIds, date, nightReport, deps.mailbox !== null);
+  for (const chatId of chatIds) await sendNextCard(api, chatId, deps);
 }
 
 /** Karte nach einer Aktion abschließen: Knöpfe weg, Ergebnis dazu. */
@@ -305,6 +336,63 @@ export async function handlePlanCallback(ctx: Context, deps: PlanBotDeps, by: st
               : "Keine Empfänger-Adresse";
     await ctx.answerCallbackQuery({ text, show_alert: r.kind !== "sent" && r.kind !== "already_sent" });
     if (r.kind === "sent" || r.kind === "already_sent") await closeCard(ctx, `✅ ${text}`);
+    return true;
+  }
+  // Alle offenen Mails auf einmal (mit Rückfrage).
+  if (data === "pl:a" || data === "pl:A" || data === "pl:x") {
+    await ctx.answerCallbackQuery();
+    const date = berlinDate(now);
+    const open = (await planItems(db, date)).filter((i) => i.status === "ready" && i.channel === "email");
+    if (data === "pl:x") {
+      await ctx.editMessageText("Abgebrochen, nichts gesendet.").catch(() => undefined);
+      return true;
+    }
+    if (data === "pl:a") {
+      await ctx.reply(
+        `Wirklich alle ${open.length} Mails jetzt senden? Jede geht einzeln über dein Postfach raus, Befund-Seiten bleiben offen.`,
+        {
+          reply_markup: {
+            inline_keyboard: [
+              [
+                { text: `✅ Ja, alle ${open.length} senden`, callback_data: "pl:A" },
+                { text: "Abbrechen", callback_data: "pl:x" },
+              ],
+            ],
+          },
+        },
+      );
+      return true;
+    }
+    if (!deps.mailbox) return true;
+    let sent = 0;
+    const problems: string[] = [];
+    for (const item of open) {
+      if (!item.draft_id) continue;
+      const r = await sendDraft(
+        { db, mailbox: deps.mailbox, mail: deps.mail, now: deps.now, followUpDays: deps.followUpDays },
+        item.draft_id,
+        by,
+      ).catch((err: unknown) => ({
+        kind: "error" as const,
+        message: err instanceof Error ? err.message : String(err),
+      }));
+      if (r.kind === "sent" || r.kind === "already_sent") {
+        await setPlanStatus(db, item.id, "done", now);
+        if (r.kind === "sent") sent++;
+      } else if (r.kind === "limit") {
+        problems.push(`Tageslimit erreicht (${r.max}), Rest bleibt offen`);
+        break;
+      } else {
+        problems.push(
+          `${item.company_name}: ${r.kind === "error" ? r.message.slice(0, 80) : "keine Adresse"}`,
+        );
+      }
+    }
+    await ctx
+      .editMessageText(`📤 ${sent} Mails gesendet.${problems.length ? `\n⚠️ ${problems.join("\n⚠️ ")}` : ""}`)
+      .catch(() => undefined);
+    await refreshHeader(ctx.api, db, date, true);
+    await showNext(ctx, deps);
     return true;
   }
   const cb = data ? parsePlanCallback(data) : null;
@@ -413,7 +501,7 @@ export async function handlePlanCallback(ctx: Context, deps: PlanBotDeps, by: st
     await showNext(ctx, deps);
     return true;
   }
-  await refreshHeader(ctx.api, db, item.plan_date);
+  await refreshHeader(ctx.api, db, item.plan_date, deps.mailbox !== null);
   await showNext(ctx, deps);
   return true;
 }

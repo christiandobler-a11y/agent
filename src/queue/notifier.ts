@@ -35,7 +35,7 @@ export interface Notifier {
   /** Fällige CRM-Erinnerungen (Phase 2). Optional: Kanäle ohne Zustellung ignorieren sie. */
   remindersDue?(reminders: DueReminder[]): Promise<void>;
   /** Morgen-Paket fertig (ab der Uhrzeit "morgens"). */
-  planReady?(date: string, result: PlanBuildResult): Promise<void>;
+  planReady?(date: string, result: PlanBuildResult, nightReport?: string[]): Promise<void>;
   /** Abend-Bilanz des Morgen-Pakets. */
   eveningSummary?(summary: EveningSummary): Promise<void>;
   /** Antwort erkannt oder Mail unzustellbar. */

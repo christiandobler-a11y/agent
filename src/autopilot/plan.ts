@@ -30,6 +30,15 @@ export const autopilotConfigSchema = z.object({
   briefe: z.object({ pro_tag: z.number().int().min(0), ab_score: z.number().int() }),
   prototyp_fuer_neue: z.boolean(),
   nachfassen: z.object({ nach_tagen: z.number().int().min(1), hoechstens: z.number().int().min(0) }),
+  suche: z
+    .object({
+      aktiv: z.boolean(),
+      ab: hm,
+      pro_nacht: z.number().int().min(0),
+      regionen: z.array(z.string()),
+      branchen: z.array(z.string()),
+    })
+    .default({ aktiv: false, ab: "22:00", pro_nacht: 0, regionen: [], branchen: [] }),
 });
 export type AutopilotConfig = z.infer<typeof autopilotConfigSchema>;
 export const loadAutopilotConfig = () => loadYamlConfig("autopilot.yaml", autopilotConfigSchema);
@@ -60,6 +69,16 @@ export interface PlanBuildResult {
 /** Kalendertag in Deutschland (YYYY-MM-DD). */
 export function berlinDate(d: Date): string {
   return new Intl.DateTimeFormat("en-CA", { timeZone: "Europe/Berlin" }).format(d);
+}
+
+/** Uhrzeit in Deutschland (HH:MM), zum Vergleich mit den Zeiten aus config/autopilot.yaml. */
+export function berlinTime(d: Date): string {
+  return new Intl.DateTimeFormat("de-DE", {
+    hour: "2-digit",
+    minute: "2-digit",
+    hour12: false,
+    timeZone: "Europe/Berlin",
+  }).format(d);
 }
 
 export function isWeekday(d: Date): boolean {

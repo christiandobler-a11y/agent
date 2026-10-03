@@ -36,7 +36,10 @@ if (env.TELEGRAM_BOT_TOKEN && env.TELEGRAM_ALLOWED_CHAT_IDS.length > 0) {
   });
   app.ctx.notifier = combineNotifiers(
     logNotifier,
-    telegramNotifier(bot.api, env.TELEGRAM_ALLOWED_CHAT_IDS, app.ctx.db),
+    telegramNotifier(bot.api, env.TELEGRAM_ALLOWED_CHAT_IDS, {
+      db: app.ctx.db,
+      morning: (date, nightReport) => bot!.sendMorning(date, nightReport),
+    }),
   );
 } else if (env.TELEGRAM_BOT_TOKEN) {
   console.warn(
