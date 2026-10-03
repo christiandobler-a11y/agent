@@ -47,8 +47,18 @@ spamschutz:
   gruesse: [Viele Grüße, Beste Grüße, Grüße aus Rosenheim, Liebe Grüße]
   regeln:
     - reiner Text, keine Bilder, kein HTML-Layout, kein Tracking-Pixel, keine Link-Kürzer
-    - höchstens ein Link (eigene Website), keine Anhänge in der ersten Mail
+    - höchstens ein Link (WhatsApp-Business-Link oder Kalender), keine Anhänge in der ersten Mail
     - keine Spam-Wörter (kostenlos, gratis, Angebot, Rabatt, garantiert, jetzt zuschlagen), keine Großbuchstaben-Wörter, kein "!!!"
     - persönliche Anrede mit Namen aus dem Impressum, sonst "Hallo zusammen" bzw. "Hallo Team {firma}"
     - von Christians normalem Postfach, höchstens 10 bis 15 neue Mails am Tag, über den Tag verteilt
     - Domain mit SPF, DKIM und DMARC (einmalig prüfen)
+
+# Kontaktweg (03.10.2026): nicht auf die eigene Website verweisen (passt noch nicht zum Anspruch), sondern auf
+# WhatsApp Business (wa.me-Link mit vorausgefülltem Text) oder den Kalender-Link. Die Werte selbst stehen nicht im
+# Repo, sondern in der .env auf dem Server (OUTREACH_PHONE, OUTREACH_WHATSAPP, OUTREACH_CALENDAR_URL).
+kontaktweg:
+  bevorzugt: whatsapp # alternativ: kalender
+  whatsapp_text: Hallo Christian, ich hab deine Nachricht zu unserer Website bekommen.
+  brief_qr: whatsapp # QR-Code auf der Befund-Seite öffnet WhatsApp mit vorausgefülltem Text
+  email_cta: >-
+    Am einfachsten schreiben Sie mir kurz per WhatsApp ({whatsapp}) oder suchen sich direkt einen Termin aus ({kalender}).
