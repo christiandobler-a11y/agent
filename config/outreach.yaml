@@ -1,0 +1,32 @@
+# Kontakt-Entwürfe (Phase 2, Baustein 1): Christians Positionierung und Schreibregeln. Grundlage für den späteren
+# Entwurfs-Prompt (prompts/contact.v1.md). Stand 03.10.2026, mit Christian abgestimmt.
+
+positionierung: >-
+  Christian erkennt, was den ersten (und zweiten) Eindruck einer Website kaputt macht, und macht ihn so überzeugend
+  wie möglich. Die Website ist online das erste Bild eines Betriebs. Kein Berufsetikett wie "Webdesigner aus XY".
+
+einstiege: # werden abgewechselt, nie wortgleich kopieren
+  - Ich heiße Christian und kümmere mich darum, dass der erste Eindruck online stimmt.
+  - Mein Job ist, dass Betriebe online genauso gut rüberkommen wie in echt.
+  - Ich schau mir Websites mit den Augen eines neuen Kunden an. Was fällt in den ersten Sekunden auf, und was hält ihn davon ab anzurufen?
+  - Ich finde, wo eine Website Kunden verliert, und behebe das.
+
+aufhaenger: >-
+  Ich habe etwas vorbereitet und würde es gern in 5 bis 10 Minuten gemeinsam durchgehen. Wann passt es diese Woche am
+  besten? (Prototyp erst bauen, wenn eine Antwort kommt.)
+
+regeln:
+  - keine Gedankenstriche (– oder —), keine Aufzählungszeichen im Fließtext
+  - professionell, aber locker und natürlich, wie 2023 geschrieben; kleine Umgangssprache erlaubt ("hab", "echt", "letztens")
+  - genau ein konkreter, belegter Befund aus dem Audit, keine Mängelliste
+  - ein Kompliment mit Fakt (z. B. Google-Bewertungen), damit klar ist, dass der Betrieb gut ist und nur die Website nicht mithält
+  - E-Mail unter 120 Wörtern, reiner Text, höchstens ein Link, Betreff mit Bezug zum Betrieb, kein Werbebetreff
+  - lokaler Bezug nur nebenbei, nicht als Etikett
+  - Du oder Sie je nach Branche (Du z. B. Fahrrad, Gastro; Sie z. B. Physio, Hotel, Handwerk)
+  - Nachfassen nach 5 Tagen kurz, mit offenem Ausstieg ("wenn es gerade nicht passt, melde ich mich nicht mehr")
+
+kanaele:
+  email: Kurz, Text, von Christians Postfach. Rechtlich heikel (UWG), Entscheidung liegt bei Christian.
+  letter: >-
+    "Befund-Seite": Handy-Screenshot der aktuellen Seite mit 2-3 roten, handschriftlich wirkenden Markierungen,
+    daneben wenige handschriftlich wirkende Zeilen und ein QR-Code. Keine ausgedruckte Mail.
