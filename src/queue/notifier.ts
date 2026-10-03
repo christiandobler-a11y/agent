@@ -36,6 +36,18 @@ export interface Notifier {
 
 export type DueReminder = Interaction & { company_name: string };
 
+/** Ereignisse aus Christians Posteingang (Antwort erkannt, Mail unzustellbar). */
+export type MailEvent =
+  | {
+      kind: "reply";
+      companyId: string;
+      companyName: string;
+      from: string | null;
+      subject: string | null;
+      excerpt: string;
+    }
+  | { kind: "bounce"; companyId: string; companyName: string; address: string };
+
 const log = (msg: string, extra: Record<string, unknown>) =>
   console.log(JSON.stringify({ level: "info", msg, ...extra }));
 
