@@ -25,6 +25,7 @@ describeDb("migrate", () => {
       "pitches",
       "places_snapshots",
       "schema_migrations",
+      "search_coverage",
       "search_runs",
       "v_costs_daily",
       "website_snapshots",

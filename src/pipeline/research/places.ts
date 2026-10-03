@@ -133,12 +133,23 @@ export function createPlacesClient(options: PlacesClientOptions) {
         languageCode: "de",
         regionCode: "de",
         pageSize: PAGE_SIZE,
-        locationBias: {
-          circle: {
-            center: { latitude: query.center.lat, longitude: query.center.lng },
-            radius: query.radiusMeters,
-          },
-        },
+        ...(query.rect
+          ? {
+              locationRestriction: {
+                rectangle: {
+                  low: { latitude: query.rect.low.lat, longitude: query.rect.low.lng },
+                  high: { latitude: query.rect.high.lat, longitude: query.rect.high.lng },
+                },
+              },
+            }
+          : {
+              locationBias: {
+                circle: {
+                  center: { latitude: query.center.lat, longitude: query.center.lng },
+                  radius: query.radiusMeters,
+                },
+              },
+            }),
         ...(pageToken ? { pageToken } : {}),
       });
       const parsed = responseSchema.parse(raw);

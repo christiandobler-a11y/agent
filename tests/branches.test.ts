@@ -11,6 +11,14 @@ describe("Branchen", () => {
     expect(resolveBranch(branches, "fahrrad")?.key).toBe("fahrrad");
     expect(resolveBranch(branches, "Frisör")?.key).toBe("friseur");
     expect(resolveBranch(branches, "Bäckerei")).toBeNull();
+    // Mehrzahl, wie man im Chat schreibt
+    expect(resolveBranch(branches, "Hotels")?.key).toBe("hotel");
+    expect(resolveBranch(branches, "Restaurants")?.key).toBe("gastro");
+    expect(resolveBranch(branches, "Schreinereien")?.key).toBe("schreiner");
+    expect(resolveBranch(branches, "Fahrradläden")?.key).toBe("fahrrad");
+    expect(resolveBranch(branches, "Physiotherapeuten")?.key).toBe("physiotherapie");
+    expect(resolveBranch(branches, "Friseure")?.key).toBe("friseur");
+    expect(resolveBranch(branches, "Bäckereien")).toBeNull();
     expect(resolveBranch(branches, "  ")).toBeNull();
   });
 

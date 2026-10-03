@@ -20,7 +20,17 @@ import { MAX_PAGES, placeToCandidate, regionProbe, type Place, type PlacesClient
 import type { Prefilter } from "./prefilter.js";
 import { computeRecheckAfter, shouldReprocess, type RecheckRules } from "./recheck.js";
 import { mapLimit } from "../../util/mapLimit.js";
-import { isInRegion, tileQueries, type Region } from "./tiling.js";
+import { coverageRows, upsertCoverage } from "../../db/coverage.js";
+import { coverageSubject, tileState, type TileStatusInput } from "./coverage.js";
+import { PAGE_SIZE } from "./places.js";
+import {
+  isInRegion,
+  MAX_SPLIT_DEPTH,
+  splitQuery,
+  tileQueries,
+  type Region,
+  type TileQuery,
+} from "./tiling.js";
 
 /**
  * Recherche-Lauf (ARCHITECTURE.md 5.2 Schritte 2–6): Places-Suche Kachel für Kachel → Dubletten-Abgleich
@@ -36,6 +46,10 @@ export const researchConfigSchema = z.object({
   max_places_requests: z.number().int().positive(),
   places_cost_per_request_usd: z.number().min(0),
   prefilter_concurrency: z.number().int().positive().max(16),
+  /** Komplett-Suche ("alle …"): eigene, höhere Kostenbremse, weil jeder Ort ganz abgesucht wird. */
+  max_places_requests_complete: z.number().int().positive(),
+  /** So lange gilt ein abgesuchter Ort als aktuell; danach zählt er wieder als offen. */
+  coverage_valid_days: z.number().int().positive(),
 });
 
 export type ResearchConfig = z.infer<typeof researchConfigSchema>;
@@ -69,6 +83,11 @@ export interface ResearchRequest {
   /** Bestehenden Lauf fortsetzen (Queue nach Neustart), statt einen neuen anzulegen. */
   searchRunId?: string;
   /**
+   * Komplett-Suche: jeden Ort ganz absuchen (keine Zielzahl), bereits vollständig abgesuchte Orte überspringen,
+   * volle Gebiete (60 Treffer) in Teilgebiete teilen.
+   */
+  complete?: boolean;
+  /**
    * `true` (Standard, CLI): Lauf am Ende abschließen. `false` (Queue): nur Statistik schreiben; abgeschlossen
    * wird der Lauf, wenn alle Folge-Jobs fertig sind.
    */
@@ -79,8 +98,18 @@ export type StopReason = "goal_reached" | "tiles_exhausted" | "request_limit" | 
 
 export interface ResearchStats {
   goal: number;
+  /** Komplett-Suche (siehe ResearchRequest.complete). */
+  complete: boolean;
+  /** Lauf schreibt seine Orte in search_coverage (ältere Läufe nicht). */
+  coverage: true;
   tiles_total: number;
   tiles_searched: number;
+  /** Komplett-Suche: Orte bzw. Teilgebiete, die schon vollständig abgesucht waren. */
+  tiles_skipped: number;
+  /** Teilgebiete, die wegen voller Orte (60 Treffer) zusätzlich abgesucht wurden. */
+  subtiles_searched: number;
+  /** Orte bzw. Teilgebiete, in denen Google das Maximum geliefert hat. */
+  tiles_saturated: number;
   places_requests: number;
   places_cost_usd: number;
   results: number;
@@ -134,6 +163,9 @@ export async function runResearch(deps: ResearchDeps, req: ResearchRequest): Pro
   const chains = chainNames(deps.branches);
   const queries = tileQueries(req.region, req.term);
   const goal = Math.ceil(req.target * config.oversearch_factor);
+  const complete = req.complete ?? false;
+  const subject = coverageSubject(req.term, deps.branches);
+  const requestLimit = complete ? config.max_places_requests_complete : config.max_places_requests;
 
   const existing = req.searchRunId ? await getSearchRun(db, req.searchRunId) : null;
   if (req.searchRunId && !existing) throw new Error(`Suchlauf ${req.searchRunId} nicht gefunden`);
@@ -141,15 +173,20 @@ export async function runResearch(deps: ResearchDeps, req: ResearchRequest): Pro
     existing ??
     (await createSearchRun(db, {
       requestedBy: req.requestedBy,
-      query: { term: req.term, region: req.region.key, branch_key: branch?.key ?? null },
+      query: { term: req.term, region: req.region.key, branch_key: branch?.key ?? null, complete },
       targetCount: req.target,
     }));
   const finish = req.finish ?? true;
 
   const stats: ResearchStats = {
     goal,
+    complete,
+    coverage: true,
     tiles_total: queries.length,
     tiles_searched: 0,
+    tiles_skipped: 0,
+    subtiles_searched: 0,
+    tiles_saturated: 0,
     places_requests: 0,
     places_cost_usd: 0,
     results: 0,
@@ -305,12 +342,45 @@ export async function runResearch(deps: ResearchDeps, req: ResearchRequest): Pro
   // Objekt statt let: wird in record() gesetzt, TypeScript würde eine Variable hier fälschlich auf null festlegen.
   const halt: { budget: BudgetExceededError | null } = { budget: null };
 
+  // Bisherige Abdeckung (nur Komplett-Suche): vollständig abgesuchte Orte werden übersprungen.
+  const rows = new Map<string, { saturated: boolean; searched_at: Date }>();
+  if (complete) {
+    for (const r of await coverageRows(db, req.region.key, subject)) rows.set(r.tile_key, r);
+  }
+  const coverage: TileStatusInput = {
+    rows,
+    legacy: new Set(),
+    now: now(),
+    validDays: config.coverage_valid_days,
+  };
+  const isFresh = (key: string) => {
+    const r = rows.get(key);
+    return (
+      r !== undefined && now().getTime() - r.searched_at.getTime() <= config.coverage_valid_days * 86_400_000
+    );
+  };
+
   try {
-    tiles: for (const query of queries) {
-      stats.tiles_searched++;
+    const pending: TileQuery[] = [...queries];
+    tiles: while (pending.length > 0) {
+      const query = pending.shift()!;
+      if (complete) {
+        if (tileState(query, coverage) === "done") {
+          stats.tiles_skipped++;
+          continue;
+        }
+        // Voller Ort, schon abgesucht: nur die noch fehlenden Teilgebiete.
+        if (isFresh(query.key) && rows.get(query.key)!.saturated && query.depth < MAX_SPLIT_DEPTH) {
+          pending.unshift(...splitQuery(query, req.term));
+          continue;
+        }
+      }
+      if (query.depth === 0) stats.tiles_searched++;
+      else stats.subtiles_searched++;
       let pageToken: string | undefined;
+      let tileResults = 0;
       for (let page = 0; page < MAX_PAGES; page++) {
-        if (stats.places_requests >= config.max_places_requests) {
+        if (stats.places_requests >= requestLimit) {
           stats.stopped_because = "request_limit";
           break tiles;
         }
@@ -326,6 +396,7 @@ export async function runResearch(deps: ResearchDeps, req: ResearchRequest): Pro
         });
         stats.results += result.places.length;
         stats.invalid_results += result.invalid;
+        tileResults += result.places.length + result.invalid;
 
         const fresh = result.places.filter((p) => {
           if (seenPlaces.has(p.id)) {
@@ -341,19 +412,44 @@ export async function runResearch(deps: ResearchDeps, req: ResearchRequest): Pro
         });
         for (const outcome of await mapLimit(fresh, config.prefilter_concurrency, processPlace))
           record(outcome);
+        if (halt.budget) {
+          await updateSearchRunStats(db, run.id, stats);
+          throw halt.budget;
+        }
+
+        // Ort fertig: alle Seiten geholt. Gesättigt, wenn Google das Maximum (3 × 20) geliefert hat.
+        const lastPage = !result.nextPageToken || page === MAX_PAGES - 1;
+        if (lastPage) {
+          const saturated = tileResults >= MAX_PAGES * PAGE_SIZE;
+          if (saturated) stats.tiles_saturated++;
+          const searchedAt = now();
+          await upsertCoverage(db, {
+            regionKey: req.region.key,
+            subject,
+            tileKey: query.key,
+            searchRunId: run.id,
+            results: tileResults,
+            pages: page + 1,
+            saturated,
+            searchedAt,
+          });
+          rows.set(query.key, { saturated, searched_at: searchedAt });
+          if (complete && saturated && query.depth < MAX_SPLIT_DEPTH) {
+            pending.unshift(...splitQuery(query, req.term));
+          }
+        }
         await updateSearchRunStats(db, run.id, stats);
         progress(
-          `${query.tile.name} (Seite ${page + 1}): ${result.places.length} Treffer, ` +
-            `${stats.passed}/${goal} bestanden`,
+          `${query.key} (Seite ${page + 1}): ${result.places.length} Treffer, ` +
+            (complete ? `${stats.passed} bestanden` : `${stats.passed}/${goal} bestanden`),
         );
 
-        if (halt.budget) throw halt.budget;
-        if (stats.passed >= goal) {
+        if (!complete && stats.passed >= goal) {
           stats.stopped_because = "goal_reached";
           break tiles;
         }
-        if (!result.nextPageToken) break;
-        pageToken = result.nextPageToken;
+        if (lastPage) break;
+        pageToken = result.nextPageToken!;
       }
     }
     stats.stopped_because ??= "tiles_exhausted";

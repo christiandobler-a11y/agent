@@ -160,6 +160,11 @@ export function createBot(options: BotOptions): Bot {
     await ctx.reply(text, { parse_mode: "HTML", reply_markup: { inline_keyboard: keyboard } });
   };
 
+  bot.command(["abdeckung", "coverage"], async (ctx) => {
+    const region = ctx.match.trim().split(/\s+/)[0] || undefined;
+    await replyLong(ctx, (await tool("coverage", region ? { region } : {}, ctx.chat.id)).text);
+  });
+
   bot.command(["kalibrieren", "bewerten"], sendRatingCard);
   bot.command(["auswertung", "kalibrierung"], async (ctx) => {
     const entries = await loadGoldenEntries({ ...pipeline.lead, db: pipeline.db, now: pipeline.now });

@@ -109,6 +109,7 @@ export function runCompletedMessage(s: RunSummary): { text: string; keyboard: In
     `<b>Suche fertig: ${escapeHtml(q.term ?? "?")} in ${escapeHtml(q.region ?? "?")}</b>`,
     `${total} Firmen geprüft: ${escapeHtml(counts || "keine")} · Kosten ${s.costUsd.toFixed(2).replace(".", ",")} $`,
   ];
+  if (s.coverage) lines.push(`Abdeckung: ${escapeHtml(s.coverage)}`);
   if (s.topLeads.length === 0) lines.push("", "Diesmal kein qualifizierter Lead.");
   const keyboard: InlineKeyboardButton[][] = [];
   s.topLeads.forEach((l, i) => {
@@ -135,7 +136,9 @@ export const HELP_TEXT = [
   "• Zeig mir die besten Leads",
   "• Warum hat Radl Meier 72 Punkte?",
   "• Was hat das diese Woche gekostet?",
+  "• Such alle Hotels in Rosenheim (komplett, bis die Region vollständig ist)",
+  "• Ist Rosenheim durch?",
   "",
-  "Schnellbefehle: /status · /kosten · /fehler · /budget (z. B. /budget +5)",
+  "Schnellbefehle: /status · /abdeckung · /kosten · /fehler · /budget (z. B. /budget +5)",
   "Kalibrierung: /kalibrieren (Firmen mit A/B/C bewerten) · /auswertung",
 ].join("\n");

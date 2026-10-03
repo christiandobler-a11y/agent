@@ -16,6 +16,8 @@ ausprobieren kann. Nach Schritt 6 ist ein Abstimmungstermin (Kalibrierung) vorge
   (Sonnet), Score (Code), Pitch (Opus ab 80 Punkten); `score` rechnet ohne LLM neu
 - `npm run worker` (Betrieb: `npm start` nach `npm run build`): Worker für alle Queues; `npm run cli -- search
 "<Begriff>" <region> -n N [--wait]`, `runs`, `failed`
+- `npm run cli -- coverage [region] [branche]` (Telegram `/abdeckung`): Abdeckung je Region × Branche; `search … --alle`
+  bzw. „Such alle …“ = Komplett-Suche ohne Zielzahl (`src/pipeline/research/coverage.ts`, Tabelle `search_coverage`)
 - `npm run cli -- chat "…"`: Manager-Agent ohne Telegram befragen (gleicher Verlauf wie der Chat)
 - `npm run cli -- calibrate [export|--file|rate <firma> <A|B|C|X>]`: Golden Set (Telegram `/kalibrieren`,
   `/auswertung`); `tests/golden/golden.json` ist Regressionstest für Gewichte und Prompts (`tests/golden.test.ts`)
@@ -61,6 +63,9 @@ ausprobieren kann. Nach Schritt 6 ist ein Abstimmungstermin (Kalibrierung) vorge
 - **Telegram/Manager:** `src/telegram/` (grammY, Allowlist zuerst), `src/manager/` (Tool-Schleife über
   `gateway.toolStep`, Werkzeuge in `tools.ts` mit Zod-Schemas). Neue Fähigkeiten = neues Werkzeug, nie freies SQL.
   Telegram-Ausgaben immer escapen (`format.ts`). Tests fangen die Telegram-API ab (`bot.api.config.use`).
+- **Abdeckung:** Jeder vollständig abgesuchte Ort landet in `search_coverage` (gilt `coverage_valid_days`). Liefert Google
+  das Maximum (60), ist der Ort „gesättigt“ und wird bei der Komplett-Suche in Teilgebiete geteilt (`splitQuery`,
+  Rechteck-Restriktion). „Vollständig“ nur, wenn alle Orte erledigt und keine Firma mehr in Prüfung ist.
 - Recherche-Reihenfolge: Places → Dubletten → **Gate (Code) → Prefilter (LLM)**. Das Gate läuft zuerst, weil es
   nichts kostet. Skip-Gründe entsprechen den Schlüsseln in `config/recheck.yaml`.
 

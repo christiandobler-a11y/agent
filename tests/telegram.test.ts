@@ -3,6 +3,7 @@ import type { Update, UserFromGetMe } from "grammy/types";
 import { describe, expect, it, vi } from "vitest";
 import { upsertCompany } from "../src/db/companies.js";
 import { loadBranches } from "../src/pipeline/research/branches.js";
+import { loadRegion } from "../src/pipeline/research/tiling.js";
 import { loadScoringConfig } from "../src/pipeline/scoring/config.js";
 import { NO_BUDGET } from "../src/llm/budget.js";
 import type { LlmGateway, ToolStepRequest } from "../src/llm/gateway.js";
@@ -237,6 +238,7 @@ describe("Manager", () => {
       "explain_score",
       "skip_lead",
       "stats",
+      "coverage",
       "costs",
       "failed_leads",
     ]);
@@ -337,6 +339,7 @@ describeDb("Telegram-Bot und Manager mit Datenbank", () => {
     expect(sent().at(-1)).toMatch(/^Heute 0\.00 \$ von 5 \$/);
     await bot.handleUpdate(textUpdate(ALLOWED, "/start"));
     expect(sent().at(-1)).toContain("Such mir 20 Fahrradläden");
+    expect(sent().at(-1)).toContain("/abdeckung");
 
     await bot.handleUpdate(callbackUpdate(ALLOWED, callbackData("d", c.id)));
     expect(sent().at(-1)).toContain("Fahrrad Huber: noch nicht bewertet");
@@ -450,6 +453,20 @@ describeDb("Telegram-Bot und Manager mit Datenbank", () => {
     await bot.handleUpdate(textUpdate(ALLOWED, "/auswertung"));
     expect(sent().at(-1)).toContain("Golden Set: 2 Firmen");
     expect(sent().at(-1)).toContain("noch nicht bestanden");
+    expect(toolStep).not.toHaveBeenCalled();
+  });
+
+  it("/abdeckung zeigt je Region, was vollständig ist und was nie gesucht wurde (ohne LLM)", async () => {
+    const pctx = {
+      ...ctx(),
+      loadRegion: (key: string) => loadRegion(key),
+      research: { branches: loadBranches(), config: { coverage_valid_days: 180 } },
+    } as unknown as PipelineContext;
+    const toolStep = vi.fn();
+    const { bot, sent } = testBot(pctx, { toolStep } as unknown as LlmGateway);
+    await bot.handleUpdate(textUpdate(ALLOWED, "/abdeckung rosenheim"));
+    expect(sent().at(-1)).toMatch(/^Landkreis Rosenheim \(\d+ Orte\):/);
+    expect(sent().at(-1)).toContain("○ Noch nie gesucht:");
     expect(toolStep).not.toHaveBeenCalled();
   });
 

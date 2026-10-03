@@ -22,15 +22,29 @@ export function loadBranches(): Branches {
 
 const fold = (s: string) => normalizeName(s).replace(/ /g, "");
 
-/** Ordnet einen Suchbegriff einer Branche zu (Schlüssel, Bezeichnung oder Alias), sonst `null`. */
+/** Mögliche Einzahl-Formen eines (gefalteten) Begriffs: "hotels" → "hotel", "schreinereien" → "schreinerei". */
+function singularForms(t: string): string[] {
+  const forms = [t];
+  const add = (f: string) => {
+    if (f.length >= 3 && !forms.includes(f)) forms.push(f);
+  };
+  add(t.replace(/aeden$/, "aden")); // Fahrradläden → Fahrradladen
+  add(t.replace(/eien$/, "ei")); // Schreinereien → Schreinerei
+  for (const suffix of ["s", "en", "n", "e"]) if (t.endsWith(suffix)) add(t.slice(0, -suffix.length));
+  return forms;
+}
+
+/** Ordnet einen Suchbegriff einer Branche zu (Schlüssel, Bezeichnung oder Alias, auch in der Mehrzahl), sonst `null`. */
 export function resolveBranch(branches: Branches, term: string): Branch | null {
   const t = fold(term);
   if (!t) return null;
-  return (
-    Object.values(branches).find(
-      (b) => fold(b.key) === t || fold(b.label) === t || b.aliases.some((a) => fold(a) === t),
-    ) ?? null
-  );
+  for (const form of singularForms(t)) {
+    const hit = Object.values(branches).find(
+      (b) => fold(b.key) === form || fold(b.label) === form || b.aliases.some((a) => fold(a) === form),
+    );
+    if (hit) return hit;
+  }
+  return null;
 }
 
 /** Alle Ketten-Namen aller Branchen, normalisiert (eine Kette bleibt eine Kette, egal wonach gesucht wird). */

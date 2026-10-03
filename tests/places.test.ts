@@ -10,6 +10,8 @@ import { makePlace } from "./helpers/places.js";
 
 const query: TileQuery = {
   tile: { name: "Bad Aibling", lat: 47.8638, lng: 12.01 },
+  key: "Bad Aibling",
+  depth: 0,
   textQuery: "Fahrradladen in Bad Aibling",
   center: { lat: 47.8638, lng: 12.01 },
   radiusMeters: 5000,

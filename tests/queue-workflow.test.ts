@@ -224,6 +224,8 @@ describeDb("Workflow über pg-boss", () => {
           max_places_requests: 5,
           places_cost_per_request_usd: 0.035,
           prefilter_concurrency: 2,
+          max_places_requests_complete: 100,
+          coverage_valid_days: 180,
         },
         budget: NO_BUDGET,
       },

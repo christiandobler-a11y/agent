@@ -6,6 +6,10 @@ import { getSearchRun, type SearchRun } from "./db/searchRuns.js";
 import { pendingJobs, runSummary, startSearch, type PipelineContext } from "./queue/pipeline.js";
 import { startWorkers } from "./queue/workers.js";
 import { askManager } from "./manager/agent.js";
+import { runTool } from "./manager/tools.js";
+import { loadBranches } from "./pipeline/research/branches.js";
+import { loadResearchConfig } from "./pipeline/research/run.js";
+import { loadRegion } from "./pipeline/research/tiling.js";
 
 /** CLI für den Queue-Betrieb (Schritt 7): search, worker, runs, failed. */
 
@@ -56,6 +60,7 @@ export async function search(argv: string[]): Promise<number> {
       regionKey: parsed.region,
       target: parsed.target,
       requestedBy: "cli",
+      complete: parsed.complete,
     });
     console.log(`Suchlauf ${run.id} eingereiht. Er läuft im Worker (npm start bzw. npm run cli -- worker).`);
     if (!wait) {
@@ -160,5 +165,29 @@ export async function chat(argv: string[]): Promise<number> {
     return 0;
   } finally {
     await app.close();
+  }
+}
+
+/** Abdeckung je Region und Branche: `avelio coverage [region] [branche]` (nur Datenbank, keine API-Keys). */
+export async function coverage(argv: string[]): Promise<number> {
+  const [region, term] = argv;
+  const { DATABASE_URL } = requireKeys(loadEnv(), ["DATABASE_URL"]);
+  const db = createDb(DATABASE_URL, { max: 2 });
+  try {
+    const ctx = {
+      db,
+      loadRegion,
+      research: { branches: loadBranches(), config: loadResearchConfig() },
+      now: () => new Date(),
+    } as unknown as PipelineContext;
+    const { text, isError } = await runTool(
+      "coverage",
+      { ...(region ? { region } : {}), ...(term ? { branche: term } : {}) },
+      { ctx, chatId: 0 },
+    );
+    console.log(text);
+    return isError ? 1 : 0;
+  } finally {
+    await db.end();
   }
 }

@@ -22,7 +22,7 @@ import { createPageSpeedClient } from "./pipeline/crawl/pagespeed.js";
 import { crawlCompany, type CrawlOutcome } from "./pipeline/crawl/run.js";
 import { mapLimit } from "./util/mapLimit.js";
 import { audit, explain, score } from "./cliLeads.js";
-import { chat, failed, runs, search, worker } from "./cliQueue.js";
+import { chat, coverage, failed, runs, search, worker } from "./cliQueue.js";
 import { calibrate } from "./cliCalibrate.js";
 
 const ICONS = { ok: "✔", missing: "–", error: "✘" } as const;
@@ -98,7 +98,9 @@ async function research(args: string[]): Promise<number> {
       models,
       budget,
     });
-    console.log(`Suche "${parsed.term}" in ${region.name}, Ziel ${parsed.target} …`);
+    console.log(
+      `Suche "${parsed.term}" in ${region.name}, ${parsed.complete ? "komplett (alle Orte)" : `Ziel ${parsed.target}`} …`,
+    );
     const result = await runResearch(
       {
         db,
@@ -111,7 +113,7 @@ async function research(args: string[]): Promise<number> {
         budget,
         onProgress: (m) => console.log(`  ${m}`),
       },
-      { term: parsed.term, region, target: parsed.target, requestedBy: "cli" },
+      { term: parsed.term, region, target: parsed.target, requestedBy: "cli", complete: parsed.complete },
     );
     console.log(`\nSuchlauf ${result.run.id}`);
     for (const c of result.passed) {
@@ -260,6 +262,7 @@ async function crawl(args: string[]): Promise<number> {
 
 const commands: Record<string, (args: string[]) => Promise<number>> = {
   search,
+  coverage,
   worker,
   chat,
   runs,

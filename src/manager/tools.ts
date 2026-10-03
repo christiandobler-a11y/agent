@@ -10,6 +10,7 @@ import { explainStoredLead } from "../pipeline/audit/explainStored.js";
 import type { Finding } from "../pipeline/audit/schema.js";
 import { pendingJobs, runSummary, startSearch, type PipelineContext } from "../queue/pipeline.js";
 import { findLead, shortId } from "./leads.js";
+import { formatRegionCoverage, regionCoverage } from "../pipeline/research/coverage.js";
 
 /**
  * Werkzeuge des Managers (ARCHITECTURE.md 5.1, 10, 12.1): feste Funktionen mit geprüften Parametern.
@@ -75,20 +76,37 @@ export const TOOLS = {
         .min(2)
         .describe('Suchbegriff wie bei Google Maps, z. B. "Fahrradladen", "Schreiner"'),
       region: z.string().describe("Regionsschlüssel aus config/regions, z. B. rosenheim"),
-      ziel: z.number().int().min(1).max(50).describe("Gewünschte Zahl an Leads"),
+      ziel: z
+        .number()
+        .int()
+        .min(1)
+        .max(50)
+        .optional()
+        .describe("Gewünschte Zahl an Leads; die Suche hört danach auf. Nicht nötig bei komplett."),
+      komplett: z
+        .boolean()
+        .optional()
+        .describe(
+          'true = ALLE Betriebe der Region absuchen ("Such alle …", "Region vollständig machen"): jeder Ort ganz, ' +
+            "bereits vollständig abgesuchte Orte werden übersprungen, volle Orte geteilt. Kostet mehr (grob 1–3 $ Google plus Audits).",
+        ),
     }),
     run: async (i, t) => {
       const regions = availableRegions();
       if (!regions.includes(i.region.toLowerCase())) {
         return `Region "${i.region}" ist nicht eingerichtet. Verfügbar: ${regions.join(", ")}. Neue Regionen legt Christian als config/regions/<name>.yaml an.`;
       }
+      if (!i.komplett && !i.ziel) return "Bitte ein Ziel (Zahl der Leads) angeben oder komplett: true.";
       const run = await startSearch(t.ctx, {
         term: i.branche,
         regionKey: i.region.toLowerCase(),
-        target: i.ziel,
+        target: i.ziel ?? 1,
         requestedBy: `telegram:${t.chatId}`,
+        complete: i.komplett ?? false,
       });
-      return `Suchlauf ${shortId(run.id)} gestartet: "${i.branche}" in ${i.region}, Ziel ${i.ziel}. Die Ergebnisse kommen automatisch, sobald alle Firmen geprüft sind.`;
+      return i.komplett
+        ? `Komplett-Suche ${shortId(run.id)} gestartet: alle "${i.branche}" in ${i.region}. Bereits vollständig abgesuchte Orte werden übersprungen. Das Ergebnis samt Abdeckung kommt automatisch.`
+        : `Suchlauf ${shortId(run.id)} gestartet: "${i.branche}" in ${i.region}, Ziel ${i.ziel}. Die Suche hört beim Ziel auf, die Region ist danach also meist nicht vollständig. Die Ergebnisse kommen automatisch, sobald alle Firmen geprüft sind.`;
     },
   }),
 
@@ -204,6 +222,29 @@ export const TOOLS = {
         );
       }
       return out.join("\n");
+    },
+  }),
+
+  coverage: define({
+    description:
+      'Abdeckung: Wie vollständig ist eine Region je Branche abgesucht? Orte vollständig/angesucht/offen, gefundene Betriebe, noch in Prüfung, Leads. Für Fragen wie "Ist Rosenheim durch?" oder "Wo fehlt noch was?".',
+    schema: z.object({
+      region: z.string().optional().describe("Regionsschlüssel; ohne Angabe alle Regionen"),
+      branche: z.string().optional().describe("Branche oder Suchbegriff; ohne Angabe alle Branchen"),
+    }),
+    run: async (i, t) => {
+      const regions = i.region ? [i.region.toLowerCase()] : availableRegions();
+      const out: string[] = [];
+      for (const key of regions) {
+        const region = t.ctx.loadRegion(key);
+        const list = await regionCoverage(t.ctx.db, region, t.ctx.research.branches, {
+          validDays: t.ctx.research.config.coverage_valid_days,
+          now: t.ctx.now(),
+          ...(i.branche ? { term: i.branche } : {}),
+        });
+        out.push(formatRegionCoverage(region, list));
+      }
+      return out.join("\n\n");
     },
   }),
 

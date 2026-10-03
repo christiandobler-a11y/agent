@@ -7,3 +7,9 @@ max_places_requests: 40
 # Text Search mit Website/Bewertungen = Enterprise-SKU; Schätzwert für die Lauf-Statistik.
 places_cost_per_request_usd: 0.035
 prefilter_concurrency: 4
+# Komplett-Suche ("Such alle Hotels in Rosenheim"): jeder Ort mit allen Seiten, volle Orte zusätzlich in Teilgebieten.
+# Rosenheim: 28 Orte × bis 3 Anfragen = 84, plus Teilgebiete. Wird die Grenze erreicht, setzt die nächste
+# Komplett-Suche dort fort, wo diese aufgehört hat.
+max_places_requests_complete: 250
+# Ein abgesuchter Ort gilt so lange als aktuell; danach zählt er in der Abdeckung wieder als offen.
+coverage_valid_days: 180

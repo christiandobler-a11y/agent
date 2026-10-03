@@ -169,3 +169,17 @@ Avelio läuft auf einem Hetzner-Server in Docker (`Dockerfile`, `docker-compose.
 Schritt: [docs/DEPLOY.md](docs/DEPLOY.md). Neue Version einspielen: `ssh root@<IP> bash /opt/avelio/scripts/deploy.sh`.
 Lebenszeichen jede Minute (Docker-Healthcheck, optional Ausfall-Alarm über `HEALTHCHECK_URL`), tägliche Sicherung
 nach `/opt/avelio/backups/`.
+
+## Abdeckung: Ist eine Region wirklich durch?
+
+Eine normale Suche („Such mir 20 Hotels in Rosenheim“) hört beim Ziel auf und deckt die Region meist nur teilweise ab.
+Für Vollständigkeit:
+
+- **„Such alle Hotels in Rosenheim“** (CLI: `npm run cli -- search "Hotel" rosenheim --alle`): jeder Ort mit allen
+  Ergebnisseiten. Bereits vollständig abgesuchte Orte werden übersprungen. Liefert Google in einem Ort das Maximum (60
+  Treffer), wird der Ort automatisch in Teilgebiete geteilt. Bricht die Suche ab (Budget, Kostenbremse), setzt die
+  nächste Komplett-Suche dort fort.
+- **`/abdeckung`** bzw. „Ist Rosenheim durch?“ (CLI: `npm run cli -- coverage rosenheim`): je Branche ✔ vollständig,
+  ◐ teilweise (x von y Orten) oder ○ noch nie gesucht, mit gefundenen Betrieben und offenen Prüfungen. Suchen von vor
+  dieser Funktion zählen als „angesucht, aber nicht sicher vollständig“.
+- Jede Ergebnismeldung nach einer Suche nennt die Abdeckung der Region für diese Branche.

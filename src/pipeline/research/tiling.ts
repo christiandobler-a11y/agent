@@ -70,21 +70,87 @@ export function isInRegion(region: Region, probe: RegionProbe): boolean {
   return region.tiles.some((t) => distanceKm(t, location) <= region.fallback_max_km);
 }
 
+export interface Rect {
+  low: LatLng;
+  high: LatLng;
+}
+
 export interface TileQuery {
   tile: Tile;
+  /** Eindeutig je Region: Ortsname, Teilgebiete mit Suffix ("Rosenheim#NW", "Rosenheim#NW.SO"). */
+  key: string;
+  /** 0 = Ort, 1+ = Teilgebiet eines vollen (gesättigten) Gebiets. */
+  depth: number;
   textQuery: string;
   center: LatLng;
   radiusMeters: number;
+  /** Nur Teilgebiete: Suche strikt auf dieses Rechteck begrenzt (statt Standort-Bias). */
+  rect?: Rect;
 }
+
+const cleanTerm = (term: string) => {
+  const t = term.trim().replace(/\s+/g, " ");
+  if (!t) throw new Error("Leerer Suchbegriff");
+  return t;
+};
 
 /** Suchanfragen in Kachel-Reihenfolge. */
 export function tileQueries(region: Region, term: string): TileQuery[] {
-  const cleanTerm = term.trim().replace(/\s+/g, " ");
-  if (!cleanTerm) throw new Error("Leerer Suchbegriff");
+  const t = cleanTerm(term);
   return region.tiles.map((tile) => ({
     tile,
-    textQuery: `${cleanTerm} in ${tile.name}`,
+    key: tile.name,
+    depth: 0,
+    textQuery: `${t} in ${tile.name}`,
     center: { lat: tile.lat, lng: tile.lng },
     radiusMeters: Math.round(region.search_radius_km * 1000),
   }));
+}
+
+/** Höchste Teilungstiefe (1 Ort → 4 → 16 Teilgebiete). */
+export const MAX_SPLIT_DEPTH = 2;
+
+const KM_PER_DEG_LAT = 111.32;
+
+function squareAround(center: LatLng, halfKm: number): Rect {
+  const dLat = halfKm / KM_PER_DEG_LAT;
+  const dLng = halfKm / (KM_PER_DEG_LAT * Math.cos(rad(center.lat)));
+  return {
+    low: { lat: center.lat - dLat, lng: center.lng - dLng },
+    high: { lat: center.lat + dLat, lng: center.lng + dLng },
+  };
+}
+
+const QUADRANTS = [
+  ["NW", 1, 0],
+  ["NO", 1, 1],
+  ["SW", 0, 0],
+  ["SO", 0, 1],
+] as const;
+
+/**
+ * Ein volles Gebiet (Google liefert höchstens 60 Treffer) in vier Rechtecke teilen. Teilgebiete suchen nur den
+ * Begriff, strikt begrenzt auf ihr Rechteck, damit jedes Teilgebiet eigene Treffer liefert.
+ */
+export function splitQuery(q: TileQuery, term: string): TileQuery[] {
+  const t = cleanTerm(term);
+  const rect = q.rect ?? squareAround(q.center, q.radiusMeters / 1000);
+  const midLat = (rect.low.lat + rect.high.lat) / 2;
+  const midLng = (rect.low.lng + rect.high.lng) / 2;
+  return QUADRANTS.map(([label, north, east]) => {
+    const sub: Rect = {
+      low: { lat: north ? midLat : rect.low.lat, lng: east ? midLng : rect.low.lng },
+      high: { lat: north ? rect.high.lat : midLat, lng: east ? rect.high.lng : midLng },
+    };
+    const center = { lat: (sub.low.lat + sub.high.lat) / 2, lng: (sub.low.lng + sub.high.lng) / 2 };
+    return {
+      tile: q.tile,
+      key: `${q.key}${q.depth === 0 ? "#" : "."}${label}`,
+      depth: q.depth + 1,
+      textQuery: t,
+      center,
+      radiusMeters: Math.round(q.radiusMeters / 2),
+      rect: sub,
+    };
+  });
 }

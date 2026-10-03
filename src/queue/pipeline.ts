@@ -11,6 +11,7 @@ import type { PageSpeedClient } from "../pipeline/crawl/pagespeed.js";
 import type { CrawlConfig } from "../pipeline/crawl/config.js";
 import { computeRecheckAfter } from "../pipeline/research/recheck.js";
 import { runResearch, type ResearchDeps } from "../pipeline/research/run.js";
+import { formatCoverage, regionCoverage } from "../pipeline/research/coverage.js";
 import type { Region } from "../pipeline/research/tiling.js";
 import type { ScoreResult } from "../pipeline/scoring/score.js";
 import type { QueueConfig, QueueName } from "./boss.js";
@@ -28,6 +29,8 @@ export interface ResearchJob {
   regionKey: string;
   target: number;
   requestedBy: string;
+  /** Komplett-Suche: alle Orte ganz absuchen (siehe ResearchRequest.complete). */
+  complete?: boolean;
 }
 
 export interface CompanyJob {
@@ -68,13 +71,13 @@ export async function enqueue(
 /** Neuen Suchlauf anlegen und den Recherche-Job einreihen. Antwortet sofort (Kriterium 1: < 10 s). */
 export async function startSearch(
   ctx: PipelineContext,
-  req: { term: string; regionKey: string; target: number; requestedBy: string },
+  req: { term: string; regionKey: string; target: number; requestedBy: string; complete?: boolean },
 ): Promise<SearchRun> {
   const region = ctx.loadRegion(req.regionKey); // wirft bei unbekannter Region, bevor etwas angelegt wird
   if (!req.term.trim()) throw new Error("Leerer Suchbegriff");
   const run = await createSearchRun(ctx.db, {
     requestedBy: req.requestedBy,
-    query: { term: req.term.trim(), region: region.key },
+    query: { term: req.term.trim(), region: region.key, complete: req.complete ?? false },
     targetCount: req.target,
   });
   await enqueue(
@@ -86,6 +89,7 @@ export async function startSearch(
       regionKey: region.key,
       target: req.target,
       requestedBy: req.requestedBy,
+      complete: req.complete ?? false,
     },
     run.id,
   );
@@ -173,6 +177,7 @@ export async function handleResearch(
       target: data.target,
       requestedBy: data.requestedBy,
       searchRunId: data.searchRunId,
+      complete: data.complete ?? false,
       finish: false,
     },
   );
@@ -306,7 +311,25 @@ export async function runSummary(ctx: PipelineContext, run: SearchRun): Promise<
     counts: Object.fromEntries(counts.map((c) => [c.status, c.n])),
     topLeads,
     costUsd: Math.round(Number(cost[0]?.usd ?? 0) * 1000) / 1000,
+    coverage: await runCoverageLine(ctx, run),
   };
+}
+
+/** Abdeckungs-Zeile für die Region und Branche eines Laufs (fehlt, wenn die Region nicht mehr existiert). */
+async function runCoverageLine(ctx: PipelineContext, run: SearchRun): Promise<string | undefined> {
+  const q = run.query as { term?: string; region?: string };
+  if (!q.term || !q.region) return undefined;
+  try {
+    const region = ctx.loadRegion(q.region);
+    const [c] = await regionCoverage(ctx.db, region, ctx.research.branches, {
+      validDays: ctx.research.config.coverage_valid_days,
+      now: ctx.now(),
+      term: q.term,
+    });
+    return c ? formatCoverage(region, c, q.term) : undefined;
+  } catch {
+    return undefined;
+  }
 }
 
 /**

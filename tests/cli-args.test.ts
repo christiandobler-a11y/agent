@@ -7,7 +7,9 @@ describe("parseResearchArgs", () => {
       term: "Fahrradladen",
       region: "rosenheim",
       target: 5,
+      complete: false,
     });
+    expect(parseResearchArgs(["Hotel", "rosenheim", "--alle"]).complete).toBe(true);
     expect(parseResearchArgs(["-n", "3", "Fahrradladen", "rosenheim"]).target).toBe(3);
     expect(parseResearchArgs(["Fahrradladen", "rosenheim"]).target).toBe(20);
   });

@@ -20,6 +20,8 @@ export interface RunSummary {
   counts: Record<string, number>;
   topLeads: TopLead[];
   costUsd: number;
+  /** Abdeckung der Region für diese Branche nach dem Lauf, z. B. "◐ Hotel …: 9/28 Orte vollständig". */
+  coverage?: string | undefined;
 }
 
 export interface Notifier {
@@ -39,6 +41,7 @@ export const logNotifier: Notifier = {
       counts: s.counts,
       top: s.topLeads.map((l) => `${l.name} ${l.score}`),
       cost_usd: s.costUsd,
+      coverage: s.coverage,
     });
     return Promise.resolve();
   },

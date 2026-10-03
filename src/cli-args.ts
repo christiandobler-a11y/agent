@@ -1,10 +1,16 @@
 /** Argumente der CLI-Befehle (getrennt von cli.ts, damit Tests sie ohne Programmstart importieren können). */
 
-const RESEARCH_USAGE = 'Verwendung: avelio research "<Suchbegriff>" <region> [-n <Ziel>]';
+const RESEARCH_USAGE = 'Verwendung: avelio research "<Suchbegriff>" <region> [-n <Ziel> | --alle]';
 
-export function parseResearchArgs(args: string[]): { term: string; region: string; target: number } {
+export function parseResearchArgs(args: string[]): {
+  term: string;
+  region: string;
+  target: number;
+  complete: boolean;
+} {
   const positional: string[] = [];
   let target = 20;
+  let complete = false;
   for (let i = 0; i < args.length; i++) {
     const arg = args[i]!;
     if (arg === "-n" || arg === "--ziel") {
@@ -12,6 +18,8 @@ export function parseResearchArgs(args: string[]): { term: string; region: strin
       if (!Number.isInteger(value) || value < 1 || value > 200)
         throw new Error("-n erwartet eine Zahl von 1 bis 200");
       target = value;
+    } else if (arg === "--alle" || arg === "--komplett") {
+      complete = true;
     } else if (arg.startsWith("-")) {
       throw new Error(`Unbekannte Option ${arg}`);
     } else {
@@ -20,7 +28,7 @@ export function parseResearchArgs(args: string[]): { term: string; region: strin
   }
   const [term, region] = positional;
   if (!term || !region || positional.length > 2) throw new Error(RESEARCH_USAGE);
-  return { term, region, target };
+  return { term, region, target, complete };
 }
 
 const CRAWL_USAGE =

@@ -3,6 +3,7 @@ import {
   distanceKm,
   isInRegion,
   loadRegion,
+  splitQuery,
   tileQueries,
   type Region,
 } from "../src/pipeline/research/tiling.js";
@@ -66,12 +67,29 @@ describe("tileQueries", () => {
     expect(tileQueries(region, "  Fahrradladen ")).toEqual([
       {
         tile: region.tiles[0],
+        key: "Rosenheim",
+        depth: 0,
         textQuery: "Fahrradladen in Rosenheim",
         center: { lat: 47.8561, lng: 12.1289 },
         radiusMeters: 5000,
       },
       expect.objectContaining({ textQuery: "Fahrradladen in Bad Aibling" }),
     ]);
+  });
+
+  it("teilt ein volles Gebiet in vier Rechtecke, die zusammen das Gebiet abdecken", () => {
+    const [q] = tileQueries(region, "Hotel");
+    const parts = splitQuery(q!, "Hotel");
+    expect(parts.map((p) => p.key)).toEqual(["Rosenheim#NW", "Rosenheim#NO", "Rosenheim#SW", "Rosenheim#SO"]);
+    expect(parts.every((p) => p.depth === 1 && p.textQuery === "Hotel" && p.rect)).toBe(true);
+    const lats = parts.flatMap((p) => [p.rect!.low.lat, p.rect!.high.lat]);
+    const lngs = parts.flatMap((p) => [p.rect!.low.lng, p.rect!.high.lng]);
+    // Quadrat ±5 km um die Ortsmitte
+    expect(Math.max(...lats) - Math.min(...lats)).toBeCloseTo(10 / 111.32, 4);
+    expect((Math.min(...lngs) + Math.max(...lngs)) / 2).toBeCloseTo(q!.center.lng, 6);
+    const deeper = splitQuery(parts[0]!, "Hotel");
+    expect(deeper[3]!.key).toBe("Rosenheim#NW.SO");
+    expect(deeper[3]!.rect!.high.lat).toBeCloseTo(parts[0]!.center.lat, 6);
   });
 
   it("verlangt einen Suchbegriff", () => {

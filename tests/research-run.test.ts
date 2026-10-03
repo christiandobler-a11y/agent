@@ -105,6 +105,8 @@ describeDb("runResearch", () => {
       max_places_requests: 40,
       places_cost_per_request_usd: 0.035,
       prefilter_concurrency: 3,
+      max_places_requests_complete: 100,
+      coverage_valid_days: 180,
     },
     budget: NO_BUDGET,
     now: () => T0,
@@ -175,7 +177,12 @@ describeDb("runResearch", () => {
     const run = (await db().query<SearchRun>("select * from search_runs where id = $1", [result.run.id]))
       .rows[0]!;
     expect(run).toMatchObject({ status: "COMPLETED", target_count: 1, requested_by: "test" });
-    expect(run.query).toEqual({ term: "Fahrradladen", region: "test", branch_key: "fahrrad" });
+    expect(run.query).toEqual({
+      term: "Fahrradladen",
+      region: "test",
+      branch_key: "fahrrad",
+      complete: false,
+    });
     expect(run.stats.passed).toBe(3);
     expect(run.finished_at).toBeInstanceOf(Date);
   });
@@ -246,6 +253,8 @@ describeDb("runResearch", () => {
           max_places_requests: 1,
           places_cost_per_request_usd: 0.035,
           prefilter_concurrency: 1,
+          max_places_requests_complete: 100,
+          coverage_valid_days: 180,
         },
       }),
       { ...request, target: 50 },
@@ -302,5 +311,91 @@ describeDb("runResearch", () => {
     const result = await runResearch(deps({ places: places.client, budget }), request);
     expect(places.searchText).not.toHaveBeenCalled();
     expect(result.stats).toMatchObject({ places_requests: 0, stopped_because: "budget_exceeded" });
+  });
+
+  it("Komplett-Suche: keine Zielzahl, Abdeckung je Ort, volle Orte werden geteilt, Erledigtes übersprungen", async () => {
+    await db().query("delete from search_coverage");
+    const full = (prefix: string, n: number): Place[] =>
+      Array.from({ length: n }, (_, i) => makePlace({ id: `${prefix}${i}`, name: `Hotel ${prefix}${i}` }));
+    // "Hotel in Rosenheim": drei volle Seiten (60 Treffer) → gesättigt → vier Teilgebiete.
+    const pages: Record<string, PlacesPage> = {
+      "Hotel in Rosenheim|": { places: full("r1-", 20), invalid: 0, nextPageToken: "p2" },
+      "Hotel in Rosenheim|p2": { places: full("r2-", 20), invalid: 0, nextPageToken: "p3" },
+      "Hotel in Rosenheim|p3": { places: full("r3-", 20), invalid: 0, nextPageToken: null },
+      "Hotel in Bad Aibling|": { places: full("ba-", 3), invalid: 0, nextPageToken: null },
+    };
+    const searchText = vi.fn((q: { textQuery: string; rect?: unknown }, token?: string) =>
+      Promise.resolve(
+        pages[`${q.textQuery}|${token ?? ""}`] ?? { places: [], invalid: 0, nextPageToken: null },
+      ),
+    );
+    const hotel = { ...request, term: "Hotel", target: 1, complete: true };
+    const pass = vi.fn((): Promise<PrefilterDecision> =>
+      Promise.resolve({
+        pass: true,
+        branchKey: "hotel",
+        reason: "passt",
+        agentRunId: "00000000-0000-0000-0000-000000000000",
+        costUsd: 0,
+      }),
+    );
+    const first = await runResearch(
+      deps({ places: { searchText } as unknown as PlacesClient, prefilter: pass }),
+      hotel,
+    );
+    // Ziel 1 hätte nach der ersten Seite gestoppt, die Komplett-Suche läuft durch.
+    expect(first.stats).toMatchObject({
+      complete: true,
+      tiles_searched: 2,
+      subtiles_searched: 4,
+      tiles_saturated: 1,
+      stopped_because: "tiles_exhausted",
+    });
+    const subQueries = searchText.mock.calls.filter(([q]) => q.rect !== undefined);
+    expect(subQueries).toHaveLength(4);
+    expect(subQueries.every(([q]) => q.textQuery === "Hotel")).toBe(true);
+    const { rows } = await db().query<{ tile_key: string; saturated: boolean; results: number }>(
+      "select tile_key, saturated, results from search_coverage where subject = 'hotel' order by tile_key",
+    );
+    expect(rows).toEqual([
+      { tile_key: "Bad Aibling", saturated: false, results: 3 },
+      { tile_key: "Rosenheim", saturated: true, results: 60 },
+      { tile_key: "Rosenheim#NO", saturated: false, results: 0 },
+      { tile_key: "Rosenheim#NW", saturated: false, results: 0 },
+      { tile_key: "Rosenheim#SO", saturated: false, results: 0 },
+      { tile_key: "Rosenheim#SW", saturated: false, results: 0 },
+    ]);
+
+    // Zweite Komplett-Suche: alles aktuell → keine einzige Places-Anfrage.
+    searchText.mockClear();
+    const second = await runResearch(
+      deps({ places: { searchText } as unknown as PlacesClient, prefilter: pass }),
+      hotel,
+    );
+    expect(searchText).not.toHaveBeenCalled();
+    expect(second.stats).toMatchObject({ tiles_skipped: 2, places_requests: 0 });
+
+    // Nach Ablauf der Gültigkeit wird wieder gesucht.
+    searchText.mockClear();
+    await runResearch(
+      deps({
+        places: { searchText } as unknown as PlacesClient,
+        prefilter: pass,
+        now: () => new Date(T0.getTime() + 181 * DAY),
+      }),
+      hotel,
+    );
+    expect(searchText).toHaveBeenCalled();
+  });
+
+  it("normale Suche schreibt nur vollständig abgesuchte Orte in die Abdeckung", async () => {
+    await db().query("delete from search_coverage");
+    // Ziel (1 × Faktor 1) wird auf Seite 1 von Rosenheim erreicht → Rosenheim ist nicht vollständig abgesucht.
+    await db().query("delete from companies");
+    const base = deps();
+    const result = await runResearch({ ...base, config: { ...base.config, oversearch_factor: 1 } }, request);
+    expect(result.stats.stopped_because).toBe("goal_reached");
+    const pass = await db().query("select tile_key from search_coverage");
+    expect(pass.rows).toEqual([]);
   });
 });
