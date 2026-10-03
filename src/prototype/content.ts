@@ -58,6 +58,8 @@ export const prototypeOutputSchema = z.object({
   /** Index in der Fotoliste für Hero bzw. Über uns (oder null). */
   hero_foto: z.number().int().nullable(),
   ueber_uns_foto: z.number().int().nullable(),
+  /** Weitere gute Fotos in Reihenfolge (Nummern), Unpassendes weggelassen. */
+  galerie_fotos: z.array(z.number().int()).max(12),
 });
 export type PrototypeOutput = z.infer<typeof prototypeOutputSchema>;
 

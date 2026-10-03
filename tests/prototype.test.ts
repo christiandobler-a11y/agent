@@ -11,7 +11,13 @@ import { buildSite, isLightLogo } from "../src/prototype/build.js";
 import { contrast, paletteFrom } from "../src/prototype/color.js";
 import type { PrototypeOutput, SiteContent } from "../src/prototype/content.js";
 import { compressHours, parseDetails, shortAuthor, shortenQuote } from "../src/prototype/placeDetails.js";
-import { buildPrototype, loadPrototypeConfig, pickPhotos, toSiteContent } from "../src/prototype/run.js";
+import {
+  buildPrototype,
+  loadPrototypeConfig,
+  pickPhotos,
+  siteForm,
+  toSiteContent,
+} from "../src/prototype/run.js";
 import { renderPhysio } from "../src/prototype/templates/physio.js";
 import { crmCallback, parseCrmCallback, prototypeMessage } from "../src/telegram/format.js";
 import { describeDb, useTestDb } from "./helpers/db.js";
@@ -43,6 +49,7 @@ const output: PrototypeOutput = {
   cta: "Termin vereinbaren",
   hero_foto: 2,
   ueber_uns_foto: null,
+  galerie_fotos: [1, 3],
 };
 
 const company = {
@@ -122,18 +129,35 @@ describe("Prototyp (rein)", () => {
   });
 
   it("Fotowahl und Inhalt: gültige Nummern, Rest in die Galerie, keine Gedankenstriche, Maps-Link aus Adresse", () => {
-    // Keine Wahl: größtes Querformat (b.jpg 1600×900) wird Hero.
-    expect(pickPhotos({ hero_foto: null, ueber_uns_foto: null }, photos).hero).toBe("https://x.de/b.jpg");
-    expect(pickPhotos({ hero_foto: 2, ueber_uns_foto: 9 }, photos)).toEqual({
+    // Keine Wahl und nichts gebilligt: größtes Querformat (b.jpg 1600×900) wird Hero.
+    expect(pickPhotos({ hero_foto: null, ueber_uns_foto: null, galerie_fotos: [] }, photos).hero).toBe(
+      "https://x.de/b.jpg",
+    );
+    // Gültige Wahl, ungültige Nummer ignoriert, Galerie ohne Dubletten von Hero/Über uns.
+    expect(pickPhotos({ hero_foto: 2, ueber_uns_foto: 9, galerie_fotos: [1, 3, 2, 1] }, photos)).toEqual({
       hero: "https://x.de/b.jpg",
       about: null,
       gallery: ["https://x.de/a.jpg", "https://x.de/c.jpg"],
     });
+    // Zu kleines Hero-Foto (900 px): größtes gebilligtes Querformat stattdessen; b.jpg wurde nicht gebilligt.
+    expect(pickPhotos({ hero_foto: 3, ueber_uns_foto: null, galerie_fotos: [1] }, photos).hero).toBe(
+      "https://x.de/a.jpg",
+    );
     const c = content();
     expect(c.hero.headline).toBe("Wieder beweglich, und fit im Alltag.");
     expect(c.contact.address).toBe("Prinzregentenstraße 5, 83022 Rosenheim");
     expect(c.contact.mapsUrl).toContain("google.com/maps/search");
     expect(c.reviews.quotes).toHaveLength(1);
+  });
+
+  it("Anrede wie auf der Website des Betriebs", () => {
+    expect(
+      siteForm("Wir helfen dir schnell. Buche deinen Termin, wir freuen uns auf dich und deine Fragen."),
+    ).toBe("du");
+    expect(
+      siteForm("Wir stimmen jede Behandlung auf Ihre Situation ab und begleiten Sie. Wir helfen Ihnen gern."),
+    ).toBe("sie");
+    expect(siteForm("Physiotherapie in Rosenheim. Krankengymnastik, Massage.")).toBeNull();
   });
 
   it("Bildauswahl beim Crawl: Logo oben, keine Icons/Texturen, große Fotos zuerst", () => {
@@ -297,6 +321,8 @@ describeDb("Prototyp mit Datenbank", () => {
     const input = (structured.mock.calls as unknown as [{ role: string; input: unknown[] }][])[0]![0];
     expect(input.role).toBe("prototype");
     expect(JSON.stringify(input.input)).toContain('"type":"image"');
+    // Das LLM sieht jedes Foto als Vorschaubild.
+    expect(JSON.stringify(input.input)).toContain("Foto 3 (900×900 px)");
 
     const second = await buildPrototype(deps, c, "test");
     if ("kind" in second) throw new Error("kein Prototyp");

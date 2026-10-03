@@ -2,6 +2,7 @@ import { randomBytes } from "node:crypto";
 import { mkdir, rm } from "node:fs/promises";
 import { join } from "node:path";
 import { chromium } from "playwright";
+import sharp from "sharp";
 import { z } from "zod";
 import { loadYamlConfig } from "../config/files.js";
 import { recordApiUsage } from "../db/apiUsage.js";
@@ -26,7 +27,7 @@ import { fetchPlaceDetails, PLACE_DETAILS_COST_USD, type PlaceDetails } from "./
  * Screenshots für Nachrichten (Vorher/Nachher).
  */
 
-export const PROTOTYPE_PROMPT_VERSION = "v1";
+export const PROTOTYPE_PROMPT_VERSION = "v2";
 
 const configSchema = z.object({
   previews_dir: z.string(),
@@ -84,19 +85,48 @@ const slugify = (s: string) =>
     .replace(/^-|-$/g, "")
     .slice(0, 32);
 
-/** Fotowahl des LLM in Adressen übersetzen; ungültige Nummern ignorieren. */
+/** Unter dieser Breite wird ein Foto im Hero (volle Bildschirmbreite) sichtbar unscharf. */
+export const MIN_HERO_WIDTH = 1000;
+
+/**
+ * Fotowahl des LLM (hat die Vorschaubilder gesehen) in Adressen übersetzen. Ungültige Nummern werden ignoriert, ein zu
+ * kleines Hero-Foto ersetzt der Code durch das größte gute Querformat (aus den vom LLM gebilligten Fotos, falls es
+ * welche gebilligt hat).
+ */
 export function pickPhotos(
-  out: Pick<PrototypeOutput, "hero_foto" | "ueber_uns_foto">,
+  out: Pick<PrototypeOutput, "hero_foto" | "ueber_uns_foto" | "galerie_fotos">,
   photos: SiteImages["photos"],
 ): { hero: string | null; about: string | null; gallery: string[] } {
-  const at = (i: number | null) => (i !== null && i >= 1 && i <= photos.length ? photos[i - 1]!.url : null);
-  // Ohne Wahl: das größte Querformat-Foto (ein Hero ohne Bild überzeugt deutlich weniger).
-  const landscape = photos
-    .filter((p) => p.w >= 1000 && p.w / p.h >= 1.3)
-    .sort((a, b) => b.w * b.h - a.w * a.h)[0];
-  const hero = at(out.hero_foto) ?? landscape?.url ?? null;
-  const about = at(out.ueber_uns_foto) === hero ? null : at(out.ueber_uns_foto);
-  return { hero, about, gallery: photos.map((p) => p.url).filter((u) => u !== hero && u !== about) };
+  const at = (i: number | null) => (i !== null && i >= 1 && i <= photos.length ? photos[i - 1]! : null);
+  const approved = [out.hero_foto, out.ueber_uns_foto, ...out.galerie_fotos]
+    .map(at)
+    .filter((p): p is SiteImages["photos"][number] => p !== null);
+  const chosen = at(out.hero_foto);
+  // Größtes scharfes Querformat, zuerst unter den gebilligten Fotos, notfalls unter allen: ein Hero ohne Bild wirkt
+  // schwächer als z. B. eine Landschaft der Region.
+  const widest = (list: SiteImages["photos"]) =>
+    list.filter((p) => p.w >= MIN_HERO_WIDTH && p.w / p.h >= 1.3).sort((a, b) => b.w * b.h - a.w * a.h)[0];
+  const landscape = widest(approved) ?? widest(photos);
+  const hero = (chosen && chosen.w >= MIN_HERO_WIDTH ? chosen : landscape)?.url ?? null;
+  const aboutPick = at(out.ueber_uns_foto)?.url ?? null;
+  const about = aboutPick === hero ? null : aboutPick;
+  const gallery = [...new Set(out.galerie_fotos.map(at).map((p) => p?.url))].filter(
+    (u): u is string => Boolean(u) && u !== hero && u !== about,
+  );
+  return { hero, about, gallery };
+}
+
+/**
+ * Duzt oder siezt die Website ihre Kunden? Zählt eindeutige Formen ("du", "dein", "Ihnen", "Ihre" mitten im Satz).
+ * `null`, wenn es nicht klar ist (dann entscheidet die Branche).
+ */
+export function siteForm(text: string): "sie" | "du" | null {
+  const du = (text.match(/\b(du|dich|dir|dein|deine|deinen|deinem|deiner|euch|euer|eure)\b/gi) ?? []).length;
+  // Großgeschriebene Höflichkeitsformen nicht am Satzanfang (dort wären es auch "Ihr Team" o. ä.).
+  const sie = (text.match(/[a-zäöüß,]\s+(Sie|Ihnen|Ihre|Ihren|Ihrem|Ihrer)\b/g) ?? []).length;
+  if (du >= 3 && du > sie * 2) return "du";
+  if (sie >= 3 && sie > du * 2) return "sie";
+  return null;
 }
 
 /** Text ohne Gedankenstriche (Christians Regel gilt auch hier). */
@@ -151,6 +181,42 @@ export function toSiteContent(
     cta: clean(out.cta),
     previewNote: "",
   };
+}
+
+/** Jede Adresse nur einmal laden (Vorschau fürs LLM und Bau der Seite). */
+export function memoFetcher(fetchImage: ImageFetcher): ImageFetcher {
+  const cache = new Map<string, Promise<Buffer | null>>();
+  return (url) => {
+    let p = cache.get(url);
+    if (!p) {
+      p = fetchImage(url);
+      cache.set(url, p);
+    }
+    return p;
+  };
+}
+
+/** Kleine Vorschaubilder (384 px breit, ca. 200 Tokens je Bild) der ladbaren Fotos. */
+export async function photoThumbnails(
+  photos: SiteImages["photos"],
+  fetchImage: ImageFetcher,
+): Promise<{ photo: SiteImages["photos"][number]; data: string }[]> {
+  const out: { photo: SiteImages["photos"][number]; data: string }[] = [];
+  for (const photo of photos) {
+    const buf = await fetchImage(photo.url);
+    if (!buf) continue;
+    try {
+      const jpg = await sharp(buf, { animated: false, limitInputPixels: 60_000_000 })
+        .rotate()
+        .resize({ width: 384, height: 384, fit: "inside", withoutEnlargement: true })
+        .jpeg({ quality: 70 })
+        .toBuffer();
+      out.push({ photo, data: jpg.toString("base64") });
+    } catch {
+      // kein lesbares Bild
+    }
+  }
+  return out;
 }
 
 export function chromiumShooter(executablePath?: string) {
@@ -232,17 +298,22 @@ export async function buildPrototype(
     }
   }
 
+  // Die Anrede, die der Betrieb selbst auf seiner Website nutzt; sonst nach Branche.
   const form: "sie" | "du" =
-    company.branch_key && deps.duBranches.includes(company.branch_key) ? "du" : "sie";
+    siteForm(snap.text_excerpt ?? "") ??
+    (company.branch_key && deps.duBranches.includes(company.branch_key) ? "du" : "sie");
   const branch = company.branch_key ? deps.branches[company.branch_key] : undefined;
   const inspiration = loadInspiration();
   const shot = await screenRegion(snap.screenshot_desktop, deps.desktopScreenPx, "Bisherige Startseite");
+  // Fotos einmal laden (auch für den Bau), Vorschaubilder fürs LLM; was nicht lädt, fällt aus der Liste.
+  const fetchImage = memoFetcher(deps.fetchImage ?? httpImageFetcher());
+  const thumbs = await photoThumbnails(images.photos.slice(0, 12), fetchImage);
+  images.photos = thumbs.map((t) => t.photo);
   const data = {
     betrieb: { name: company.name, ort: company.city },
     branche: branch?.label ?? company.category,
     anrede: form,
     website_text: (snap.text_excerpt ?? "").slice(0, 9000),
-    fotos: images.photos.map((p, i) => ({ nr: i + 1, beschreibung: p.alt || null, breite: p.w, hoehe: p.h })),
     logo_vorhanden: Boolean(images.logo),
     google: places?.rating ? { sterne: places.rating, bewertungen: places.review_count } : null,
     audit_befunde: ((audit?.findings as Finding[] | undefined) ?? []).slice(0, 6).map((f) => f.title),
@@ -257,6 +328,16 @@ export async function buildPrototype(
     input: [
       { type: "text", text: "Screenshot der bisherigen Startseite (erster Bildschirm am Rechner):" },
       { type: "image", source: { type: "base64", media_type: shot.mediaType, data: shot.data } },
+      ...thumbs.flatMap((t, i) => [
+        {
+          type: "text" as const,
+          text: `Foto ${i + 1} (${t.photo.w}×${t.photo.h} px${t.photo.alt ? `, Beschreibung: ${t.photo.alt}` : ""}):`,
+        },
+        {
+          type: "image" as const,
+          source: { type: "base64" as const, media_type: "image/jpeg" as const, data: t.data },
+        },
+      ]),
       { type: "text", text: `<daten>\n${JSON.stringify(data)}\n</daten>` },
     ],
     schema: prototypeOutputSchema,
@@ -283,7 +364,7 @@ export async function buildPrototype(
   const slug = existing[0]?.slug ?? `${slugify(content.name) || "entwurf"}-${randomBytes(4).toString("hex")}`;
   const dir = join(deps.config.previews_dir, slug);
   await rm(dir, { recursive: true, force: true });
-  const built = await buildSite(content, dir, deps.fetchImage ?? httpImageFetcher());
+  const built = await buildSite(content, dir, fetchImage);
   if (built.images === 0) warnings.push("Keine Fotos geladen, Seite nutzt Farbflächen");
   const shoot = deps.shoot ?? chromiumShooter(process.env.CHROMIUM_PATH);
   const shots = await shoot(join(process.cwd(), dir, "index.html"), join(deps.config.shots_dir, slug));
