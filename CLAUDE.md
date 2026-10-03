@@ -66,6 +66,9 @@ ausprobieren kann. Nach Schritt 6 ist ein Abstimmungstermin (Kalibrierung) vorge
 - **Abdeckung:** Jeder vollständig abgesuchte Ort landet in `search_coverage` (gilt `coverage_valid_days`). Liefert Google
   das Maximum (60), ist der Ort „gesättigt“ und wird bei der Komplett-Suche in Teilgebiete geteilt (`splitQuery`,
   Rechteck-Restriktion). „Vollständig“ nur, wenn alle Orte erledigt und keine Firma mehr in Prüfung ist.
+- **CRM (Phase 2):** Vertriebsstatus (`src/crm/status.ts`, ab `READY_FOR_CONTACT`) setzt nur Christian (Buttons,
+  Manager-Werkzeuge `set_status`/`add_note`/`add_reminder`/`pipeline`); jeder Wechsel, jede Notiz und Erinnerung steht
+  in `interactions` (`src/db/crm.ts`). Erinnerungen stellt der Sweep zu, nie in der Ruhezeit (`config/crm.yaml`).
 - Recherche-Reihenfolge: Places → Dubletten → **Gate (Code) → Prefilter (LLM)**. Das Gate läuft zuerst, weil es
   nichts kostet. Skip-Gründe entsprechen den Schlüsseln in `config/recheck.yaml`.
 

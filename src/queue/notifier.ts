@@ -1,3 +1,4 @@
+import type { Interaction } from "../db/crm.js";
 import type { SearchRun } from "../db/searchRuns.js";
 
 /**
@@ -29,7 +30,11 @@ export interface Notifier {
   runFailed(run: SearchRun, error: string): Promise<void>;
   /** Höchstens einmal je Tag bzw. Monat (Dedupe übernimmt der Aufrufer). */
   budgetExceeded(message: string): Promise<void>;
+  /** Fällige CRM-Erinnerungen (Phase 2). Optional: Kanäle ohne Zustellung ignorieren sie. */
+  remindersDue?(reminders: DueReminder[]): Promise<void>;
 }
+
+export type DueReminder = Interaction & { company_name: string };
 
 const log = (msg: string, extra: Record<string, unknown>) =>
   console.log(JSON.stringify({ level: "info", msg, ...extra }));
@@ -53,6 +58,10 @@ export const logNotifier: Notifier = {
     log("Budget erreicht", { message });
     return Promise.resolve();
   },
+  remindersDue: (reminders) => {
+    log("Erinnerungen fällig", { reminders: reminders.map((r) => `${r.company_name}: ${r.body ?? ""}`) });
+    return Promise.resolve();
+  },
 };
 
 /** Mehrere Notifier (z. B. Log + Telegram); Fehler einzelner Kanäle stoppen die anderen nicht. */
@@ -71,5 +80,6 @@ export function combineNotifiers(...notifiers: Notifier[]): Notifier {
     runCompleted: (s) => all((n) => n.runCompleted(s)),
     runFailed: (r, e) => all((n) => n.runFailed(r, e)),
     budgetExceeded: (m) => all((n) => n.budgetExceeded(m)),
+    remindersDue: (r) => all((n) => n.remindersDue?.(r) ?? Promise.resolve()),
   };
 }

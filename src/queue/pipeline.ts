@@ -16,6 +16,8 @@ import type { Region } from "../pipeline/research/tiling.js";
 import type { ScoreResult } from "../pipeline/scoring/score.js";
 import type { QueueConfig, QueueName } from "./boss.js";
 import type { Notifier, RunSummary, TopLead } from "./notifier.js";
+import { dueReminders, markNotified } from "../db/crm.js";
+import { isQuietTime, loadCrmConfig, type CrmConfig } from "../crm/status.js";
 
 /**
  * Workflow (ARCHITECTURE.md 5.2): research → crawl → audit(+score) → pitch, je Firma ein Job.
@@ -56,6 +58,8 @@ export interface PipelineContext {
   budget: BudgetGuard;
   notifier: Notifier;
   now: () => Date;
+  /** Mini-CRM (Phase 2); ohne Angabe gilt config/crm.yaml. */
+  crm?: CrmConfig;
 }
 
 export async function enqueue(
@@ -361,10 +365,27 @@ export async function maybeCompleteRun(
   return true;
 }
 
-/** Alle offenen Läufe prüfen (Cron). */
+/** Alle offenen Läufe prüfen und fällige Erinnerungen zustellen (Cron). */
 export async function sweep(ctx: PipelineContext): Promise<void> {
   const { rows } = await ctx.db.query<{ id: string }>("select id from search_runs where status = 'RUNNING'");
   for (const r of rows) await maybeCompleteRun(ctx, r.id);
+  await deliverDueReminders(ctx);
+}
+
+/** Fällige CRM-Erinnerungen melden, außerhalb der Ruhezeit. Gibt die Zahl der zugestellten zurück. */
+export async function deliverDueReminders(ctx: PipelineContext): Promise<number> {
+  const crm = ctx.crm ?? loadCrmConfig();
+  const now = ctx.now();
+  if (!ctx.notifier.remindersDue || isQuietTime(now, crm.quiet_hours)) return 0;
+  const due = await dueReminders(ctx.db, now);
+  if (due.length === 0) return 0;
+  await ctx.notifier.remindersDue(due);
+  await markNotified(
+    ctx.db,
+    due.map((r) => r.id),
+    now,
+  );
+  return due.length;
 }
 
 /** Wegen Budget verschobene Jobs sofort freigeben (nach `/budget +N`). Gibt die Anzahl zurück. */

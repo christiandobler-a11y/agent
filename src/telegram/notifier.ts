@@ -2,7 +2,7 @@ import type { Api } from "grammy";
 import type { InlineKeyboardButton } from "grammy/types";
 import type { SearchRun } from "../db/searchRuns.js";
 import type { Notifier, RunSummary } from "../queue/notifier.js";
-import { escapeHtml, runCompletedMessage } from "./format.js";
+import { escapeHtml, reminderMessage, runCompletedMessage } from "./format.js";
 
 /**
  * Meldungen per Telegram. Ziel: der Chat, aus dem die Suche kam (`requested_by = telegram:<id>`), sonst alle
@@ -40,6 +40,12 @@ export function telegramNotifier(api: Api, allowedChatIds: readonly number[]): N
         targets(),
         `⚠️ ${escapeHtml(message)}\nMit /budget +5 gebe ich für heute 5 $ mehr frei und mache sofort weiter.`,
       );
+    },
+    async remindersDue(reminders) {
+      for (const r of reminders) {
+        const { text, keyboard } = reminderMessage(r);
+        await sendAll(targets(), text, keyboard);
+      }
     },
   };
 }

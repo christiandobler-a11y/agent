@@ -11,7 +11,7 @@ import { availableRegions, runTool, toolDefinitions } from "./tools.js";
  * gespeicherte Chat-Verlauf (nur Text, keine Tool-Details), damit jeder Turn klein und günstig bleibt.
  */
 
-export const MANAGER_PROMPT_VERSION = "v2";
+export const MANAGER_PROMPT_VERSION = "v3";
 const HISTORY_MESSAGES = 12;
 const MAX_TOOL_ROUNDS = 6;
 

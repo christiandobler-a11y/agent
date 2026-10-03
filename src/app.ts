@@ -16,6 +16,7 @@ import { loadRegion } from "./pipeline/research/tiling.js";
 import { loadScoringConfig } from "./pipeline/scoring/config.js";
 import { createBoss, ensureQueues, loadQueueConfig } from "./queue/boss.js";
 import { logNotifier, type Notifier } from "./queue/notifier.js";
+import { loadCrmConfig } from "./crm/status.js";
 import type { PipelineContext } from "./queue/pipeline.js";
 
 /**
@@ -81,6 +82,7 @@ export async function createApp(options: { notifier?: Notifier; worker?: boolean
     budget,
     notifier: options.notifier ?? logNotifier,
     now: () => new Date(),
+    crm: loadCrmConfig(),
   };
 
   return {

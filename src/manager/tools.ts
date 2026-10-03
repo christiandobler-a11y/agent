@@ -10,6 +10,16 @@ import { explainStoredLead } from "../pipeline/audit/explainStored.js";
 import type { Finding } from "../pipeline/audit/schema.js";
 import { pendingJobs, runSummary, startSearch, type PipelineContext } from "../queue/pipeline.js";
 import { findLead, shortId } from "./leads.js";
+import {
+  addNote,
+  addReminder,
+  companyHistory,
+  openReminders,
+  salesPipeline,
+  setSalesStatus,
+} from "../db/crm.js";
+import { loadCrmConfig, SALES_LABELS, SALES_STATUSES } from "../crm/status.js";
+import { pipelineMessage } from "../telegram/format.js";
 import { formatRegionCoverage, regionCoverage } from "../pipeline/research/coverage.js";
 
 /**
@@ -29,6 +39,16 @@ interface ToolDef<S extends z.ZodType> {
 }
 
 const define = <S extends z.ZodType>(d: ToolDef<S>) => d;
+
+/** Wanduhrzeit in Berlin (JJJJ-MM-TT, HH:MM) → Zeitpunkt, Sommer-/Winterzeit berücksichtigt. */
+export function berlinDateTime(date: string, time: string): Date {
+  const asUtc = new Date(`${date}T${time}:00Z`);
+  const offset = (d: Date) =>
+    new Date(d.toLocaleString("en-US", { timeZone: "Europe/Berlin" })).getTime() -
+    new Date(d.toLocaleString("en-US", { timeZone: "UTC" })).getTime();
+  const first = new Date(asUtc.getTime() - offset(asUtc));
+  return new Date(asUtc.getTime() - offset(first));
+}
 
 export function availableRegions(): string[] {
   return readdirSync(`${CONFIG_DIR}regions`)
@@ -166,6 +186,17 @@ export const TOOLS = {
       }
       if (pitch)
         out.push(`Pitch: ${pitch.main_opportunity}`, ...pitch.arguments.map((a, n) => `${n + 1}. ${a}`));
+      const history = await companyHistory(db, c.id, 8);
+      const reminders = await openReminders(db, c.id);
+      for (const r of reminders)
+        out.push(`Offene Erinnerung (fällig ${r.due_at?.toISOString().slice(0, 10)}): ${r.body ?? ""}`);
+      if (history.length > 0) {
+        out.push("Verlauf (neueste zuerst):");
+        for (const h of history)
+          out.push(
+            `- ${h.created_at.toISOString().slice(0, 10)} ${h.type}${h.to_status ? ` → ${h.to_status}` : ""}${h.body ? `: ${h.body}` : ""}`,
+          );
+      }
       return out.join("\n");
     },
   }),
@@ -194,6 +225,75 @@ export const TOOLS = {
       );
       return `${c.name} ist aussortiert (Grund: ${i.grund}).`;
     },
+  }),
+
+  set_status: define({
+    description:
+      "Vertriebsstatus eines Leads setzen (CRM): vorgemerkt, kontaktiert, Antwort, Termin/Interesse, Prototyp, gewonnen, verloren. Bei kontaktiert wird automatisch eine Nachfass-Erinnerung angelegt. Nur auf Christians Angabe.",
+    schema: z.object({
+      lead: z.string(),
+      status: z.enum(SALES_STATUSES),
+      kanal: z.enum(["email", "letter", "phone", "visit", "other"]).optional().describe("Wie kontaktiert"),
+      notiz: z.string().max(500).optional(),
+    }),
+    run: async (i, t) => {
+      const c = await lookup(t, i.lead);
+      if (typeof c === "string") return c;
+      const crm = t.ctx.crm ?? loadCrmConfig();
+      const { reminder } = await setSalesStatus(t.ctx.db, c.id, i.status, {
+        by: `telegram:${t.chatId}`,
+        note: i.notiz ?? null,
+        channel: i.kanal ?? null,
+        now: t.ctx.now(),
+        followUpDays: crm.follow_up_days,
+      });
+      return `${c.name}: Status ${SALES_LABELS[i.status]}.${reminder ? ` Nachfass-Erinnerung am ${reminder.due_at!.toISOString().slice(0, 10)}.` : ""}`;
+    },
+  }),
+
+  add_note: define({
+    description: "Notiz zu einem Lead speichern (z. B. Gesprächsinhalt, Rückruf, Einwand).",
+    schema: z.object({ lead: z.string(), text: z.string().min(2).max(1000) }),
+    run: async (i, t) => {
+      const c = await lookup(t, i.lead);
+      if (typeof c === "string") return c;
+      await addNote(t.ctx.db, c.id, { text: i.text, by: `telegram:${t.chatId}`, now: t.ctx.now() });
+      return `Notiz zu ${c.name} gespeichert.`;
+    },
+  }),
+
+  add_reminder: define({
+    description:
+      "Erinnerung zu einem Lead anlegen. Sie kommt zum Termin als Telegram-Nachricht (nicht nachts). Datum aus Angaben wie „Freitag“ oder „in 3 Tagen“ selbst ausrechnen (heutiges Datum steht im System-Prompt).",
+    schema: z.object({
+      lead: z.string(),
+      datum: z.iso.date().describe("Fälligkeitstag JJJJ-MM-TT"),
+      uhrzeit: z
+        .string()
+        .regex(/^\d{2}:\d{2}$/)
+        .optional()
+        .describe("Standard 09:00, deutsche Zeit"),
+      text: z.string().min(2).max(300),
+    }),
+    run: async (i, t) => {
+      const c = await lookup(t, i.lead);
+      if (typeof c === "string") return c;
+      const dueAt = berlinDateTime(i.datum, i.uhrzeit ?? "09:00");
+      if (dueAt.getTime() < t.ctx.now().getTime() - 60_000) return "Das Datum liegt in der Vergangenheit.";
+      await addReminder(t.ctx.db, c.id, {
+        dueAt,
+        text: i.text,
+        by: `telegram:${t.chatId}`,
+        now: t.ctx.now(),
+      });
+      return `Erinnerung für ${c.name} am ${i.datum} um ${i.uhrzeit ?? "09:00"}: ${i.text}`;
+    },
+  }),
+
+  pipeline: define({
+    description: "Überblick Vertrieb: Leads je Vertriebsstatus und offene Erinnerungen.",
+    schema: z.object({}),
+    run: async (_i, t) => pipelineMessage(await salesPipeline(t.ctx.db), await openReminders(t.ctx.db)),
   }),
 
   stats: define({

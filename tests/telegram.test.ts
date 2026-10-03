@@ -237,6 +237,10 @@ describe("Manager", () => {
       "get_lead",
       "explain_score",
       "skip_lead",
+      "set_status",
+      "add_note",
+      "add_reminder",
+      "pipeline",
       "stats",
       "coverage",
       "costs",
@@ -330,7 +334,7 @@ describeDb("Telegram-Bot und Manager mit Datenbank", () => {
     expect(rows[1]!.tool_calls).toEqual([{ name: "list_leads", input: { limit: 5 }, isError: false }]);
   });
 
-  it("Schnellbefehle ohne LLM; Buttons: Details, Skip mit Rückfrage, Phase-2/3-Hinweise", async () => {
+  it("Schnellbefehle ohne LLM; Buttons: Details, Skip mit Rückfrage, Phase-3-Hinweis", async () => {
     const c = await lead("Fahrrad Huber");
     const toolStep = vi.fn();
     const { bot, sent, calls } = testBot(ctx(), { toolStep } as unknown as LlmGateway);
@@ -357,9 +361,9 @@ describeDb("Telegram-Bot und Manager mit Datenbank", () => {
       skip_detail: "Manuell: per Button in Telegram",
     });
 
-    await bot.handleUpdate(callbackUpdate(ALLOWED, callbackData("c", c.id)));
+    await bot.handleUpdate(callbackUpdate(ALLOWED, callbackData("p", c.id)));
     const alert = calls.filter((x) => x.method === "answerCallbackQuery").at(-1)!.payload;
-    expect(alert).toMatchObject({ text: "Kontakt-Vorbereitung kommt in Phase 2", show_alert: true });
+    expect(alert).toMatchObject({ text: "Prototypen kommen in Phase 3", show_alert: true });
     expect(toolStep).not.toHaveBeenCalled();
   });
 

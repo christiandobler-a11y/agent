@@ -183,3 +183,12 @@ Für Vollständigkeit:
   ◐ teilweise (x von y Orten) oder ○ noch nie gesucht, mit gefundenen Betrieben und offenen Prüfungen. Suchen von vor
   dieser Funktion zählen als „angesucht, aber nicht sicher vollständig“.
 - Jede Ergebnismeldung nach einer Suche nennt die Abdeckung der Region für diese Branche.
+
+## Mini-CRM (Phase 2)
+
+- In der Ergebnismeldung auf **Kontakt** tippen: CRM-Karte mit Status-Buttons (📤 kontaktiert, 💬 Antwort,
+  📅 Termin, 🛠 Prototyp, ✅ gewonnen, ❌ verloren), Verlauf und Erinnerung „in 3/7 Tagen“.
+- Nach „kontaktiert“ legt Avelio automatisch eine Nachfass-Erinnerung an (`config/crm.yaml`, Standard 5 Tage).
+  Fällige Erinnerungen kommen als Telegram-Nachricht mit „Erledigt“ / „+2 Tage“, nie nachts (21–8 Uhr).
+- Freitext geht auch: „Hab Radl Sepp angerufen, will ein Angebot“, „Notiz zu Ariadne: …“, „Erinner mich Freitag an …“.
+- `/pipeline`: alle Leads im Vertrieb je Status und offene Erinnerungen.

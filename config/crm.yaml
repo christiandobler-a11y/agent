@@ -1,0 +1,5 @@
+# Mini-CRM (Phase 2): Vertriebsstatus, Notizen, Erinnerungen per Telegram.
+# Nach "kontaktiert" automatisch eine Nachfass-Erinnerung in so vielen Tagen (0 = aus).
+follow_up_days: 5
+# Erinnerungen nur tagsüber zustellen (deutsche Zeit); fällige Erinnerungen in der Nacht kommen morgens.
+quiet_hours: { start: "21:00", end: "08:00" }

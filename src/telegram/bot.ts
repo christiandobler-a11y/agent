@@ -1,7 +1,17 @@
 import { Bot, type Context } from "grammy";
 import type { UserFromGetMe } from "grammy/types";
 import { setRating } from "../db/calibration.js";
-import { findCompany } from "../db/companies.js";
+import { findCompany, type Company } from "../db/companies.js";
+import {
+  addReminder,
+  companyHistory,
+  completeReminder,
+  openReminders,
+  salesPipeline,
+  setSalesStatus,
+  snoozeReminder,
+} from "../db/crm.js";
+import { loadCrmConfig, SALES_LABELS } from "../crm/status.js";
 import { raiseBudgetToday } from "../llm/budget.js";
 import { askManager, type ManagerDeps } from "../manager/agent.js";
 import { runTool } from "../manager/tools.js";
@@ -14,8 +24,11 @@ import {
   chunk,
   HELP_TEXT,
   markdownToTelegramHtml,
+  leadCrmCard,
   parseCallback,
+  parseCrmCallback,
   parseGradeCallback,
+  pipelineMessage,
   ratingCardMessage,
 } from "./format.js";
 
@@ -176,7 +189,68 @@ export function createBot(options: BotOptions): Bot {
     await replyLong(ctx, formatCalibrationReport(report, pipeline.lead.scoring.version));
   });
 
+  // Mini-CRM (Phase 2): Karte mit Status-Buttons, Erinnerungen, Überblick.
+  const crmConfig = () => pipeline.crm ?? loadCrmConfig();
+  const crmCard = async (company: Company) => {
+    const fresh = (await findCompany(pipeline.db, company.id)) ?? company;
+    return leadCrmCard(
+      fresh,
+      await companyHistory(pipeline.db, company.id, 6),
+      await openReminders(pipeline.db, company.id),
+    );
+  };
+  const by = (chatId: number | undefined) => `telegram:${chatId ?? "?"}`;
+
+  bot.command("pipeline", async (ctx) => {
+    await replyLong(ctx, pipelineMessage(await salesPipeline(pipeline.db), await openReminders(pipeline.db)));
+  });
+
   bot.on("callback_query:data", async (ctx) => {
+    const crm = parseCrmCallback(ctx.callbackQuery.data);
+    if (crm) {
+      const now = pipeline.now();
+      if (crm.kind === "done" || crm.kind === "snooze") {
+        const r =
+          crm.kind === "done"
+            ? await completeReminder(pipeline.db, crm.interactionId, now)
+            : await snoozeReminder(pipeline.db, crm.interactionId, 2, now);
+        await ctx.answerCallbackQuery({
+          text: !r ? "Erinnerung nicht gefunden" : crm.kind === "done" ? "Erledigt" : "In 2 Tagen wieder",
+        });
+        if (r)
+          await ctx.editMessageReplyMarkup({ reply_markup: { inline_keyboard: [] } }).catch(() => undefined);
+        return;
+      }
+      const company = await findCompany(pipeline.db, crm.companyId);
+      if (!company) {
+        await ctx.answerCallbackQuery({ text: "Lead nicht gefunden" });
+        return;
+      }
+      if (crm.kind === "status") {
+        const { reminder } = await setSalesStatus(pipeline.db, company.id, crm.status, {
+          by: by(ctx.chat?.id),
+          now,
+          followUpDays: crmConfig().follow_up_days,
+        });
+        await ctx.answerCallbackQuery({
+          text: `${SALES_LABELS[crm.status]}${reminder ? ` · Nachfassen in ${crmConfig().follow_up_days} Tagen` : ""}`,
+        });
+      } else {
+        await addReminder(pipeline.db, company.id, {
+          dueAt: new Date(now.getTime() + crm.days * 86_400_000),
+          text: "Melden",
+          by: by(ctx.chat?.id),
+          now,
+        });
+        await ctx.answerCallbackQuery({ text: `Erinnerung in ${crm.days} Tagen` });
+      }
+      const card = await crmCard(company);
+      await ctx
+        .editMessageText(card.text, { parse_mode: "HTML", reply_markup: { inline_keyboard: card.keyboard } })
+        .catch(() => undefined);
+      return;
+    }
+
     const graded = parseGradeCallback(ctx.callbackQuery.data);
     if (graded) {
       const company = await findCompany(pipeline.db, graded.companyId);
@@ -234,9 +308,16 @@ export function createBot(options: BotOptions): Bot {
         await ctx.answerCallbackQuery({ text: "Bleibt drin" });
         await ctx.editMessageText(`${company.name} bleibt in der Liste.`).catch(() => undefined);
         return;
-      case "c":
-        await ctx.answerCallbackQuery({ text: "Kontakt-Vorbereitung kommt in Phase 2", show_alert: true });
+      case "c": {
+        await ctx.answerCallbackQuery();
+        const card = await crmCard(company);
+        await ctx.reply(card.text, {
+          parse_mode: "HTML",
+          link_preview_options: { is_disabled: true },
+          reply_markup: { inline_keyboard: card.keyboard },
+        });
         return;
+      }
       case "p":
         await ctx.answerCallbackQuery({ text: "Prototypen kommen in Phase 3", show_alert: true });
         return;

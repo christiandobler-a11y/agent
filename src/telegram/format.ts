@@ -1,6 +1,17 @@
 import type { InlineKeyboardButton } from "grammy/types";
 import type { Grade } from "../db/calibration.js";
 import type { RatingCard } from "../pipeline/calibration.js";
+import type { Company } from "../db/companies.js";
+import type { Interaction } from "../db/crm.js";
+import {
+  isSalesStatus,
+  SALES_CODES,
+  SALES_EMOJI,
+  SALES_LABELS,
+  SALES_STATUSES,
+  salesStatusFromCode,
+  type SalesStatus,
+} from "../crm/status.js";
 import type { RunSummary } from "../queue/notifier.js";
 
 /** Texte und Buttons für Telegram (HTML-Modus). Alles Fremde wird escaped. */
@@ -138,7 +149,147 @@ export const HELP_TEXT = [
   "• Was hat das diese Woche gekostet?",
   "• Such alle Hotels in Rosenheim (komplett, bis die Region vollständig ist)",
   "• Ist Rosenheim durch?",
+  "• Notiz zu Radl Sepp: hat zurückgerufen, will Angebot",
+  "• Erinner mich Freitag an Hotel Ariadne",
   "",
-  "Schnellbefehle: /status · /abdeckung · /kosten · /fehler · /budget (z. B. /budget +5)",
+  "Schnellbefehle: /status · /pipeline · /abdeckung · /kosten · /fehler · /budget (z. B. /budget +5)",
   "Kalibrierung: /kalibrieren (Firmen mit A/B/C bewerten) · /auswertung",
 ].join("\n");
+
+// ---------------------------------------------------------------------------------------------------------------
+// Mini-CRM (Phase 2)
+
+export type CrmCallback =
+  | { kind: "status"; status: SalesStatus; companyId: string }
+  | { kind: "remind"; days: number; companyId: string }
+  | { kind: "done"; interactionId: string }
+  | { kind: "snooze"; interactionId: string };
+
+const UUID = "[0-9a-f-]{36}";
+
+export function crmCallback(c: CrmCallback): string {
+  switch (c.kind) {
+    case "status":
+      return `ss:${SALES_CODES[c.status]}:${c.companyId}`;
+    case "remind":
+      return `sr:${c.days}:${c.companyId}`;
+    case "done":
+      return `rd:${c.interactionId}`;
+    case "snooze":
+      return `rz:${c.interactionId}`;
+  }
+}
+
+export function parseCrmCallback(data: string): CrmCallback | null {
+  let m = new RegExp(`^ss:([a-z]):(${UUID})$`).exec(data);
+  if (m) {
+    const status = salesStatusFromCode(m[1]!);
+    return status ? { kind: "status", status, companyId: m[2]! } : null;
+  }
+  m = new RegExp(`^sr:(\\d{1,2}):(${UUID})$`).exec(data);
+  if (m) return { kind: "remind", days: Number(m[1]), companyId: m[2]! };
+  m = new RegExp(`^r([dz]):(${UUID})$`).exec(data);
+  if (m)
+    return m[1] === "d" ? { kind: "done", interactionId: m[2]! } : { kind: "snooze", interactionId: m[2]! };
+  return null;
+}
+
+const shortDate = (d: Date) =>
+  d.toLocaleString("de-DE", {
+    timeZone: "Europe/Berlin",
+    weekday: "short",
+    day: "2-digit",
+    month: "2-digit",
+  });
+
+function historyLine(i: Interaction): string {
+  const when = shortDate(i.created_at);
+  if (i.type === "status" && i.to_status && isSalesStatus(i.to_status))
+    return `${when}: ${SALES_EMOJI[i.to_status]} ${SALES_LABELS[i.to_status]}${i.body ? ` – ${i.body}` : ""}`;
+  if (i.type === "note") return `${when}: 📝 ${i.body ?? ""}`;
+  if (i.type === "reminder")
+    return `${when}: ⏰ ${i.body ?? "Erinnerung"} (fällig ${i.due_at ? shortDate(i.due_at) : "?"}${i.done_at ? ", erledigt" : ""})`;
+  return `${when}: ${i.type}`;
+}
+
+/** CRM-Karte eines Leads: Status, letzte Einträge, offene Erinnerung und Status-Buttons. */
+export function leadCrmCard(
+  c: Company,
+  history: Interaction[],
+  open: Interaction[],
+): { text: string; keyboard: InlineKeyboardButton[][] } {
+  const status = isSalesStatus(c.status)
+    ? `${SALES_EMOJI[c.status]} ${SALES_LABELS[c.status]}`
+    : `noch nicht im Vertrieb (${c.status})`;
+  const lines = [
+    `<b>${escapeHtml(c.name)}</b>${c.city ? ` (${escapeHtml(c.city)})` : ""}${c.current_score !== null ? ` – ${c.current_score}/100` : ""}`,
+    `Status: ${status}`,
+  ];
+  if (c.website_url) lines.push(escapeHtml(c.website_url));
+  if (c.phone) lines.push(`☎️ ${escapeHtml(c.phone)}`);
+  for (const r of open)
+    lines.push(`⏰ ${escapeHtml(r.body ?? "Erinnerung")} – fällig ${r.due_at ? shortDate(r.due_at) : "?"}`);
+  if (history.length > 0) {
+    lines.push("", "<i>Verlauf</i>");
+    for (const h of history.slice(0, 6)) lines.push(escapeHtml(historyLine(h)));
+  }
+  const btn = (s: SalesStatus): InlineKeyboardButton => ({
+    text: `${SALES_EMOJI[s]} ${SALES_LABELS[s]}`,
+    callback_data: crmCallback({ kind: "status", status: s, companyId: c.id }),
+  });
+  return {
+    text: lines.join("\n"),
+    keyboard: [
+      [btn("CONTACTED"), btn("REPLIED")],
+      [btn("INTERESTED"), btn("PROTOTYPE")],
+      [btn("WON"), btn("LOST")],
+      [
+        { text: "⏰ in 3 Tagen", callback_data: crmCallback({ kind: "remind", days: 3, companyId: c.id }) },
+        { text: "⏰ in 7 Tagen", callback_data: crmCallback({ kind: "remind", days: 7, companyId: c.id }) },
+      ],
+    ],
+  };
+}
+
+/** Fällige Erinnerung mit Buttons Erledigt / +2 Tage / Lead öffnen. */
+export function reminderMessage(r: Interaction & { company_name: string }): {
+  text: string;
+  keyboard: InlineKeyboardButton[][];
+} {
+  return {
+    text: `⏰ <b>${escapeHtml(r.company_name)}</b>: ${escapeHtml(r.body ?? "Erinnerung")}`,
+    keyboard: [
+      [
+        { text: "✅ Erledigt", callback_data: crmCallback({ kind: "done", interactionId: r.id }) },
+        { text: "⏰ +2 Tage", callback_data: crmCallback({ kind: "snooze", interactionId: r.id }) },
+        { text: "📋 Lead", callback_data: callbackData("c", r.company_id) },
+      ],
+    ],
+  };
+}
+
+/** Überblick Vertrieb: Firmen je Status und offene Erinnerungen (für /pipeline). */
+export function pipelineMessage(
+  companies: Company[],
+  reminders: (Interaction & { company_name: string })[],
+): string {
+  if (companies.length === 0 && reminders.length === 0)
+    return "Noch kein Lead im Vertrieb. Tipp: In der Ergebnismeldung auf „Kontakt“ tippen und den Status setzen.";
+  const lines: string[] = [];
+  for (const s of SALES_STATUSES) {
+    const list = companies.filter((c) => c.status === s);
+    if (list.length === 0) continue;
+    lines.push(
+      `${SALES_EMOJI[s]} ${SALES_LABELS[s]} (${list.length}): ${list
+        .slice(0, 8)
+        .map((c) => c.name)
+        .join(", ")}${list.length > 8 ? " …" : ""}`,
+    );
+  }
+  if (reminders.length > 0) {
+    lines.push("", "Offene Erinnerungen:");
+    for (const r of reminders.slice(0, 10))
+      lines.push(`⏰ ${r.due_at ? shortDate(r.due_at) : "?"} ${r.company_name}: ${r.body ?? ""}`);
+  }
+  return lines.join("\n");
+}
