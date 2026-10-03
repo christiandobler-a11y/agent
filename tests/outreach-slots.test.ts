@@ -49,6 +49,15 @@ describe("Terminvorschläge", () => {
     }
   });
 
+  it("„Neu schreiben“ (nächste Variante) schlägt andere Termine bzw. einen anderen Satz vor", () => {
+    for (let seed = 0; seed < 20; seed++) {
+      const base = { now: NOW, config: cfg.termine, branchKey: null, du: false, taken: new Map(), seed };
+      const a = proposeSlots({ ...base, variant: 0 })!;
+      const b = proposeSlots({ ...base, variant: 1 })!;
+      expect(a.sentence).not.toBe(b.sentence);
+    }
+  });
+
   it("Satz mit Sie bzw. Du, Uhrzeiten so wie man sie schreibt", () => {
     const sie = proposeSlots({
       now: NOW,

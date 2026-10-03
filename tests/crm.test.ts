@@ -286,16 +286,39 @@ describeDb("CRM mit Datenbank", () => {
       } as never);
     });
     await bot.handleUpdate(callbackUpdate(crmCallback({ kind: "email", companyId: c.id })));
-    const msg = calls.filter((x) => x.method === "sendMessage").at(-1)!.payload;
-    expect(String(msg.text)).toContain("✍️ <b>E-Mail-Entwurf für Physio Entwurf</b>");
+    const sent = () => calls.filter((x) => x.method === "sendMessage").map((x) => x.payload);
+    const lastInfo = () =>
+      String(
+        sent()
+          .filter((m) => String(m.text).includes("✍️"))
+          .at(-1)!.text,
+      );
+    const info = lastInfo();
+    const msg = sent().at(-1)!;
+    expect(info).toContain("✍️ <b>E-Mail an Physio Entwurf</b>");
+    expect(info).not.toContain("Variante");
+    expect(info).toContain("keine Adresse gefunden");
+    expect(info).toMatch(/<b>Betreff:<\/b> <code>[^<]+<\/code>/);
+    expect(info).toContain("<b>Ansprechpartner:</b> keiner im Impressum");
     expect(String(msg.text)).toContain("<pre>Hallo Team Physio Entwurf,\n\nich heiße Christian.");
     expect(String(msg.text)).not.toContain("mailto:");
-    expect(String(msg.text)).toContain("keine Adresse gefunden");
     const buttons = (
       msg.reply_markup as { inline_keyboard: { text: string; callback_data: string }[][] }
     ).inline_keyboard.flat();
     expect(buttons.map((b) => b.text)).toEqual(["📤 Gesendet, kontaktiert", "🔄 Neu schreiben"]);
     expect(structured).toHaveBeenCalledTimes(1);
+
+    // „Neu schreiben“: andere Variante (Betreff, Gruß), der alte Mittelteil geht als vorheriger_text mit.
+    await bot.handleUpdate(callbackUpdate(buttons[1]!.callback_data));
+    const info2 = lastInfo();
+    expect(info2).toContain("(Variante 2)");
+    const subject = (t: string) => /<b>Betreff:<\/b> <code>([^<]+)<\/code>/.exec(t)![1];
+    expect(subject(info2)).not.toBe(subject(info));
+    expect(String(sent().at(-1)!.text)).not.toBe(String(msg.text));
+    const input2 = JSON.parse((structured.mock.calls as unknown as [{ input: string }][])[1]![0].input) as {
+      vorheriger_text?: string;
+    };
+    expect(input2.vorheriger_text).toContain("Nummer nicht antippbar");
 
     await bot.handleUpdate(callbackUpdate(buttons[0]!.callback_data));
     const { rows } = await db().query<{ status: string }>("select status from companies where id = $1", [

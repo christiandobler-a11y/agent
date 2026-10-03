@@ -27,7 +27,7 @@ import {
   chunk,
   HELP_TEXT,
   markdownToTelegramHtml,
-  emailDraftMessage,
+  emailDraftMessages,
   leadButtons,
   topLeadsText,
   leadCrmCard,
@@ -318,16 +318,21 @@ export function createBot(options: BotOptions): Bot {
           await ctx.reply(`${company.name} ist noch nicht auditiert, dafür fehlt mir der Befund.`);
           return;
         }
-        const send = (mailto: string | null) => {
-          const m = emailDraftMessage(company, draft, mailto);
-          return ctx.reply(m.text, {
+        const parts = (mailto: string | null) => emailDraftMessages(company, draft, mailto);
+        await ctx.reply(parts(null).info, {
+          parse_mode: "HTML",
+          link_preview_options: { is_disabled: true },
+        });
+        const sendBody = (mailto: string | null) => {
+          const m = parts(mailto);
+          return ctx.reply(m.body, {
             parse_mode: "HTML",
             link_preview_options: { is_disabled: true },
             reply_markup: { inline_keyboard: m.keyboard },
           });
         };
         // mailto-Links akzeptiert nicht jede Telegram-Version; dann ohne Link senden.
-        await send(mailtoLink(draft.to, draft.subject, draft.body)).catch(() => send(null));
+        await sendBody(mailtoLink(draft.to, draft.subject, draft.body)).catch(() => sendBody(null));
         return;
       }
       if (crm.kind === "status") {

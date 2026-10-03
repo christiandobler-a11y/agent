@@ -302,27 +302,46 @@ export function pipelineMessage(
   return lines.join("\n");
 }
 
-/** E-Mail-Entwurf: Empfänger und Betreff zum Antippen-Kopieren, Text als Block (Antippen kopiert alles). */
-export function emailDraftMessage(
+/**
+ * E-Mail-Entwurf in zwei Nachrichten: erst alle Angaben (Empfänger mit Herkunft, Betreff, Ansprechpartner, Kontakt
+ * des Betriebs), dann nur der Text. Antippen kopiert jeweils genau ein Feld bzw. den ganzen Text.
+ */
+export function emailDraftMessages(
   company: Company,
-  d: { to: string | null; subject: string; body: string; warnings: string[]; costUsd: number },
+  d: {
+    to: string | null;
+    emailSource: "impressum" | "website" | "google" | null;
+    contactName: string | null;
+    subject: string;
+    body: string;
+    warnings: string[];
+    variant: number;
+  },
   mailto: string | null,
-): { text: string; keyboard: InlineKeyboardButton[][] } {
-  const lines = [
-    `✍️ <b>E-Mail-Entwurf für ${escapeHtml(company.name)}</b>`,
-    `An: ${d.to ? `<code>${escapeHtml(d.to)}</code>` : "– keine Adresse gefunden, bitte selbst eintragen"}`,
-    `Betreff: <code>${escapeHtml(d.subject)}</code>`,
+): { info: string; body: string; keyboard: InlineKeyboardButton[][] } {
+  const source = {
+    impressum: "aus dem Impressum",
+    website: "von der Website",
+    google: "aus Google",
+  } as const;
+  const info = [
+    `✍️ <b>E-Mail an ${escapeHtml(company.name)}</b>${d.variant > 1 ? ` (Variante ${d.variant})` : ""}`,
     "",
-    `<pre>${escapeHtml(d.body)}</pre>`,
+    `<b>An:</b> ${d.to ? `<code>${escapeHtml(d.to)}</code>${d.emailSource ? ` <i>(${source[d.emailSource]})</i>` : ""}` : "keine Adresse gefunden, bitte auf der Website nachsehen"}`,
+    `<b>Betreff:</b> <code>${escapeHtml(d.subject)}</code>`,
+    `<b>Ansprechpartner:</b> ${d.contactName ? escapeHtml(d.contactName) : "keiner im Impressum, Anrede ans Team"}`,
   ];
-  if (mailto) lines.push("", `<a href="${escapeHtml(mailto)}">✉️ In Mail-App öffnen</a>`);
-  lines.push(
-    "",
-    "<i>Antippen kopiert Adresse, Betreff bzw. Text. Nach dem Senden auf „kontaktiert“ tippen.</i>",
-  );
-  if (d.warnings.length > 0) lines.push(`⚠️ ${escapeHtml(d.warnings.join(" · "))}`);
+  if (company.phone) info.push(`<b>Telefon Betrieb:</b> <code>${escapeHtml(company.phone)}</code>`);
+  if (company.website_url) info.push(`<b>Website:</b> ${escapeHtml(company.website_url)}`);
+  if (d.warnings.length > 0) info.push("", `⚠️ ${escapeHtml(d.warnings.join(" · "))}`);
+  info.push("", "<i>Text kommt in der nächsten Nachricht. Antippen kopiert ihn.</i>");
+
+  const body = [`<pre>${escapeHtml(d.body)}</pre>`];
+  if (mailto) body.push(`<a href="${escapeHtml(mailto)}">✉️ In Mail-App öffnen</a>`);
+  body.push("<i>Nach dem Senden auf „Gesendet, kontaktiert“ tippen.</i>");
   return {
-    text: lines.join("\n"),
+    info: info.join("\n"),
+    body: body.join("\n"),
     keyboard: [
       [
         {

@@ -18,7 +18,7 @@ import { duToIhr, lowerFirst, subjectFor, type Form } from "./form.js";
  * nichts; Christian sendet selbst.
  */
 
-export const CONTACT_PROMPT_VERSION = "v2";
+export const CONTACT_PROMPT_VERSION = "v3";
 
 export const contactOutputSchema = z.object({
   absatz: z.string().min(40).max(1000),
@@ -35,6 +35,10 @@ export interface OutreachDeps {
 
 export interface EmailDraft {
   to: string | null;
+  emailSource: "impressum" | "website" | "google" | null;
+  contactName: string | null;
+  /** 1 = erster Entwurf, 2 = nach einmal "Neu schreiben" … */
+  variant: number;
   subject: string;
   body: string;
   slots: string[];
@@ -126,10 +130,17 @@ export function mailtoLink(to: string | null, subject: string, body: string): st
   return `mailto:${to ?? ""}?subject=${encodeURIComponent(subject)}&body=${encodeURIComponent(body)}`;
 }
 
-const pick = <T>(list: readonly T[], seed: number, shift: number): T => list[(seed >>> shift) % list.length]!;
+/**
+ * Baustein wählen: Startpunkt je Firma aus dem Seed, jede neue Variante ("Neu schreiben") rückt einen weiter. So
+ * unterscheidet sich jede Variante sicher von der vorigen, sobald es mehr als eine Auswahl gibt.
+ */
+const pick = <T>(list: readonly T[], seed: number, shift: number, variant: number): T =>
+  list[((seed >>> shift) + variant) % list.length]!;
 
 interface Recipient {
   email: string | null;
+  /** Woher die Adresse stammt. */
+  emailSource: "impressum" | "website" | "google" | null;
   name: string | null;
   salutation: "Herr" | "Frau" | null;
 }
@@ -150,7 +161,10 @@ async function recipient(db: Db, companyId: string): Promise<Recipient> {
   const person = contacts.find((c) => c.name && c.source === "impressum");
   const name = person?.name ?? null;
   const salutation = person?.salutation ?? null;
-  if (email) return { email, name, salutation };
+  if (email) {
+    const source = contacts.find((c) => c.email === email)?.source;
+    return { email, emailSource: source === "impressum" ? "impressum" : "google", name, salutation };
+  }
   // Notfalls die erste mailto-Adresse der Website.
   const snapshotId = await latestOkSnapshotId(db, companyId);
   if (snapshotId) {
@@ -159,9 +173,9 @@ async function recipient(db: Db, companyId: string): Promise<Recipient> {
       [snapshotId],
     );
     const mail = rows[0]?.facts?.mailto_links?.[0]?.replace(/^mailto:/i, "").split("?")[0] ?? null;
-    return { email: mail || null, name, salutation };
+    return { email: mail || null, emailSource: mail ? "website" : null, name, salutation };
   }
-  return { email: null, name, salutation };
+  return { email: null, emailSource: null, name, salutation };
 }
 
 export async function draftEmail(
@@ -176,20 +190,23 @@ export async function draftEmail(
   if (!audit && company.segment !== "NO_WEBSITE") return { kind: "no_audit" };
 
   const places = await latestPlacesSnapshot(db, company.id);
-  const { email, name, salutation } = await recipient(db, company.id);
+  const { email, emailSource, name, salutation } = await recipient(db, company.id);
   const duBranch = company.branch_key !== null && o.du_branchen.includes(company.branch_key);
   const form: Form = !duBranch ? "sie" : name ? "du" : "ihr";
   const du = form !== "sie";
   const inForm = (sieText: string, duText: string) =>
     form === "sie" ? sieText : form === "du" ? duText : duToIhr(duText);
-  const { rows: prior } = await db.query<{ n: number }>(
-    "select count(*)::int as n from interactions where company_id = $1 and type = 'draft'",
+  const { rows: prior } = await db.query<{ body: string | null }>(
+    "select body from interactions where company_id = $1 and type = 'draft' order by created_at desc",
     [company.id],
   );
-  const seed = seedOf(`${company.id}:${prior[0]!.n}`);
+  const variant = prior.length;
+  const seed = seedOf(company.id);
+  // Mittelteil des letzten Entwurfs (Absatz nach der Grußzeile), damit "Neu schreiben" anders formuliert.
+  const previous = prior[0]?.body?.split("\n\n")[1] ?? null;
 
   const intros = [o.einstieg, ...o.einstiege_abwechslung];
-  const intro = prior[0]!.n === 0 ? o.einstieg : pick(intros, seed, 0);
+  const intro = intros[variant % intros.length]!;
   const branch = company.branch_key ? deps.branches[company.branch_key] : undefined;
   const input = {
     betrieb: { name: company.name, ort: company.city, branche: branch?.label ?? company.category },
@@ -209,6 +226,7 @@ export async function draftEmail(
             ]
           : [],
     kompliment_fakt: complimentFact(places),
+    ...(previous ? { vorheriger_text: previous } : {}),
   };
 
   const system = loadPrompt("contact", CONTACT_PROMPT_VERSION);
@@ -238,18 +256,22 @@ export async function draftEmail(
     du,
     taken: await takenSlots(db, now),
     seed,
+    variant,
   });
   const k = o.kontaktweg;
   const slotSentence = slots ? (form === "ihr" ? duToIhr(slots.sentence) : slots.sentence) : null;
-  const prepared = inForm(pick(k.vorbereitet, seed, 7), pick(k.vorbereitet_du, seed, 7));
+  const prepared = inForm(pick(k.vorbereitet, seed, 7, variant), pick(k.vorbereitet_du, seed, 7, variant));
   const cta = deps.contact.whatsapp
     ? inForm(k.email_cta, k.email_cta_du).replace(
         "{whatsapp}",
         whatsappLink(deps.contact.whatsapp, form === "sie" ? k.whatsapp_text_sie : k.whatsapp_text),
       )
     : inForm(k.email_cta_ohne_whatsapp, k.email_cta_ohne_whatsapp_du);
-  const subject = subjectFor(pick(o.spamschutz.betreffe, seed, 11).replace("{firma}", company.name), form);
-  const greeting = pick(o.spamschutz.gruesse, seed, 13);
+  const subject = subjectFor(
+    pick(o.spamschutz.betreffe, seed, 11, variant).replace("{firma}", shortCompanyName(company.name)),
+    form,
+  );
+  const greeting = pick(o.spamschutz.gruesse, seed, 13, variant);
   const signature = [o.absender_name, o.absender_zusatz, deps.contact.phone].filter(Boolean).join("\n");
 
   const body = [
@@ -268,12 +290,15 @@ export async function draftEmail(
   const draft = await insertDraft(db, company.id, {
     channel: "email",
     body,
-    meta: { subject, to: email, slots: slots?.slots ?? [], prompt: CONTACT_PROMPT_VERSION },
+    meta: { subject, to: email, slots: slots?.slots ?? [], prompt: CONTACT_PROMPT_VERSION, variant },
     by,
     now,
   });
   return {
     to: email,
+    emailSource,
+    contactName: name,
+    variant: variant + 1,
     subject,
     body,
     slots: slots?.slots ?? [],

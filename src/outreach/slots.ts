@@ -66,7 +66,10 @@ export function proposeSlots(input: {
   /** Bereits angebotene Termine (ISO) → Anzahl Leads, denen sie gerade angeboten sind. */
   taken: ReadonlyMap<string, number>;
   seed: number;
+  /** Laufende Nummer des Entwurfs (0, 1, 2 …): "Neu schreiben" bekommt andere Tage und Formulierung. */
+  variant?: number;
 }): SlotProposal | null {
+  const variant = input.variant ?? 0;
   const c = input.config;
   const today = berlinDate(input.now);
   const preferred = input.branchKey ? c.branchen_bevorzugt[input.branchKey] : undefined;
@@ -89,7 +92,7 @@ export function proposeSlots(input: {
 
   // Tage mit Abstand wählen (nicht direkt hintereinander), Startpunkt je Lead verschieden.
   const days: SlotDay[] = [];
-  const start = input.seed % candidates.length;
+  const start = (input.seed + variant) % candidates.length;
   for (let k = 0; k < candidates.length && days.length < c.tage_je_nachricht; k++) {
     const day = candidates[(start + k) % candidates.length]!;
     const tooClose = days.some(
@@ -116,7 +119,7 @@ export function proposeSlots(input: {
   });
 
   const templates = input.du ? c.formulierungen_du : c.formulierungen;
-  const template = templates[(input.seed >>> 5) % templates.length]!;
+  const template = templates[((input.seed >>> 5) + variant) % templates.length]!;
   const values: Record<string, string> = {};
   chosen.forEach((d, i) => {
     values[`tag${i + 1}`] = dayLabel(d, today);
