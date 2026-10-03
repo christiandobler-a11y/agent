@@ -152,6 +152,7 @@ export const HELP_TEXT = [
   "• Notiz zu Radl Sepp: hat zurückgerufen, will Angebot",
   "• Erinner mich Freitag an Hotel Ariadne",
   "",
+  "Leads öffnen: /leads (Top 10 mit Buttons) · /lead Name (z. B. /lead Ariadne)",
   "Schnellbefehle: /status · /pipeline · /abdeckung · /kosten · /fehler · /budget (z. B. /budget +5)",
   "Kalibrierung: /kalibrieren (Firmen mit A/B/C bewerten) · /auswertung",
 ].join("\n");
@@ -331,4 +332,28 @@ export function emailDraftMessage(
       ],
     ],
   };
+}
+
+/** Liste der Top-Leads (Nummer, Name, Ort, Score, Vertriebsstatus). */
+export function topLeadsText(companies: Company[]): string {
+  const lines = ["<b>Deine besten Leads</b> (antippen öffnet die Karte):", ""];
+  companies.forEach((c, i) => {
+    const sales = isSalesStatus(c.status) ? ` · ${SALES_EMOJI[c.status]} ${SALES_LABELS[c.status]}` : "";
+    const site = c.segment === "NO_WEBSITE" ? " · ohne Website" : "";
+    lines.push(
+      `${i + 1}. ${escapeHtml(c.name)}${c.city ? ` (${escapeHtml(c.city)})` : ""} – ${c.current_score ?? "?"}${site}${sales}`,
+    );
+  });
+  return lines.join("\n");
+}
+
+/** Ein Button je Lead (öffnet die CRM-Karte), zwei pro Zeile. */
+export function leadButtons(companies: Company[]): InlineKeyboardButton[][] {
+  const buttons = companies.map((c, i) => ({
+    text: `${i + 1}. ${c.name.length > 24 ? `${c.name.slice(0, 23)}…` : c.name}`,
+    callback_data: callbackData("c", c.id),
+  }));
+  const rows: InlineKeyboardButton[][] = [];
+  for (let i = 0; i < buttons.length; i += 2) rows.push(buttons.slice(i, i + 2));
+  return rows;
 }

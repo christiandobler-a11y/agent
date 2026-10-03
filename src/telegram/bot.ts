@@ -16,6 +16,7 @@ import type { OutreachConfig } from "../outreach/config.js";
 import { draftEmail, mailtoLink, type OutreachDeps } from "../outreach/draft.js";
 import { raiseBudgetToday } from "../llm/budget.js";
 import { askManager, type ManagerDeps } from "../manager/agent.js";
+import { findLead } from "../manager/leads.js";
 import { runTool } from "../manager/tools.js";
 import { explainStoredLead } from "../pipeline/audit/explainStored.js";
 import { loadGoldenEntries, nextRatingCard } from "../pipeline/calibration.js";
@@ -27,6 +28,8 @@ import {
   HELP_TEXT,
   markdownToTelegramHtml,
   emailDraftMessage,
+  leadButtons,
+  topLeadsText,
   leadCrmCard,
   parseCallback,
   parseCrmCallback,
@@ -108,6 +111,18 @@ export function telegramFetch(fetchFn: typeof globalThis.fetch) {
     }
   };
 }
+
+/** Befehlsmenü in Telegram (setMyCommands). */
+export const BOT_COMMANDS = [
+  { command: "leads", description: "Beste Leads mit Buttons" },
+  { command: "lead", description: "Lead-Karte öffnen, z. B. /lead Ariadne" },
+  { command: "pipeline", description: "Vertrieb und offene Erinnerungen" },
+  { command: "abdeckung", description: "Wie vollständig sind die Regionen?" },
+  { command: "status", description: "Stand der Suchen" },
+  { command: "kosten", description: "Ausgaben und Budget" },
+  { command: "kalibrieren", description: "Firmen mit A/B/C bewerten" },
+  { command: "hilfe", description: "Was ich kann" },
+];
 
 export function createBot(options: BotOptions): Bot {
   const bot = new Bot(options.token, {
@@ -208,6 +223,48 @@ export function createBot(options: BotOptions): Bot {
 
   bot.command("pipeline", async (ctx) => {
     await replyLong(ctx, pipelineMessage(await salesPipeline(pipeline.db), await openReminders(pipeline.db)));
+  });
+
+  const sendCard = async (ctx: Context, company: Company) => {
+    const card = await crmCard(company);
+    await ctx.reply(card.text, {
+      parse_mode: "HTML",
+      link_preview_options: { is_disabled: true },
+      reply_markup: { inline_keyboard: card.keyboard },
+    });
+  };
+
+  // Karte eines Leads per Name, Domain oder Kurz-ID: /lead Ariadne
+  bot.command(["lead", "kontakt"], async (ctx) => {
+    const ref = ctx.match.trim();
+    if (!ref) {
+      await ctx.reply("Welcher Lead? Zum Beispiel: /lead Ariadne (oder /leads für die besten mit Buttons)");
+      return;
+    }
+    const found = await findLead(pipeline.db, ref);
+    if (found.kind === "found") await sendCard(ctx, found.company);
+    else if (found.kind === "none") await ctx.reply(`Keinen Lead gefunden für „${ref}“.`);
+    else
+      await ctx.reply("Mehrere Treffer, welcher ist gemeint?", {
+        reply_markup: { inline_keyboard: leadButtons(found.candidates) },
+      });
+  });
+
+  // Die besten Leads (qualifiziert oder im Vertrieb) mit je einem Button zur Karte.
+  bot.command(["leads", "top"], async (ctx) => {
+    const { rows } = await pipeline.db.query<Company>(
+      `select * from companies
+        where status in ('QUALIFIED', 'READY_FOR_CONTACT', 'CONTACTED', 'REPLIED', 'INTERESTED', 'PROTOTYPE')
+        order by current_score desc nulls last limit 10`,
+    );
+    if (rows.length === 0) {
+      await ctx.reply("Noch keine qualifizierten Leads.");
+      return;
+    }
+    await ctx.reply(topLeadsText(rows), {
+      parse_mode: "HTML",
+      reply_markup: { inline_keyboard: leadButtons(rows) },
+    });
   });
 
   bot.on("callback_query:data", async (ctx) => {
@@ -355,16 +412,10 @@ export function createBot(options: BotOptions): Bot {
         await ctx.answerCallbackQuery({ text: "Bleibt drin" });
         await ctx.editMessageText(`${company.name} bleibt in der Liste.`).catch(() => undefined);
         return;
-      case "c": {
+      case "c":
         await ctx.answerCallbackQuery();
-        const card = await crmCard(company);
-        await ctx.reply(card.text, {
-          parse_mode: "HTML",
-          link_preview_options: { is_disabled: true },
-          reply_markup: { inline_keyboard: card.keyboard },
-        });
+        await sendCard(ctx, company);
         return;
-      }
       case "p":
         await ctx.answerCallbackQuery({ text: "Prototypen kommen in Phase 3", show_alert: true });
         return;

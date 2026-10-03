@@ -66,7 +66,9 @@ const textUpdate = (text: string): Update => ({
     chat: { id: ALLOWED, type: "private", first_name: "X" },
     from: { id: ALLOWED, is_bot: false, first_name: "X" },
     text,
-    ...(text.startsWith("/") ? { entities: [{ type: "bot_command", offset: 0, length: text.length }] } : {}),
+    ...(text.startsWith("/")
+      ? { entities: [{ type: "bot_command", offset: 0, length: text.split(" ")[0]!.length }] }
+      : {}),
   },
 });
 const callbackUpdate = (data: string): Update => ({
@@ -181,6 +183,19 @@ describeDb("CRM mit Datenbank", () => {
     expect(last("answerCallbackQuery")).toMatchObject({ text: "kontaktiert · Nachfassen in 5 Tagen" });
     expect(String(last("editMessageText").text)).toContain("Status: 📤 kontaktiert");
     expect(String(last("editMessageText").text)).toContain("⏰ Nachfassen: noch keine Antwort?");
+
+    await bot.handleUpdate(textUpdate("/leads"));
+    expect(String(last("sendMessage").text)).toMatch(
+      /\d+\. Hotel Ariadne \(Rosenheim\) – 77 .*📤 kontaktiert/,
+    );
+    const leadButtons = (
+      last("sendMessage").reply_markup as { inline_keyboard: { text: string; callback_data: string }[][] }
+    ).inline_keyboard.flat();
+    expect(leadButtons.find((b) => b.text.includes("Hotel Ariadne"))!.callback_data).toBe(
+      callbackData("c", c.id),
+    );
+    await bot.handleUpdate(textUpdate("/lead Ariadne"));
+    expect(String(last("sendMessage").text)).toContain("<b>Hotel Ariadne</b> (Rosenheim) – 77/100");
 
     await bot.handleUpdate(textUpdate("/pipeline"));
     expect(String(last("sendMessage").text)).toMatch(/📤 kontaktiert \(\d+\): .*Hotel Ariadne/);

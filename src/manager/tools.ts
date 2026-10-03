@@ -150,7 +150,7 @@ export const TOOLS = {
       );
       return rows.length === 0
         ? "Keine passenden Leads."
-        : `ID | Name | Ort | Score | Status | Website\n${rows.map(line).join("\n")}`;
+        : `ID | Name | Ort | Score | Status | Website\n${rows.map(line).join("\n")}\n\nHinweis für Christian: Karte mit Buttons (Status, E-Mail-Entwurf) über /leads oder /lead <Name>.`;
     },
   }),
 

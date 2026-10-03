@@ -4,7 +4,7 @@ import { loadOutreachConfig } from "./outreach/config.js";
 import { loadDotEnv, loadEnv } from "./config/env.js";
 import { combineNotifiers, logNotifier } from "./queue/notifier.js";
 import { startWorkers } from "./queue/workers.js";
-import { createBot } from "./telegram/bot.js";
+import { BOT_COMMANDS, createBot } from "./telegram/bot.js";
 import { telegramNotifier } from "./telegram/notifier.js";
 
 /**
@@ -42,8 +42,11 @@ if (bot) {
   console.log(JSON.stringify({ level: "info", msg: "Telegram-Bot verbindet sich …" }));
   bot
     .start({
-      onStart: (info) =>
-        console.log(JSON.stringify({ level: "info", msg: "Telegram-Bot läuft", bot: `@${info.username}` })),
+      onStart: (info) => {
+        console.log(JSON.stringify({ level: "info", msg: "Telegram-Bot läuft", bot: `@${info.username}` }));
+        // Befehlsmenü in Telegram (Schaltfläche "/" bzw. "Menü").
+        void bot.api.setMyCommands(BOT_COMMANDS).catch(() => undefined);
+      },
     })
     .catch((err: unknown) => {
       // Z. B. 401 (Token falsch) oder 409 (Bot läuft schon woanders). Beenden, damit es auffällt bzw. Docker neu startet.
