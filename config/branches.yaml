@@ -58,7 +58,8 @@ physiotherapie:
   label: Physiotherapie
   aliases: [Physiotherapie, Physiotherapeut, Krankengymnastik]
   places_types: [physiotherapist]
-  value: 3
+  # 4 statt 3 (03.10.2026): viel Konkurrenz, die Website entscheidet mit (Christian); Golden Set leicht besser.
+  value: 4
   chains: []
 
 kosmetik:
