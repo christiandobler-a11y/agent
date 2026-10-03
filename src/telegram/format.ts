@@ -1,3 +1,5 @@
+import type { EveningSummary } from "../autopilot/schedule.js";
+import type { MailEvent } from "../queue/notifier.js";
 import type { InlineKeyboardButton } from "grammy/types";
 import type { Grade } from "../db/calibration.js";
 import type { RatingCard } from "../pipeline/calibration.js";
@@ -330,8 +332,11 @@ export function emailDraftMessages(
     body: string;
     warnings: string[];
     variant: number;
+    draftId?: string;
   },
   mailto: string | null,
+  /** Postfach eingerichtet: "Jetzt senden" statt "Gesendet, kontaktiert". */
+  canSend = false,
 ): { info: string; body: string; keyboard: InlineKeyboardButton[][] } {
   const source = {
     impressum: "aus dem Impressum",
@@ -352,16 +357,22 @@ export function emailDraftMessages(
 
   const body = [`<pre>${escapeHtml(d.body)}</pre>`];
   if (mailto) body.push(`<a href="${escapeHtml(mailto)}">✉️ In Mail-App öffnen</a>`);
-  body.push("<i>Nach dem Senden auf „Gesendet, kontaktiert“ tippen.</i>");
+  body.push(
+    canSend && d.draftId
+      ? "<i>„Jetzt senden“ schickt die Mail über dein Postfach.</i>"
+      : "<i>Nach dem Senden auf „Gesendet, kontaktiert“ tippen.</i>",
+  );
   return {
     info: info.join("\n"),
     body: body.join("\n"),
     keyboard: [
       [
-        {
-          text: "📤 Gesendet, kontaktiert",
-          callback_data: crmCallback({ kind: "status", status: "CONTACTED", companyId: company.id }),
-        },
+        canSend && d.draftId
+          ? { text: "📤 Jetzt senden", callback_data: `sd:${d.draftId}` }
+          : {
+              text: "📤 Gesendet, kontaktiert",
+              callback_data: crmCallback({ kind: "status", status: "CONTACTED", companyId: company.id }),
+            },
         { text: "🔄 Neu schreiben", callback_data: crmCallback({ kind: "email", companyId: company.id }) },
       ],
     ],
@@ -420,6 +431,50 @@ export function prototypeMessage(
     callback_data: crmCallback({ kind: "prototype", companyId: company.id }),
   });
   return { caption: lines.join("\n"), keyboard: [row] };
+}
+
+/** Antwort erkannt bzw. Mail unzustellbar (aus dem Posteingang). */
+export function mailEventMessage(e: MailEvent): { text: string; keyboard: InlineKeyboardButton[][] } {
+  const open = [[{ text: "🗂 Lead öffnen", callback_data: callbackData("c", e.companyId) }]];
+  if (e.kind === "bounce") {
+    return {
+      text: `⚠️ <b>Unzustellbar:</b> ${escapeHtml(e.companyName)}\nDie Mail an <code>${escapeHtml(e.address)}</code> kam zurück. Vielleicht per Brief?`,
+      keyboard: open,
+    };
+  }
+  return {
+    text: [
+      `💬 <b>Antwort von ${escapeHtml(e.companyName)}!</b>`,
+      e.from ? `Von: ${escapeHtml(e.from)}` : null,
+      e.subject ? `Betreff: ${escapeHtml(e.subject)}` : null,
+      "",
+      e.excerpt ? `<blockquote>${escapeHtml(e.excerpt)}</blockquote>` : "",
+      "Status steht jetzt auf „geantwortet“, Nachfassen ist gestoppt.",
+    ]
+      .filter((l) => l !== null)
+      .join("\n"),
+    keyboard: open,
+  };
+}
+
+export function eveningSummaryText(s: EveningSummary): string {
+  const c = s.counts;
+  const part = (label: string, x: { done: number; total: number }) =>
+    x.total > 0 ? `${label} ${x.done}/${x.total}` : null;
+  const parts = [
+    part("Mails", c.email),
+    part("Befund-Seiten", c.letter),
+    part("Nachfassen", c.followup),
+  ].filter(Boolean);
+  const lines = [`🌙 <b>Bilanz heute:</b> ${parts.join(" · ") || "nichts geplant"}`];
+  if (s.replies.length > 0) lines.push(`💬 Antworten: ${s.replies.map(escapeHtml).join(", ")}`);
+  if (s.bounces.length > 0) lines.push(`⚠️ Unzustellbar: ${s.bounces.map(escapeHtml).join(", ")}`);
+  const open =
+    c.email.total - c.email.done + c.letter.total - c.letter.done + c.followup.total - c.followup.done;
+  if (open > 0)
+    lines.push(`Noch offen: ${open}. Mit /heute weitermachen, sonst kommen sie in einen der nächsten Tage.`);
+  lines.push("Morgen früh kommt das nächste Paket.");
+  return lines.join("\n");
 }
 
 /** Liste der Top-Leads (Nummer, Name, Ort, Score, Vertriebsstatus). */

@@ -23,6 +23,7 @@ describeDb("migrate", () => {
       "interactions",
       "lead_scores",
       "messages",
+      "outreach_plan",
       "pitches",
       "places_snapshots",
       "prototypes",

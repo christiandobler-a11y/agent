@@ -16,6 +16,12 @@ import { loadRegion } from "./pipeline/research/tiling.js";
 import { loadScoringConfig } from "./pipeline/scoring/config.js";
 import { createBoss, ensureQueues, loadQueueConfig } from "./queue/boss.js";
 import { logNotifier, type Notifier } from "./queue/notifier.js";
+import { loadAutopilotConfig } from "./autopilot/plan.js";
+import { loadOutreachConfig } from "./outreach/config.js";
+import { chromiumLetterRenderer } from "./outreach/letterPdf.js";
+import { loadMailConfig, mailboxFromEnv, type MailConfig, type Mailbox } from "./outreach/mail.js";
+import { createMxCheck } from "./outreach/mx.js";
+import { loadPrototypeConfig } from "./prototype/run.js";
 import { loadCrmConfig } from "./crm/status.js";
 import type { PipelineContext } from "./queue/pipeline.js";
 
@@ -28,6 +34,9 @@ export interface App {
   ctx: PipelineContext;
   db: Db;
   llm: LlmGateway;
+  /** Christians Postfach (Versand per Knopf, Antwort-Erkennung); `null`, wenn nicht eingerichtet. */
+  mailbox: Mailbox | null;
+  mail: MailConfig;
   close(): Promise<void>;
 }
 
@@ -85,10 +94,57 @@ export async function createApp(options: { notifier?: Notifier; worker?: boolean
     crm: loadCrmConfig(),
   };
 
+  // Morgen-Paket und Postfach (Phase 2).
+  const outreach = loadOutreachConfig();
+  const mail = loadMailConfig();
+  const mailbox = mailboxFromEnv(env, mail, outreach.absender_name);
+  const baseUrl = env.PREVIEW_BASE_URL?.replace(/\/$/, "") ?? null;
+  const prototypeConfig = loadPrototypeConfig();
+  const contact = { whatsapp: env.OUTREACH_WHATSAPP ?? null, phone: env.OUTREACH_PHONE ?? null };
+  const desktopScreenPx = crawlConfig.desktop.height * crawlConfig.desktop.scale;
+  ctx.mailbox = mailbox;
+  ctx.mail = mail;
+  ctx.autopilot = {
+    config: loadAutopilotConfig(),
+    planDeps: () => ({
+      db,
+      now: ctx.now,
+      config: loadAutopilotConfig(),
+      letter: {
+        db,
+        llm,
+        outreach,
+        branches,
+        now: ctx.now,
+        contact,
+        previewBaseUrl: baseUrl,
+        render: chromiumLetterRenderer(process.env.CHROMIUM_PATH),
+        prototype: { shotsDir: prototypeConfig.shots_dir, baseUrl },
+        desktopScreenPx,
+      },
+      prototype: {
+        db,
+        llm,
+        budget,
+        branches,
+        config: prototypeConfig,
+        duBranches: outreach.du_branchen,
+        now: ctx.now,
+        googleApiKey: keys.GOOGLE_API_KEY,
+        baseUrl,
+        desktopScreenPx,
+      },
+      mx: createMxCheck(),
+      lettersDir: "data/letters",
+    }),
+  };
+
   return {
     ctx,
     db,
     llm,
+    mailbox,
+    mail,
     async close() {
       await boss.stop({ graceful: true, timeout: 30_000 }).catch(() => undefined);
       if (crawler) await (await crawler).close().catch(() => undefined);

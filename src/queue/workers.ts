@@ -4,7 +4,8 @@ import { setFailed } from "../db/companies.js";
 import { finishSearchRun, getSearchRun } from "../db/searchRuns.js";
 import { BudgetExceededError } from "../llm/budget.js";
 import { computeRecheckAfter } from "../pipeline/research/recheck.js";
-import { QUEUES, SWEEP_QUEUE, type QueueName } from "./boss.js";
+import { PLAN_QUEUE, QUEUES, SWEEP_QUEUE, type QueueName } from "./boss.js";
+import { runPlanJob } from "../autopilot/schedule.js";
 import {
   enqueue,
   handleAudit,
@@ -168,6 +169,10 @@ export async function startWorkers(ctx: PipelineContext): Promise<void> {
       },
     );
   }
+  await ctx.boss.work(PLAN_QUEUE, { pollingIntervalSeconds: 30 }, async () => {
+    const result = await runPlanJob(ctx);
+    if (result) console.log(JSON.stringify({ level: "info", msg: "Morgen-Paket vorbereitet", ...result }));
+  });
   await ctx.boss.work(SWEEP_QUEUE, { pollingIntervalSeconds: 10 }, async () => {
     await sweep(ctx);
   });

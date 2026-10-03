@@ -65,6 +65,23 @@ export const outreachConfigSchema = z.object({
       gruss: ["Viele Grüße"],
       unterschrift: "Christian",
     }),
+  nachfassen: z
+    .object({
+      saetze: z.array(z.string()).min(1),
+      saetze_du: z.array(z.string()).min(1),
+      entwurf: z.string(),
+      entwurf_du: z.string(),
+      ausstieg: z.string(),
+      ausstieg_du: z.string(),
+    })
+    .default({
+      saetze: ["ich wollte nur kurz nachhaken, ob meine Mail von letzter Woche bei Ihnen angekommen ist."],
+      saetze_du: ["ich wollte nur kurz nachhaken, ob meine Mail von letzter Woche bei dir angekommen ist."],
+      entwurf: "Den Entwurf für Ihre Startseite können Sie sich weiterhin hier ansehen: {link}",
+      entwurf_du: "Den Entwurf für eure Startseite könnt ihr euch weiterhin hier ansehen: {link}",
+      ausstieg: "Wenn es gerade nicht passt, ist das völlig in Ordnung, dann melde ich mich nicht mehr.",
+      ausstieg_du: "Wenn es gerade nicht passt, ist das völlig in Ordnung, dann melde ich mich nicht mehr.",
+    }),
   termine: z.object({
     zeitfenster: z.partialRecord(z.enum(WEEKDAYS), z.array(hm)),
     ausnahmen_mittagspause: z.partialRecord(z.enum(WEEKDAYS), z.array(hm)).default({}),

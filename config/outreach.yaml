@@ -125,3 +125,16 @@ brief:
   qr_text_telefon: Oder einfach kurz anrufen.
   gruss: [Viele Grüße, Beste Grüße, Grüße aus Peißenberg]
   unterschrift: Christian
+
+# Nachfass-Mail (03.10.2026): kurz, im selben Verlauf (Re: …), mit offenem Ausstieg. Text aus Code, kein LLM.
+nachfassen:
+  saetze:
+    - ich wollte nur kurz nachhaken, ob meine Mail von letzter Woche bei Ihnen angekommen ist.
+    - kurze Nachfrage zu meiner Mail von letzter Woche, ist die bei Ihnen gelandet?
+  saetze_du:
+    - ich wollte nur kurz nachhaken, ob meine Mail von letzter Woche bei dir angekommen ist.
+    - kurze Nachfrage zu meiner Mail von letzter Woche, ist die bei dir gelandet?
+  entwurf: "Den Entwurf für Ihre Startseite können Sie sich weiterhin hier ansehen: {link}"
+  entwurf_du: "Den Entwurf für eure Startseite könnt ihr euch weiterhin hier ansehen: {link}"
+  ausstieg: Wenn es gerade nicht passt, ist das völlig in Ordnung, dann melde ich mich nicht mehr.
+  ausstieg_du: Wenn es gerade nicht passt, ist das völlig in Ordnung, dann melde ich mich nicht mehr.

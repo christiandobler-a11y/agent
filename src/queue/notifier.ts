@@ -1,5 +1,7 @@
 import type { Interaction } from "../db/crm.js";
 import type { SearchRun } from "../db/searchRuns.js";
+import type { PlanBuildResult } from "../autopilot/plan.js";
+import type { EveningSummary } from "../autopilot/schedule.js";
 
 /**
  * Meldungen an Christian (ARCHITECTURE.md 5.2 Schritt 11, 11.1). In Schritt 8 per Telegram, sonst als Log.
@@ -32,6 +34,12 @@ export interface Notifier {
   budgetExceeded(message: string): Promise<void>;
   /** Fällige CRM-Erinnerungen (Phase 2). Optional: Kanäle ohne Zustellung ignorieren sie. */
   remindersDue?(reminders: DueReminder[]): Promise<void>;
+  /** Morgen-Paket fertig (ab der Uhrzeit "morgens"). */
+  planReady?(date: string, result: PlanBuildResult): Promise<void>;
+  /** Abend-Bilanz des Morgen-Pakets. */
+  eveningSummary?(summary: EveningSummary): Promise<void>;
+  /** Antwort erkannt oder Mail unzustellbar. */
+  mailEvent?(event: MailEvent): Promise<void>;
 }
 
 export type DueReminder = Interaction & { company_name: string };

@@ -2,13 +2,21 @@ import type { Api } from "grammy";
 import type { InlineKeyboardButton } from "grammy/types";
 import type { SearchRun } from "../db/searchRuns.js";
 import type { Notifier, RunSummary } from "../queue/notifier.js";
-import { escapeHtml, reminderMessage, runCompletedMessage } from "./format.js";
+import type { Db } from "../db/client.js";
+import {
+  eveningSummaryText,
+  escapeHtml,
+  mailEventMessage,
+  reminderMessage,
+  runCompletedMessage,
+} from "./format.js";
+import { sendPlanHeader } from "./plan.js";
 
 /**
  * Meldungen per Telegram. Ziel: der Chat, aus dem die Suche kam (`requested_by = telegram:<id>`), sonst alle
  * erlaubten Chats (z. B. Suchen aus der CLI, Budget-Meldungen).
  */
-export function telegramNotifier(api: Api, allowedChatIds: readonly number[]): Notifier {
+export function telegramNotifier(api: Api, allowedChatIds: readonly number[], db?: Db): Notifier {
   const targets = (run?: SearchRun): number[] => {
     const m = run ? /^telegram:(-?\d+)$/.exec(run.requested_by) : null;
     const id = m ? Number(m[1]) : null;
@@ -46,6 +54,22 @@ export function telegramNotifier(api: Api, allowedChatIds: readonly number[]): N
         const { text, keyboard } = reminderMessage(r);
         await sendAll(targets(), text, keyboard);
       }
+    },
+    async planReady(date, result) {
+      if (!db) return;
+      await sendPlanHeader(api, db, targets(), date);
+      if (result.stoppedByBudget)
+        await sendAll(
+          targets(),
+          "⚠️ Das Tagesbudget hat nicht für alle Kontakte gereicht. Mit /budget +5 und /heute geht es weiter.",
+        );
+    },
+    async eveningSummary(s) {
+      await sendAll(targets(), eveningSummaryText(s));
+    },
+    async mailEvent(e) {
+      const { text, keyboard } = mailEventMessage(e);
+      await sendAll(targets(), text, keyboard);
     },
   };
 }

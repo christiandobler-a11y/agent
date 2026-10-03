@@ -1,0 +1,22 @@
+# Morgen-Paket (03.10.2026, mit Christian abgestimmt): Avelio bereitet nachts alles vor, morgens kommt in Telegram
+# "Heute: 0/15", jede Nachricht mit einem Knopf zum Senden. Gesendet wird nur auf Knopfdruck.
+zeiten:
+  vorbereiten: "05:00" # Plan bauen (Prototypen, Mails, Befund-Seiten, Nachfassen); dauert bis zu einer Stunde
+  morgens: "07:00" # Telegram-Nachricht "Heute: …"
+  abends: "19:00" # kurze Bilanz des Tages
+
+neue_kontakte:
+  start: 15 # neue Leads pro Tag in den ersten Wochen
+  spaeter: 30 # danach, wenn nichts zurückkommt (Spamfilter gewöhnen sich an den Absender)
+  steigern_nach_tagen: 14 # Tage seit der ersten gesendeten Mail
+  nur_werktags: true # Mo bis Fr; am Wochenende nur Nachfassen
+# Befund-Seiten (Briefe): für die stärksten Leads und für Leads ohne erreichbare E-Mail-Adresse.
+briefe:
+  pro_tag: 3
+  ab_score: 80
+# Prototyp für jeden neuen Lead mit Website (ca. 5 Cent je Stück); Vorher/Nachher in Brief und Mail.
+prototyp_fuer_neue: true
+
+nachfassen:
+  nach_tagen: 5 # nach der ersten Mail ohne Antwort
+  hoechstens: 1 # einmal nachfassen, danach Ruhe

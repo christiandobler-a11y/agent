@@ -19,6 +19,9 @@ import type { Notifier, RunSummary, TopLead } from "./notifier.js";
 import { dueReminders, markNotified } from "../db/crm.js";
 import { isQuietTime, loadCrmConfig, type CrmConfig } from "../crm/status.js";
 import { claimState } from "../db/appState.js";
+import { autopilotTick, mailTick } from "../autopilot/schedule.js";
+import type { AutopilotConfig, PlanDeps } from "../autopilot/plan.js";
+import type { MailConfig, Mailbox } from "../outreach/mail.js";
 import { cleanupPrototypes, loadPrototypeConfig } from "../prototype/run.js";
 
 /**
@@ -62,6 +65,11 @@ export interface PipelineContext {
   now: () => Date;
   /** Mini-CRM (Phase 2); ohne Angabe gilt config/crm.yaml. */
   crm?: CrmConfig;
+  /** Christians Postfach: Antworten erkennen (Sweep). */
+  mailbox?: Mailbox | null;
+  mail?: MailConfig;
+  /** Morgen-Paket: nachts planen, morgens melden, abends Bilanz. */
+  autopilot?: { config: AutopilotConfig; planDeps: () => PlanDeps };
 }
 
 export async function enqueue(
@@ -372,6 +380,21 @@ export async function sweep(ctx: PipelineContext): Promise<void> {
   const { rows } = await ctx.db.query<{ id: string }>("select id from search_runs where status = 'RUNNING'");
   for (const r of rows) await maybeCompleteRun(ctx, r.id);
   await deliverDueReminders(ctx);
+  // Morgen-Paket und Postfach; Fehler hier dürfen den Sweep nicht abbrechen.
+  await autopilotTick(ctx).catch((err: unknown) =>
+    console.error(
+      JSON.stringify({ level: "error", msg: "Morgen-Paket-Takt fehlgeschlagen", error: String(err) }),
+    ),
+  );
+  await mailTick(ctx).catch((err: unknown) =>
+    console.error(
+      JSON.stringify({
+        level: "error",
+        msg: "Postfach prüfen fehlgeschlagen",
+        error: err instanceof Error ? err.message : String(err),
+      }),
+    ),
+  );
   // Alte Prototyp-Vorschauen einmal am Tag aufräumen.
   const day = ctx.now().toISOString().slice(0, 10);
   if (await claimState(ctx.db, `prototype-cleanup:${day}`, true)) {

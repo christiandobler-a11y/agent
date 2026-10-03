@@ -14,7 +14,10 @@ import {
 import { loadCrmConfig, SALES_LABELS } from "../crm/status.js";
 import type { OutreachConfig } from "../outreach/config.js";
 import { draftEmail, mailtoLink, type OutreachDeps } from "../outreach/draft.js";
-import { draftLetter } from "../outreach/letter.js";
+import { draftLetter, type LetterDeps } from "../outreach/letter.js";
+import { loadMailConfig, type MailConfig, type Mailbox } from "../outreach/mail.js";
+import { berlinDate } from "../autopilot/plan.js";
+import { handlePlanCallback, sendPlanHeader, type PlanBotDeps } from "./plan.js";
 import { buildPrototype, type PrototypeDeps } from "../prototype/run.js";
 import { chromiumLetterRenderer, type LetterRenderer } from "../outreach/letterPdf.js";
 import { raiseBudgetToday } from "../llm/budget.js";
@@ -24,7 +27,7 @@ import { runTool } from "../manager/tools.js";
 import { explainStoredLead } from "../pipeline/audit/explainStored.js";
 import { loadGoldenEntries, nextRatingCard } from "../pipeline/calibration.js";
 import { evaluateGoldenSet, formatCalibrationReport } from "../pipeline/scoring/calibration.js";
-import { releaseBudgetDeferredJobs } from "../queue/pipeline.js";
+import { releaseBudgetDeferredJobs, type PipelineContext } from "../queue/pipeline.js";
 import {
   callbackData,
   chunk,
@@ -62,6 +65,8 @@ export interface BotOptions {
     /** Befund-Seite als PDF; ohne Angabe Chromium (CHROMIUM_PATH). */
     renderLetter?: LetterRenderer;
   };
+  /** Christians Postfach (Versand per Knopf); ohne Angabe nur "selbst gesendet". */
+  mail?: { mailbox: Mailbox | null; config: MailConfig };
   /** Prototypen (Phase 3); ohne Angabe zeigt der Button einen Hinweis. */
   prototype?: Omit<PrototypeDeps, "db" | "llm" | "budget" | "branches" | "now" | "desktopScreenPx">;
 }
@@ -126,6 +131,7 @@ export function telegramFetch(fetchFn: typeof globalThis.fetch) {
 
 /** Befehlsmenü in Telegram (setMyCommands). */
 export const BOT_COMMANDS = [
+  { command: "heute", description: "Morgen-Paket: heute vorbereitete Kontakte" },
   { command: "leads", description: "Beste Leads mit Buttons" },
   { command: "lead", description: "Lead-Karte öffnen, z. B. /lead Ariadne" },
   { command: "pipeline", description: "Vertrieb und offene Erinnerungen" },
@@ -223,6 +229,47 @@ export function createBot(options: BotOptions): Bot {
 
   // Mini-CRM (Phase 2): Karte mit Status-Buttons, Erinnerungen, Überblick.
   const crmConfig = () => pipeline.crm ?? loadCrmConfig();
+  const outreachDeps = (): OutreachDeps | null =>
+    options.outreach
+      ? {
+          db: pipeline.db,
+          llm: options.manager.llm,
+          outreach: options.outreach.config,
+          branches: pipeline.lead.branches,
+          now: pipeline.now,
+          contact: options.outreach.contact,
+          previewBaseUrl: options.prototype?.baseUrl ?? null,
+        }
+      : null;
+  const letterDeps = (): LetterDeps | null => {
+    const base = outreachDeps();
+    // Ohne Crawl-Konfiguration (z. B. in Tests) keine Befund-Seiten.
+    const crawl = (pipeline.crawl as PipelineContext["crawl"] | undefined)?.config;
+    if (!base || !options.outreach || !crawl) return null;
+    return {
+      ...base,
+      render: options.outreach.renderLetter ?? chromiumLetterRenderer(process.env.CHROMIUM_PATH),
+      ...(options.prototype
+        ? { prototype: { shotsDir: options.prototype.config.shots_dir, baseUrl: options.prototype.baseUrl } }
+        : {}),
+      desktopScreenPx: crawl.desktop.height * crawl.desktop.scale,
+    };
+  };
+  const mailbox = options.mail?.mailbox ?? null;
+  const planDeps = (): PlanBotDeps | null => {
+    const outreach = outreachDeps();
+    return outreach
+      ? {
+          db: pipeline.db,
+          now: pipeline.now,
+          mailbox,
+          mail: options.mail?.config ?? loadMailConfig(),
+          outreach,
+          letter: letterDeps(),
+          followUpDays: crmConfig().follow_up_days,
+        }
+      : null;
+  };
   const crmCard = async (company: Company) => {
     const fresh = (await findCompany(pipeline.db, company.id)) ?? company;
     return leadCrmCard(
@@ -279,7 +326,17 @@ export function createBot(options: BotOptions): Bot {
     });
   });
 
+  bot.command(["heute", "paket"], async (ctx) => {
+    if (!planDeps()) {
+      await ctx.reply("Das Morgen-Paket ist noch nicht eingerichtet.");
+      return;
+    }
+    await sendPlanHeader(ctx.api, pipeline.db, [ctx.chat.id], berlinDate(pipeline.now()));
+  });
+
   bot.on("callback_query:data", async (ctx) => {
+    const plan = planDeps();
+    if (plan && (await handlePlanCallback(ctx, plan, by(ctx.chat?.id)))) return;
     const crm = parseCrmCallback(ctx.callbackQuery.data);
     if (crm) {
       const now = pipeline.now();
@@ -307,19 +364,7 @@ export function createBot(options: BotOptions): Bot {
         }
         await ctx.answerCallbackQuery({ text: "Schreibe Entwurf …" });
         await ctx.replyWithChatAction("typing").catch(() => undefined);
-        const draft = await draftEmail(
-          {
-            db: pipeline.db,
-            llm: options.manager.llm,
-            outreach: options.outreach.config,
-            branches: pipeline.lead.branches,
-            now: pipeline.now,
-            contact: options.outreach.contact,
-            previewBaseUrl: options.prototype?.baseUrl ?? null,
-          },
-          company,
-          by(ctx.chat?.id),
-        ).catch((err: unknown) => {
+        const draft = await draftEmail(outreachDeps()!, company, by(ctx.chat?.id)).catch((err: unknown) => {
           log("error", "Entwurf fehlgeschlagen", { error: err instanceof Error ? err.message : String(err) });
           return null;
         });
@@ -331,7 +376,7 @@ export function createBot(options: BotOptions): Bot {
           await ctx.reply(`${company.name} ist noch nicht auditiert, dafür fehlt mir der Befund.`);
           return;
         }
-        const parts = (mailto: string | null) => emailDraftMessages(company, draft, mailto);
+        const parts = (mailto: string | null) => emailDraftMessages(company, draft, mailto, mailbox !== null);
         await ctx.reply(parts(null).info, {
           parse_mode: "HTML",
           link_preview_options: { is_disabled: true },
@@ -401,29 +446,7 @@ export function createBot(options: BotOptions): Bot {
         }
         await ctx.answerCallbackQuery({ text: "Erstelle Befund-Seite, dauert etwa 30 Sekunden …" });
         await ctx.replyWithChatAction("upload_document").catch(() => undefined);
-        const crawl = pipeline.crawl.config;
-        const letter = await draftLetter(
-          {
-            db: pipeline.db,
-            llm: options.manager.llm,
-            outreach: options.outreach.config,
-            branches: pipeline.lead.branches,
-            now: pipeline.now,
-            contact: options.outreach.contact,
-            render: options.outreach.renderLetter ?? chromiumLetterRenderer(process.env.CHROMIUM_PATH),
-            ...(options.prototype
-              ? {
-                  prototype: {
-                    shotsDir: options.prototype.config.shots_dir,
-                    baseUrl: options.prototype.baseUrl,
-                  },
-                }
-              : {}),
-            desktopScreenPx: crawl.desktop.height * crawl.desktop.scale,
-          },
-          company,
-          by(ctx.chat?.id),
-        ).catch((err: unknown) => {
+        const letter = await draftLetter(letterDeps()!, company, by(ctx.chat?.id)).catch((err: unknown) => {
           log("error", "Befund-Seite fehlgeschlagen", {
             error: err instanceof Error ? err.message : String(err),
           });

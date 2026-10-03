@@ -10,6 +10,8 @@ export type QueueName = (typeof QUEUES)[number];
 export const SWEEP_QUEUE = "sweep";
 /** Endgültig gescheiterte Jobs landen hier (Ansicht: CLI `failed`). */
 export const DEAD_QUEUE = "dead";
+/** Morgen-Paket bauen (src/autopilot/schedule.ts). */
+export const PLAN_QUEUE = "daily-plan";
 
 const queueSchema = z.object({
   retry_limit: z.number().int().min(0).max(10),
@@ -73,6 +75,13 @@ export async function ensureQueues(boss: PgBoss, config: QueueConfig): Promise<v
   };
   await upsert(DEAD_QUEUE, { policy: "standard", retentionSeconds: 30 * 24 * 3600 });
   await upsert(SWEEP_QUEUE, { policy: "exclusive", retryLimit: 0, expireInSeconds: 120 });
+  // Morgen-Paket: Prototypen, Mails und Briefe für den Tag; darf bis zu zwei Stunden dauern.
+  await upsert(PLAN_QUEUE, {
+    policy: "exclusive",
+    retryLimit: 1,
+    retryDelay: 600,
+    expireInSeconds: 2 * 3600,
+  });
   for (const name of QUEUES) {
     const q = config.queues[name];
     await upsert(name, {

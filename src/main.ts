@@ -26,6 +26,7 @@ if (env.TELEGRAM_BOT_TOKEN && env.TELEGRAM_ALLOWED_CHAT_IDS.length > 0) {
       config: loadOutreachConfig(),
       contact: { whatsapp: env.OUTREACH_WHATSAPP ?? null, phone: env.OUTREACH_PHONE ?? null },
     },
+    mail: { mailbox: app.mailbox, config: app.mail },
     prototype: {
       config: loadPrototypeConfig(),
       duBranches: loadOutreachConfig().du_branchen,
@@ -33,7 +34,10 @@ if (env.TELEGRAM_BOT_TOKEN && env.TELEGRAM_ALLOWED_CHAT_IDS.length > 0) {
       baseUrl: env.PREVIEW_BASE_URL?.replace(/\/$/, "") ?? null,
     },
   });
-  app.ctx.notifier = combineNotifiers(logNotifier, telegramNotifier(bot.api, env.TELEGRAM_ALLOWED_CHAT_IDS));
+  app.ctx.notifier = combineNotifiers(
+    logNotifier,
+    telegramNotifier(bot.api, env.TELEGRAM_ALLOWED_CHAT_IDS, app.ctx.db),
+  );
 } else if (env.TELEGRAM_BOT_TOKEN) {
   console.warn(
     JSON.stringify({
