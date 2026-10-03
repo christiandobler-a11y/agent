@@ -14,6 +14,8 @@ ausprobieren kann. Nach Schritt 6 ist ein Abstimmungstermin (Kalibrierung) vorge
   Impressum, PageSpeed (Screenshots unter `data/screenshots/`, nicht im Repo)
 - `npm run cli -- audit --pending -n 10` / `audit <firma>`, `explain <firma> [--full]`, `score --all`: Audit
   (Sonnet), Score (Code), Pitch (Opus ab 80 Punkten); `score` rechnet ohne LLM neu
+- `npm run worker` (Betrieb: `npm start` nach `npm run build`): Worker für alle Queues; `npm run cli -- search
+"<Begriff>" <region> -n N [--wait]`, `runs`, `failed`
 - `npm run costs`: Ausgaben heute/Monat gegen das Budget, letzte 7 Tage je Rolle bzw. Dienst
 - `npm run db-status`: Migrationen, Tabellen, Zeilen, RLS/Data-API-Schutz der Datenbank aus `DATABASE_URL`
 - `npm run cli -- <befehl>`: einzelne Pipeline-Schritte ausführen (Debugging), z. B.
@@ -32,7 +34,10 @@ ausprobieren kann. Nach Schritt 6 ist ein Abstimmungstermin (Kalibrierung) vorge
 - **Secrets nur aus Umgebungsvariablen**, nie im Repo, nie in Logs. Module holen sich ihre Keys über
   `requireKeys()` aus `src/config/env.ts` und nur die, die sie brauchen. In Cloud-Sessions kommt der
   Anthropic-Key als `AVELIO_ANTHROPIC_API_KEY` an (`ANTHROPIC_API_KEY` wird dort gefiltert).
-- **Ein Job = eine Firma × ein Schritt.** Jobs sind idempotent (Upsert über Firmen-ID).
+- **Ein Job = eine Firma × ein Schritt.** Jobs sind idempotent (Upsert über Firmen-ID). Queue: pg-boss
+  (`src/queue/`), Policy `exclusive` mit Firmen- bzw. Lauf-ID als Schlüssel. Nächster Schritt einer Firma ergibt
+  sich aus ihrem gespeicherten Zustand (`nextStep` in `src/queue/pipeline.ts`), nie aus Zwischenspeicher.
+  Fachliche Fehler (Website nicht erreichbar) setzen die Firma auf FAILED; geworfene Fehler lösen Wiederholungen aus.
 - Konfiguration (Gewichte, Modelle, Branchen, Regionen) liegt in `config/`, Prompts versioniert in `prompts/`
   (`<rolle>.v<N>.md`; geänderter Prompt = neue Version, die alte bleibt).
 - LLM nur über `createLlmGateway` (`src/llm/gateway.ts`): Rolle → Modell aus `config/models.yaml`, festes

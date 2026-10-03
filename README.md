@@ -3,7 +3,7 @@
 Internes System für Avelio: lokale Unternehmen finden, Websites auditieren, Leads mit dem
 Avelio Lead Score bewerten und über Telegram berichten.
 
-Plan: [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md). Stand: Schritt 6 (Audit, Avelio Lead Score, Erklärung, Pitch) umgesetzt.
+Plan: [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md). Stand: Schritt 7 (Job-Queue: automatischer Ablauf von der Suche bis zum Pitch) umgesetzt.
 
 Datenbank im Betrieb: Supabase, Einrichtung in [docs/SUPABASE.md](docs/SUPABASE.md).
 
@@ -100,3 +100,28 @@ npm run cli -- score --all              # alle neu bewerten nach Gewichtsänderu
 - **Score (Code):** fünf Dimensionen (Business 25, Website-Chance 30, Potenzial 20, Lücke 15, Erreichbarkeit 10)
   und Knock-outs; alle Gewichte in `config/scoring.v1.yaml`. Ab 60 Punkten `QUALIFIED`, sonst `SKIPPED` mit Grund.
 - **Pitch (Opus):** ab 80 Punkten Hauptchance, drei Argumente und ein Einstiegssatz für das Gespräch (ca. 3 Cent).
+
+## Automatischer Ablauf (Schritt 7)
+
+Ab jetzt läuft alles über eine Job-Queue (pg-boss, Tabellen im Schema `pgboss`):
+
+```sh
+npm run worker                                        # Worker starten (läuft dauerhaft, Strg+C beendet)
+npm run cli -- search "Fahrradladen" rosenheim -n 5   # in einem zweiten Terminal: Suche einreihen
+npm run cli -- runs                                   # Stand der letzten Suchläufe mit Top-Leads und Kosten
+npm run cli -- failed                                 # fehlgeschlagene Firmen der letzten 14 Tage
+```
+
+Mit `search … --wait` wartet der Befehl und zeigt den Fortschritt, bis der Lauf fertig ist.
+
+Ablauf je Firma: Recherche → Crawl → Audit + Score → Pitch (ab 80 Punkten), jeder Schritt ein eigener Job.
+
+- **Robust:** Stürzt der Worker ab (oder wird beendet), übernimmt der nächste Start die offenen Jobs, ohne dass
+  etwas doppelt läuft. Jede Firma endet in `QUALIFIED`, `SKIPPED` (mit Grund) oder `FAILED` (mit Fehler).
+- **Fehler:** Eine nicht erreichbare Website wird nach 5 Minuten und 1 Stunde erneut versucht, danach bleibt nur
+  diese Firma `FAILED`; der Lauf geht weiter.
+- **Budget:** Ist das Tages- oder Monatslimit erreicht, wartet die offene Arbeit bis zum nächsten Morgen (06:00)
+  bzw. Monatsersten, und es gibt genau eine Meldung.
+- **Abschluss:** Sind alle Jobs eines Laufs fertig, wird er abgeschlossen und gemeldet (bis Schritt 8 im Log des
+  Workers, danach per Telegram).
+- Wiederholungen, Timeouts und Parallelität stehen in `config/queue.yaml`.
