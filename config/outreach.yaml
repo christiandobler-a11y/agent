@@ -31,3 +31,24 @@ kanaele:
   letter: >-
     "Befund-Seite": Handy-Screenshot der aktuellen Seite mit 2-3 roten, handschriftlich wirkenden Markierungen,
     daneben wenige handschriftlich wirkende Zeilen und ein QR-Code. Keine ausgedruckte Mail.
+
+# Gegen Spamfilter (03.10.2026, Christians Wunsch): jede Mail etwas anders, wenig Masse, sauberer Absender.
+spamschutz:
+  abwechseln: [einstieg, betreff, aufhaenger, gruss] # je Mail eine andere Kombination; nie zwei gleiche Mails am selben Tag
+  betreffe:
+    - Ihr erster Eindruck online
+    - Kurze Frage zu Ihrer Website
+    - "{firma}: ein Gedanke zur Website"
+    - Ihre Website auf dem Handy
+  aufhaenger_varianten:
+    - Ich hab Ihnen dazu etwas vorbereitet und würde es gern kurz mit Ihnen durchgehen, 5 bis 10 Minuten reichen. Wann passt es Ihnen diese Woche am besten?
+    - Dazu hab ich schon was vorbereitet. Hätten Sie diese Woche 10 Minuten, damit ich es Ihnen kurz zeigen kann?
+    - Ich hab mir dazu schon Gedanken gemacht und etwas vorbereitet. Wann hätten Sie diese Woche kurz 5 bis 10 Minuten?
+  gruesse: [Viele Grüße, Beste Grüße, Grüße aus Rosenheim, Liebe Grüße]
+  regeln:
+    - reiner Text, keine Bilder, kein HTML-Layout, kein Tracking-Pixel, keine Link-Kürzer
+    - höchstens ein Link (eigene Website), keine Anhänge in der ersten Mail
+    - keine Spam-Wörter (kostenlos, gratis, Angebot, Rabatt, garantiert, jetzt zuschlagen), keine Großbuchstaben-Wörter, kein "!!!"
+    - persönliche Anrede mit Namen aus dem Impressum, sonst "Hallo zusammen" bzw. "Hallo Team {firma}"
+    - von Christians normalem Postfach, höchstens 10 bis 15 neue Mails am Tag, über den Tag verteilt
+    - Domain mit SPF, DKIM und DMARC (einmalig prüfen)
