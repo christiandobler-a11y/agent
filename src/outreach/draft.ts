@@ -265,7 +265,7 @@ export async function draftEmail(
   });
   const k = o.kontaktweg;
   const slotSentence = slots ? (form === "ihr" ? duToIhr(slots.sentence) : slots.sentence) : null;
-  const prepared = inForm(pick(k.vorbereitet, seed, 7, variant), pick(k.vorbereitet_du, seed, 7, variant));
+
   const { rows: proto } = deps.previewBaseUrl
     ? await db.query<{ slug: string }>(
         "select slug from prototypes where company_id = $1 order by created_at desc limit 1",
@@ -276,6 +276,12 @@ export async function draftEmail(
   const draftSentence = previewUrl
     ? inForm(k.entwurf_satz, k.entwurf_satz_du).replace("{link}", previewUrl)
     : null;
+  const prepared = previewUrl
+    ? inForm(
+        pick(k.vorbereitet_mit_entwurf, seed, 7, variant),
+        pick(k.vorbereitet_mit_entwurf_du, seed, 7, variant),
+      )
+    : inForm(pick(k.vorbereitet, seed, 7, variant), pick(k.vorbereitet_du, seed, 7, variant));
   // Höchstens ein Link je Mail: mit Entwurfs-Link wird per Antwort-Mail geantwortet statt per WhatsApp.
   const cta = previewUrl
     ? inForm(k.email_cta_ohne_whatsapp, k.email_cta_ohne_whatsapp_du)

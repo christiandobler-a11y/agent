@@ -78,6 +78,13 @@ kontaktweg:
     - Ich hab Ihnen dazu etwas vorbereitet und würde es gern kurz mit Ihnen durchgehen, 5 bis 10 Minuten reichen.
     - Dazu hab ich schon was vorbereitet, das ich Ihnen gern kurz zeigen würde. Dauert 5 bis 10 Minuten.
     - Ich hab mir dazu schon Gedanken gemacht und etwas vorbereitet, das würde ich Ihnen gern in 5 bis 10 Minuten zeigen.
+  # Mit Entwurf-Link davor: kein zweites "vorbereitet".
+  vorbereitet_mit_entwurf:
+    - Den Rest würde ich Ihnen gern kurz zeigen, 5 bis 10 Minuten reichen.
+    - Mehr dazu zeige ich Ihnen gern in 5 bis 10 Minuten.
+  vorbereitet_mit_entwurf_du:
+    - Den Rest zeig ich dir gern kurz, 5 bis 10 Minuten reichen.
+    - Mehr dazu zeig ich dir gern in 5 bis 10 Minuten.
   vorbereitet_du:
     - Ich hab dir dazu was vorbereitet und würd das gern kurz mit dir durchgehen, 5 bis 10 Minuten reichen.
     - Dazu hab ich schon was vorbereitet, das ich dir gern kurz zeigen würde. Dauert 5 bis 10 Minuten.

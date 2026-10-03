@@ -45,6 +45,14 @@ export const outreachConfigSchema = z.object({
     email_cta_ohne_whatsapp_du: z.string(),
     vorbereitet: z.array(z.string()).min(1),
     vorbereitet_du: z.array(z.string()).min(1),
+    vorbereitet_mit_entwurf: z
+      .array(z.string())
+      .min(1)
+      .default(["Den Rest würde ich Ihnen gern kurz zeigen, 5 bis 10 Minuten reichen."]),
+    vorbereitet_mit_entwurf_du: z
+      .array(z.string())
+      .min(1)
+      .default(["Den Rest zeig ich dir gern kurz, 5 bis 10 Minuten reichen."]),
   }),
   brief: z
     .object({
