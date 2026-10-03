@@ -54,6 +54,29 @@ export interface BudgetGuard {
   assertAvailable(): Promise<void>;
 }
 
+const berlinDay = (d: Date) => d.toLocaleDateString("sv-SE", { timeZone: "Europe/Berlin" });
+export const budgetExtraKey = (now: Date) => `budget_extra:${berlinDay(now)}`;
+
+/** Zusätzliches Budget für heute (Telegram `/budget +5`); gilt für Tages- und Monatslimit. */
+export async function budgetExtraToday(db: DbClient, now: Date): Promise<number> {
+  const { rows } = await db.query<{ usd: number }>(
+    "select (value->>'usd')::float8 as usd from app_state where key = $1",
+    [budgetExtraKey(now)],
+  );
+  return rows[0]?.usd ?? 0;
+}
+
+export async function raiseBudgetToday(db: DbClient, now: Date, usd: number): Promise<number> {
+  const { rows } = await db.query<{ usd: number }>(
+    `insert into app_state (key, value) values ($1, jsonb_build_object('usd', $2::float8))
+     on conflict (key) do update
+       set value = jsonb_build_object('usd', (app_state.value->>'usd')::float8 + $2::float8), updated_at = now()
+     returning (value->>'usd')::float8 as usd`,
+    [budgetExtraKey(now), usd],
+  );
+  return rows[0]!.usd;
+}
+
 export function createBudgetGuard(
   db: DbClient,
   limits: BudgetLimits,
@@ -62,11 +85,13 @@ export function createBudgetGuard(
   return {
     limits,
     async assertAvailable() {
-      const spent = await spending(db, now());
-      if (spent.month >= limits.monthly_usd)
-        throw new BudgetExceededError("Monat", spent.month, limits.monthly_usd);
-      if (spent.today >= limits.daily_usd)
-        throw new BudgetExceededError("Tag", spent.today, limits.daily_usd);
+      const at = now();
+      const spent = await spending(db, at);
+      const extra = await budgetExtraToday(db, at);
+      if (spent.month >= limits.monthly_usd + extra)
+        throw new BudgetExceededError("Monat", spent.month, limits.monthly_usd + extra);
+      if (spent.today >= limits.daily_usd + extra)
+        throw new BudgetExceededError("Tag", spent.today, limits.daily_usd + extra);
     },
   };
 }

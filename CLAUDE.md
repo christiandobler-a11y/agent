@@ -16,6 +16,7 @@ ausprobieren kann. Nach Schritt 6 ist ein Abstimmungstermin (Kalibrierung) vorge
   (Sonnet), Score (Code), Pitch (Opus ab 80 Punkten); `score` rechnet ohne LLM neu
 - `npm run worker` (Betrieb: `npm start` nach `npm run build`): Worker für alle Queues; `npm run cli -- search
 "<Begriff>" <region> -n N [--wait]`, `runs`, `failed`
+- `npm run cli -- chat "…"`: Manager-Agent ohne Telegram befragen (gleicher Verlauf wie der Chat)
 - `npm run costs`: Ausgaben heute/Monat gegen das Budget, letzte 7 Tage je Rolle bzw. Dienst
 - `npm run db-status`: Migrationen, Tabellen, Zeilen, RLS/Data-API-Schutz der Datenbank aus `DATABASE_URL`
 - `npm run cli -- <befehl>`: einzelne Pipeline-Schritte ausführen (Debugging), z. B.
@@ -51,6 +52,9 @@ ausprobieren kann. Nach Schritt 6 ist ein Abstimmungstermin (Kalibrierung) vorge
   Browser-Tests laufen gegen einen lokalen Testserver; in Cloud-Sessions `CHROMIUM_PATH=/opt/pw-browsers/chromium`
   setzen (Playwright-Version ≠ vorinstallierter Browser) und das Proxy-Zertifikat ins NSS-Store eintragen
   (`certutil -d sql:$HOME/.pki/nssdb -A -t "C,," -n proxy -i /root/.ccr/agent-proxy-ca.crt`).
+- **Telegram/Manager:** `src/telegram/` (grammY, Allowlist zuerst), `src/manager/` (Tool-Schleife über
+  `gateway.toolStep`, Werkzeuge in `tools.ts` mit Zod-Schemas). Neue Fähigkeiten = neues Werkzeug, nie freies SQL.
+  Telegram-Ausgaben immer escapen (`format.ts`). Tests fangen die Telegram-API ab (`bot.api.config.use`).
 - Recherche-Reihenfolge: Places → Dubletten → **Gate (Code) → Prefilter (LLM)**. Das Gate läuft zuerst, weil es
   nichts kostet. Skip-Gründe entsprechen den Schlüsseln in `config/recheck.yaml`.
 

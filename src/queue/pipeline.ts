@@ -343,3 +343,12 @@ export async function sweep(ctx: PipelineContext): Promise<void> {
   const { rows } = await ctx.db.query<{ id: string }>("select id from search_runs where status = 'RUNNING'");
   for (const r of rows) await maybeCompleteRun(ctx, r.id);
 }
+
+/** Wegen Budget verschobene Jobs sofort freigeben (nach `/budget +N`). Gibt die Anzahl zurück. */
+export async function releaseBudgetDeferredJobs(ctx: PipelineContext): Promise<number> {
+  const { rowCount } = await ctx.db.query(
+    `update ${ctx.bossSchema}.job set start_after = now()
+      where state = 'created' and singleton_key like '%:budget:%' and start_after > now()`,
+  );
+  return rowCount ?? 0;
+}

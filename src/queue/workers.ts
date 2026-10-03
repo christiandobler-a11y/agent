@@ -81,7 +81,7 @@ function handlers(ctx: PipelineContext): Record<QueueName, Handler> {
           ctx,
           "research",
           job.data,
-          `${job.data.searchRunId}:resume:${resumeAt.toISOString()}`,
+          `${job.data.searchRunId}:budget:${resumeAt.toISOString()}`,
           resumeAt,
         );
       }

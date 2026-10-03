@@ -30,6 +30,7 @@ function leadDeps(db: Db, llm: LlmGateway): LeadDeps {
 /** Ohne Anthropic-Key: Gateway, das jeden Aufruf ablehnt (für score/explain reicht die Datenbank). */
 const NO_LLM: LlmGateway = {
   structured: () => Promise.reject(new Error("Kein LLM in diesem Befehl")),
+  toolStep: () => Promise.reject(new Error("Kein LLM in diesem Befehl")),
 };
 
 async function targets(

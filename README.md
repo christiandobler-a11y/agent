@@ -3,7 +3,7 @@
 Internes System für Avelio: lokale Unternehmen finden, Websites auditieren, Leads mit dem
 Avelio Lead Score bewerten und über Telegram berichten.
 
-Plan: [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md). Stand: Schritt 7 (Job-Queue: automatischer Ablauf von der Suche bis zum Pitch) umgesetzt.
+Plan: [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md). Stand: Schritt 8 (Telegram-Bot mit Manager-Agent) umgesetzt. Nächster Schritt: 9 (Deploy auf einen Server).
 
 Datenbank im Betrieb: Supabase, Einrichtung in [docs/SUPABASE.md](docs/SUPABASE.md).
 
@@ -125,3 +125,26 @@ Ablauf je Firma: Recherche → Crawl → Audit + Score → Pitch (ab 80 Punkten)
 - **Abschluss:** Sind alle Jobs eines Laufs fertig, wird er abgeschlossen und gemeldet (bis Schritt 8 im Log des
   Workers, danach per Telegram).
 - Wiederholungen, Timeouts und Parallelität stehen in `config/queue.yaml`.
+
+## Telegram (Schritt 8)
+
+```sh
+npm run worker      # startet Worker + Telegram-Bot (braucht TELEGRAM_BOT_TOKEN und TELEGRAM_ALLOWED_CHAT_IDS)
+```
+
+Dann in Telegram an **@avelio_manager_bot** schreiben, z. B.:
+
+- „Such mir 20 Fahrradläden im Landkreis Rosenheim“ → Bestätigung sofort, Ergebnis mit Top-Leads und Buttons
+  `[Details] [Skip] [Kontakt] [Prototyp]`, sobald alle Firmen geprüft sind
+- „Zeig mir die besten Leads“, „Warum hat Radl Sepp 72 Punkte?“, „Warum wurde Cycle aussortiert?“
+- „Was hat das diese Woche gekostet?“
+- Schnellbefehle ohne KI: `/status`, `/kosten`, `/fehler`, `/budget` (`/budget +5` gibt heute 5 $ mehr frei und
+  setzt wartende Jobs sofort fort)
+
+Der Bot antwortet nur auf die Chat-IDs in `TELEGRAM_ALLOWED_CHAT_IDS`; alle anderen werden ignoriert und
+protokolliert. Ohne diese Variable startet er gar nicht. Der Manager (Sonnet) arbeitet nur über feste Werkzeuge
+(Suche starten, Leads auflisten/zeigen/erklären/aussortieren, Status, Kosten, Fehler), ohne freien Datenbankzugriff;
+eine Antwort kostet etwa 1–2 Cent. Ohne Telegram testen: `npm run cli -- chat "Zeig mir die besten Leads"`.
+
+Wichtig: Der Bot darf nur in **einem** Prozess laufen (Telegram erlaubt nur einen Abrufer pro Bot). Läuft er später
+auf dem Server, auf dem Mac nur `npm run cli -- …` verwenden, nicht `npm run worker`.

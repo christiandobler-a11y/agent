@@ -37,6 +37,24 @@ export interface StructuredRequest<S extends z.ZodType> {
   inputSummary?: string;
 }
 
+export interface ToolStepRequest {
+  role: string;
+  promptVersion: string;
+  system: string;
+  messages: Anthropic.MessageParam[];
+  tools: Anthropic.Tool[];
+  inputSummary?: string;
+  companyId?: string | null;
+  searchRunId?: string | null;
+  jobId?: string | null;
+}
+
+export interface ToolStepResult {
+  message: Anthropic.Message;
+  agentRunId: string;
+  costUsd: number;
+}
+
 export interface StructuredResult<T> {
   output: T;
   agentRunId: string;
@@ -136,7 +154,10 @@ export function createLlmGateway({ db, messages, models, budget }: LlmGatewayDep
   }
 
   async function startRun(
-    req: StructuredRequest<z.ZodType>,
+    req: Pick<
+      StructuredRequest<z.ZodType>,
+      "role" | "companyId" | "searchRunId" | "jobId" | "promptVersion" | "inputSummary"
+    >,
     model: string,
     attempt: number,
   ): Promise<string> {
@@ -160,6 +181,43 @@ export function createLlmGateway({ db, messages, models, budget }: LlmGatewayDep
   }
 
   return {
+    /**
+     * Ein Schritt einer Tool-Schleife (Manager-Agent): ein API-Aufruf mit Tools, geloggt wie jeder andere Aufruf.
+     * Die Schleife selbst (Tools ausführen, Ergebnisse zurückgeben) liegt beim Aufrufer.
+     */
+    async toolStep(req: ToolStepRequest): Promise<ToolStepResult> {
+      const roleConfig = models.roles[req.role];
+      if (!roleConfig)
+        throw new Error(`Keine Modell-Konfiguration für Rolle "${req.role}" (config/models.yaml)`);
+      const model = roleConfig.model;
+      await budget.assertAvailable();
+      const runId = await startRun(req, model, 1);
+      let response: Anthropic.Message | undefined;
+      try {
+        response = await messages.create({
+          model,
+          max_tokens: roleConfig.max_tokens,
+          system: roleConfig.cache_system
+            ? [{ type: "text", text: req.system, cache_control: { type: "ephemeral" } }]
+            : req.system,
+          messages: req.messages,
+          tools: req.tools,
+          ...(roleConfig.effort ? { output_config: { effort: roleConfig.effort } } : {}),
+        });
+        if (response.stop_reason === "refusal") throw new Error("Anfrage vom Modell abgelehnt (refusal)");
+        const summary = response.content
+          .map((b) => (b.type === "text" ? b.text : b.type === "tool_use" ? `[${b.name}]` : ""))
+          .filter(Boolean)
+          .join(" ");
+        const cost = await finishRun(runId, "OK", model, usageOf(response), clip(summary), null);
+        return { message: response, agentRunId: runId, costUsd: cost };
+      } catch (err) {
+        const message = err instanceof Error ? err.message : String(err);
+        await finishRun(runId, "ERROR", model, usageOf(response), null, clip(message));
+        throw new LlmError(`${req.role}: ${message}`, runId, { cause: err });
+      }
+    },
+
     /**
      * Ein Aufruf ohne Tools mit erzwungenem JSON-Schema. Jeder Versuch steht mit Kosten in agent_runs.
      * Wirft `BudgetExceededError` (vor dem Aufruf, nichts wird ausgegeben) oder `LlmError`.

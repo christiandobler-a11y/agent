@@ -1,0 +1,162 @@
+import { Bot, type Context } from "grammy";
+import type { UserFromGetMe } from "grammy/types";
+import { findCompany } from "../db/companies.js";
+import { raiseBudgetToday } from "../llm/budget.js";
+import { askManager, type ManagerDeps } from "../manager/agent.js";
+import { runTool } from "../manager/tools.js";
+import { explainStoredLead } from "../pipeline/audit/explainStored.js";
+import { releaseBudgetDeferredJobs } from "../queue/pipeline.js";
+import { callbackData, chunk, HELP_TEXT, markdownToTelegramHtml, parseCallback } from "./format.js";
+
+/**
+ * Telegram-Bot (ARCHITECTURE.md 5.1, 12.1): Long Polling, reagiert nur auf erlaubte Chat-IDs. Freitext geht an den
+ * Manager-Agenten, Schnellbefehle und Buttons laufen ohne LLM direkt über die Werkzeuge.
+ */
+
+export interface BotOptions {
+  token: string;
+  allowedChatIds: readonly number[];
+  manager: ManagerDeps;
+  /** Für Tests: Bot-Infos vorgeben (kein getMe-Aufruf). */
+  botInfo?: UserFromGetMe;
+}
+
+const log = (level: "info" | "warn" | "error", msg: string, extra: Record<string, unknown> = {}) =>
+  console[level === "info" ? "log" : level](JSON.stringify({ level, msg, ...extra }));
+
+async function replyLong(ctx: Context, text: string) {
+  for (const part of chunk(text)) await ctx.reply(part, { link_preview_options: { is_disabled: true } });
+}
+
+/** Antwort des Managers mit Fettdruck; lehnt Telegram das Markup ab, als reiner Text. */
+async function replyFormatted(ctx: Context, text: string) {
+  for (const part of chunk(text)) {
+    await ctx
+      .reply(markdownToTelegramHtml(part), {
+        parse_mode: "HTML",
+        link_preview_options: { is_disabled: true },
+      })
+      .catch(() => ctx.reply(part, { link_preview_options: { is_disabled: true } }));
+  }
+}
+
+export function createBot(options: BotOptions): Bot {
+  const bot = new Bot(options.token, {
+    ...(options.botInfo ? { botInfo: options.botInfo } : {}),
+    // Globales fetch: nutzt Proxy-Einstellungen der Umgebung (node-fetch täte das nicht).
+    client: { fetch: globalThis.fetch as never },
+  });
+  const { ctx: pipeline } = options.manager;
+  const tool = (name: string, input: unknown, chatId: number) =>
+    runTool(name, input, { ctx: pipeline, chatId });
+
+  // Allowlist (Kriterium 9): fremde Chats bekommen keine Antwort, werden aber protokolliert.
+  bot.use(async (ctx, next) => {
+    const chatId = ctx.chat?.id;
+    if (chatId === undefined || !options.allowedChatIds.includes(chatId)) {
+      log("warn", "Nachricht aus fremdem Chat ignoriert", {
+        chat_id: chatId ?? null,
+        from: ctx.from?.username ?? null,
+      });
+      return;
+    }
+    await next();
+  });
+
+  bot.command(["start", "hilfe", "help"], (ctx) => ctx.reply(HELP_TEXT));
+
+  bot.command(["status", "stats"], async (ctx) => {
+    await replyLong(ctx, (await tool("stats", {}, ctx.chat.id)).text);
+  });
+  bot.command(["kosten", "costs"], async (ctx) => {
+    await replyLong(ctx, (await tool("costs", {}, ctx.chat.id)).text);
+  });
+  bot.command(["fehler", "failed"], async (ctx) => {
+    await replyLong(ctx, (await tool("failed_leads", {}, ctx.chat.id)).text);
+  });
+  bot.command("budget", async (ctx) => {
+    const m = /^\+?\s*(\d+(?:[.,]\d+)?)$/.exec(ctx.match.trim());
+    if (!m) {
+      await replyLong(
+        ctx,
+        `${(await tool("costs", { tage: 1 }, ctx.chat.id)).text}\n\nMehr Budget für heute: /budget +5`,
+      );
+      return;
+    }
+    const usd = Number(m[1]!.replace(",", "."));
+    if (!(usd > 0 && usd <= 50)) {
+      await ctx.reply("Bitte einen Betrag zwischen 0 und 50 $ angeben, z. B. /budget +5");
+      return;
+    }
+    const extra = await raiseBudgetToday(pipeline.db, pipeline.now(), usd);
+    const released = await releaseBudgetDeferredJobs(pipeline);
+    log("info", "Budget erhöht", { usd, extra_today: extra, released });
+    await ctx.reply(
+      `Okay, heute ${extra.toFixed(2).replace(".", ",")} $ zusätzlich freigegeben.${released > 0 ? ` ${released} wartende Jobs laufen jetzt weiter.` : ""}`,
+    );
+  });
+
+  bot.on("callback_query:data", async (ctx) => {
+    const cb = parseCallback(ctx.callbackQuery.data);
+    const chatId = ctx.chat?.id;
+    if (!cb || chatId === undefined) {
+      await ctx.answerCallbackQuery();
+      return;
+    }
+    const company = await findCompany(pipeline.db, cb.companyId);
+    if (!company) {
+      await ctx.answerCallbackQuery({ text: "Lead nicht gefunden" });
+      return;
+    }
+    switch (cb.action) {
+      case "d":
+        await ctx.answerCallbackQuery();
+        await replyLong(ctx, await explainStoredLead(pipeline.db, company));
+        return;
+      case "s":
+        await ctx.answerCallbackQuery();
+        await ctx.reply(`${company.name} wirklich aussortieren?`, {
+          reply_markup: {
+            inline_keyboard: [
+              [
+                { text: "Ja, aussortieren", callback_data: callbackData("sy", company.id) },
+                { text: "Nein", callback_data: callbackData("sn", company.id) },
+              ],
+            ],
+          },
+        });
+        return;
+      case "sy": {
+        const r = await tool("skip_lead", { lead: company.id, grund: "per Button in Telegram" }, chatId);
+        await ctx.answerCallbackQuery({ text: "Aussortiert" });
+        await ctx.editMessageText(r.text).catch(() => ctx.reply(r.text));
+        return;
+      }
+      case "sn":
+        await ctx.answerCallbackQuery({ text: "Bleibt drin" });
+        await ctx.editMessageText(`${company.name} bleibt in der Liste.`).catch(() => undefined);
+        return;
+      case "c":
+        await ctx.answerCallbackQuery({ text: "Kontakt-Vorbereitung kommt in Phase 2", show_alert: true });
+        return;
+      case "p":
+        await ctx.answerCallbackQuery({ text: "Prototypen kommen in Phase 3", show_alert: true });
+        return;
+    }
+  });
+
+  bot.on("message:text", async (ctx) => {
+    await ctx.replyWithChatAction("typing").catch(() => undefined);
+    const reply = await askManager(options.manager, ctx.chat.id, ctx.message.text);
+    await replyFormatted(ctx, reply.text);
+  });
+
+  bot.catch((err) => {
+    log("error", "Telegram-Fehler", {
+      error: err.error instanceof Error ? err.error.message : String(err.error),
+    });
+    void err.ctx.reply("Da ist etwas schiefgegangen. Versuch es bitte noch einmal.").catch(() => undefined);
+  });
+
+  return bot;
+}

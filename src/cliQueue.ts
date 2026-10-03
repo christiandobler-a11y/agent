@@ -5,6 +5,7 @@ import { createDb, type Db } from "./db/client.js";
 import { getSearchRun, type SearchRun } from "./db/searchRuns.js";
 import { pendingJobs, runSummary, startSearch, type PipelineContext } from "./queue/pipeline.js";
 import { startWorkers } from "./queue/workers.js";
+import { askManager } from "./manager/agent.js";
 
 /** CLI für den Queue-Betrieb (Schritt 7): search, worker, runs, failed. */
 
@@ -137,5 +138,27 @@ export async function failed(): Promise<number> {
     return 0;
   } finally {
     await db.end();
+  }
+}
+
+/** Manager ohne Telegram befragen (gleicher Agent, gleicher Verlauf wie im Chat). */
+export async function chat(argv: string[]): Promise<number> {
+  const text = argv.join(" ").trim();
+  if (!text) {
+    console.error('Verwendung: avelio chat "Was hat das diese Woche gekostet?"');
+    return 2;
+  }
+  const chatId = loadEnv().TELEGRAM_ALLOWED_CHAT_IDS[0] ?? 0;
+  const app = await createApp();
+  try {
+    const reply = await askManager({ ctx: app.ctx, llm: app.llm }, chatId, text);
+    console.log(reply.text);
+    const tools = reply.toolCalls.map((t) => `${t.name}${t.isError ? " (Fehler)" : ""}`).join(", ");
+    console.log(
+      `\n[Werkzeuge: ${tools || "keine"} · Kosten ${reply.costUsd.toFixed(4).replace(".", ",")} $]`,
+    );
+    return 0;
+  } finally {
+    await app.close();
   }
 }
