@@ -1,6 +1,8 @@
 import { readFile } from "node:fs/promises";
 import { createRequire } from "node:module";
+import { join } from "node:path";
 import QRCode from "qrcode";
+import sharp from "sharp";
 import { z } from "zod";
 import type { Company } from "../db/companies.js";
 import { insertDraft } from "../db/drafts.js";
@@ -30,7 +32,7 @@ import { seedOf } from "./slots.js";
  * Kontaktdaten setzt der Code. Avelio verschickt nichts: Christian druckt aus und schreibt den Umschlag selbst.
  */
 
-export const LETTER_PROMPT_VERSION = "v1";
+export const LETTER_PROMPT_VERSION = "v2";
 
 const pct = z.number();
 export const letterOutputSchema = z.object({
@@ -52,6 +54,8 @@ export interface LetterDeps extends OutreachDeps {
   render: LetterRenderer;
   /** Bildschirmhöhe der Desktop-Screenshots in Pixeln (config/crawl.yaml: desktop.height × scale). */
   desktopScreenPx: number;
+  /** Prototyp-Screenshots (config/prototype.yaml → shots_dir) und Vorschau-Adresse für Vorher/Nachher. */
+  prototype?: { shotsDir: string; baseUrl: string | null };
 }
 
 export interface LetterDraft {
@@ -132,6 +136,33 @@ const slug = (s: string) =>
     .slice(0, 40)
     .toLowerCase();
 
+/** Hero-Screenshot und Adresse des neuesten Prototyps (oder `null`). */
+async function prototypeHero(
+  db: OutreachDeps["db"],
+  companyId: string,
+  p: { shotsDir: string; baseUrl: string | null },
+): Promise<{ dataUri: string; url: string | null } | null> {
+  const { rows } = await db.query<{ slug: string }>(
+    "select slug from prototypes where company_id = $1 order by created_at desc limit 1",
+    [companyId],
+  );
+  const slug = rows[0]?.slug;
+  if (!slug) return null;
+  try {
+    // Für den Druck verkleinert (ca. 80 mm breit), der schwarze Entwurfs-Hinweis oben bleibt sichtbar.
+    const jpg = await sharp(join(p.shotsDir, slug, "hero.jpg"))
+      .resize({ width: 1100 })
+      .jpeg({ quality: 82 })
+      .toBuffer();
+    return {
+      dataUri: `data:image/jpeg;base64,${jpg.toString("base64")}`,
+      url: p.baseUrl ? `${p.baseUrl}/${slug}/` : null,
+    };
+  } catch {
+    return null;
+  }
+}
+
 export async function draftLetter(deps: LetterDeps, company: Company, by: string): Promise<LetterOutcome> {
   const { db, outreach: o } = deps;
   const now = deps.now();
@@ -166,8 +197,12 @@ export async function draftLetter(deps: LetterDeps, company: Company, by: string
   const seed = seedOf(company.id);
   const previous = prior[0]?.meta?.zeilen ?? null;
 
+  // Nachher: Kopfbereich des letzten Prototyps, falls es einen gibt.
+  const after = deps.prototype ? await prototypeHero(db, company.id, deps.prototype) : null;
+
   const branch = company.branch_key ? deps.branches[company.branch_key] : undefined;
   const data = {
+    entwurf_vorhanden: after !== null,
     betrieb: { name: company.name, ort: company.city, branche: branch?.label ?? company.category },
     anrede: form,
     befunde: findings.map((f, i) => ({
@@ -236,6 +271,21 @@ export async function draftLetter(deps: LetterDeps, company: Company, by: string
     closing: pick(b.gruss, seed, 13, variant),
     signature: b.unterschrift,
     qr,
+    after: after
+      ? {
+          dataUri: after.dataUri,
+          label: inForm("So könnte Ihre Seite aussehen:", "So könnte eure Seite aussehen:"),
+          qrSvg: after.url
+            ? await QRCode.toString(after.url, {
+                type: "svg",
+                margin: 0,
+                errorCorrectionLevel: "M",
+                color: { dark: "#1d3557", light: "#ffffff" },
+              })
+            : null,
+          qrText: after.url ? inForm("Ganzen Entwurf ansehen", "Ganzen Entwurf ansehen") : null,
+        }
+      : null,
     phoneLine,
     footer: [o.absender_name, o.absender_zusatz, phone].filter(Boolean).join(" · "),
     fontDataUri: await handwritingFont(),
@@ -257,6 +307,8 @@ export async function draftLetter(deps: LetterDeps, company: Company, by: string
   if (marks.filter((m) => m.box).length === 0) warnings.push("Keine Stelle im Bild markiert, bitte prüfen");
   if (!company.street || !company.postal_code)
     warnings.push("Anschrift unvollständig, bitte im Impressum prüfen");
+  if (after && !after.url)
+    warnings.push("Vorschau-Adresse fehlt (PREVIEW_BASE_URL), daher kein QR-Code zum Entwurf");
   if (!whatsapp) warnings.push("WhatsApp-Nummer fehlt (OUTREACH_WHATSAPP), daher kein QR-Code");
 
   const notes = marks.map((m) => `${m.n}. ${m.note}`);

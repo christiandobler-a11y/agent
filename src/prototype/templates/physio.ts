@@ -15,7 +15,7 @@ const telHref = (phone: string) => `tel:${phone.replace(/[^\d+]/g, "").replace(/
 
 export function renderPhysio(c: SiteContent): string {
   const p = paletteFrom(c.primary);
-  const style = c.transition ?? "waves";
+  const style = c.transition ?? "curve";
   const band = (back: string, middle: string, front: string) =>
     style === "waves" ? wavesSvg(back, middle, front) : curveSvg(middle, front);
   const sie = c.form === "sie";

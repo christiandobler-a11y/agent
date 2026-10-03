@@ -27,6 +27,8 @@ export interface LetterPage {
   closing: string;
   signature: string;
   qr: { svg: string; text: string } | null;
+  /** Nachher: Kopfbereich des Prototyps, optional mit QR-Code zur Vorschau. */
+  after?: { dataUri: string; label: string; qrSvg: string | null; qrText: string | null } | null;
   phoneLine: string | null;
   footer: string;
   /** Handschrift (woff2 als data-URI); ohne Angabe eine Systemschrift. */
@@ -167,8 +169,17 @@ body { width: 210mm; height: 297mm; padding: 14mm 18mm 10mm; font-family: "Helve
 ol.notes { list-style: none; margin: 4mm 0 0; padding: 0; font-size: 18pt; line-height: 1.15; }
 ol.notes li { display: flex; gap: 3mm; margin: 0 0 1.2mm; }
 ol.notes .n { color: ${RED}; font-weight: 700; min-width: 5mm; }
+.pair { display: grid; grid-template-columns: 1fr 78mm; gap: 6mm; align-items: start; }
+.pair ol.notes { font-size: 16pt; }
+.after { margin: 3mm 0 0; }
+.after img { width: 100%; display: block; border: 0.3mm solid #ccc; border-radius: 1.5mm; box-shadow: 0 0.8mm 2.5mm rgba(0,0,0,.18); }
+.alabel { font-size: 16pt; color: ${RED}; margin-bottom: 1.5mm; transform: rotate(-1.5deg); }
+.aqr { display: flex; align-items: center; gap: 3mm; margin-top: 2.5mm; }
+.aqr svg { width: 17mm; height: 17mm; flex: none; }
+.aqr span { font-size: 13pt; line-height: 1.1; }
 .lines { font-size: 18pt; line-height: 1.2; margin: 4mm 0 0; }
 .lines p { margin: 0 0 1.5mm; }
+.lines { margin-bottom: 5mm; }
 .bottom { margin-top: auto; display: flex; justify-content: space-between; align-items: flex-end; gap: 8mm; }
 .qr { display: flex; align-items: center; gap: 4mm; }
 .qr svg { width: 27mm; height: 27mm; }
@@ -184,7 +195,18 @@ ol.notes .n { color: ${RED}; font-weight: 700; min-width: 5mm; }
 <div class="greeting hand">${escapeHtml(page.greeting)}</div>
 <div class="shot"><img src="${page.image.dataUri}" alt="Startseite">${marksSvg(page.marks, page.image.width, page.image.height, page.seed)}</div>
 <div class="caption">${escapeHtml(page.caption)}</div>
-${notes ? `<ol class="notes hand">${notes}</ol>` : ""}
+${
+  page.after
+    ? `<div class="pair"><div>${notes ? `<ol class="notes hand">${notes}</ol>` : ""}</div>
+<figure class="after"><div class="alabel hand">${escapeHtml(page.after.label)}</div><img src="${page.after.dataUri}" alt="Entwurf">${
+        page.after.qrSvg
+          ? `<div class="aqr">${page.after.qrSvg}<span class="hand">${escapeHtml(page.after.qrText ?? "")}</span></div>`
+          : ""
+      }</figure></div>`
+    : notes
+      ? `<ol class="notes hand">${notes}</ol>`
+      : ""
+}
 <div class="lines hand">${paragraphs(page.lines)}</div>
 <div class="bottom hand">${qr}<div class="sign"><div class="closing">${escapeHtml(page.closing)}</div><div class="signature">${escapeHtml(page.signature)}</div></div></div>
 <div class="footer">${escapeHtml(page.footer)}</div>

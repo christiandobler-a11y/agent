@@ -20,6 +20,8 @@ import {
 } from "../src/prototype/run.js";
 import { renderPhysio } from "../src/prototype/templates/physio.js";
 import { crmCallback, parseCrmCallback, prototypeMessage } from "../src/telegram/format.js";
+import { loadOutreachConfig } from "../src/outreach/config.js";
+import { draftEmail } from "../src/outreach/draft.js";
 import { describeDb, useTestDb } from "./helpers/db.js";
 
 const output: PrototypeOutput = {
@@ -332,6 +334,37 @@ describeDb("Prototyp mit Datenbank", () => {
       [c.id],
     );
     expect(rows[0]!.n).toBe(2);
+    // Die Mail verlinkt den Entwurf statt WhatsApp (höchstens ein Link).
+    await db().query(
+      `insert into audits (company_id, prompt_version, model, findings, rubric, commercial, summary)
+       values ($1, 'v1', 'm', '[]', '{}', '{}', 's')`,
+      [c.id],
+    );
+    const mail = await draftEmail(
+      {
+        db: db(),
+        llm: {
+          structured: () =>
+            Promise.resolve({
+              output: { absatz: "ich heiße Christian und mache Online-Auftritte zeitgemäß." },
+              agentRunId: "r",
+              costUsd: 0,
+              model: "m",
+            }),
+        } as unknown as LlmGateway,
+        outreach: loadOutreachConfig(),
+        branches: {},
+        now: () => NOW,
+        contact: { whatsapp: "+49 151 1", phone: null },
+        previewBaseUrl: "https://vorschau.example",
+      },
+      c,
+      "test",
+    );
+    if ("kind" in mail) throw new Error("kein Entwurf");
+    expect(mail.body).toContain(first.url!);
+    expect(mail.body).not.toContain("wa.me");
+
     const { rows: usage } = await db().query<{ n: number }>(
       "select count(*)::int as n from api_usage where company_id = $1 and operation = 'place_details_prototype'",
       [c.id],

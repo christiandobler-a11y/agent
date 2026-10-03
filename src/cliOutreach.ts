@@ -37,6 +37,10 @@ export async function letter(argv: string[]): Promise<number> {
         now: app.ctx.now,
         contact: { whatsapp: env.OUTREACH_WHATSAPP ?? null, phone: env.OUTREACH_PHONE ?? null },
         render: chromiumLetterRenderer(process.env.CHROMIUM_PATH),
+        prototype: {
+          shotsDir: loadPrototypeConfig().shots_dir,
+          baseUrl: env.PREVIEW_BASE_URL?.replace(/\/$/, "") ?? null,
+        },
         desktopScreenPx: crawl.desktop.height * crawl.desktop.scale,
       },
       found.company,

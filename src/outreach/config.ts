@@ -33,6 +33,14 @@ export const outreachConfigSchema = z.object({
     whatsapp_text_sie: z.string(),
     email_cta: z.string(),
     email_cta_du: z.string(),
+    entwurf_satz: z
+      .string()
+      .default(
+        "Ich hab mir auch schon mal erlaubt zu skizzieren, wie Ihre Startseite aussehen könnte: {link}",
+      ),
+    entwurf_satz_du: z
+      .string()
+      .default("Ich hab auch schon mal skizziert, wie eure Startseite aussehen könnte: {link}"),
     email_cta_ohne_whatsapp: z.string(),
     email_cta_ohne_whatsapp_du: z.string(),
     vorbereitet: z.array(z.string()).min(1),

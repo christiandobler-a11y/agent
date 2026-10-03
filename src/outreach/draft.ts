@@ -31,6 +31,8 @@ export interface OutreachDeps {
   branches: Branches;
   now: () => Date;
   contact: { whatsapp: string | null; phone: string | null };
+  /** Vorschau-Adresse der Prototypen; gibt es einen, kommt der Link in die Mail (statt WhatsApp). */
+  previewBaseUrl?: string | null;
 }
 
 export interface EmailDraft {
@@ -264,12 +266,25 @@ export async function draftEmail(
   const k = o.kontaktweg;
   const slotSentence = slots ? (form === "ihr" ? duToIhr(slots.sentence) : slots.sentence) : null;
   const prepared = inForm(pick(k.vorbereitet, seed, 7, variant), pick(k.vorbereitet_du, seed, 7, variant));
-  const cta = deps.contact.whatsapp
-    ? inForm(k.email_cta, k.email_cta_du).replace(
-        "{whatsapp}",
-        whatsappLink(deps.contact.whatsapp, form === "sie" ? k.whatsapp_text_sie : k.whatsapp_text),
+  const { rows: proto } = deps.previewBaseUrl
+    ? await db.query<{ slug: string }>(
+        "select slug from prototypes where company_id = $1 order by created_at desc limit 1",
+        [company.id],
       )
-    : inForm(k.email_cta_ohne_whatsapp, k.email_cta_ohne_whatsapp_du);
+    : { rows: [] };
+  const previewUrl = proto[0] && deps.previewBaseUrl ? `${deps.previewBaseUrl}/${proto[0].slug}/` : null;
+  const draftSentence = previewUrl
+    ? inForm(k.entwurf_satz, k.entwurf_satz_du).replace("{link}", previewUrl)
+    : null;
+  // Höchstens ein Link je Mail: mit Entwurfs-Link wird per Antwort-Mail geantwortet statt per WhatsApp.
+  const cta = previewUrl
+    ? inForm(k.email_cta_ohne_whatsapp, k.email_cta_ohne_whatsapp_du)
+    : deps.contact.whatsapp
+      ? inForm(k.email_cta, k.email_cta_du).replace(
+          "{whatsapp}",
+          whatsappLink(deps.contact.whatsapp, form === "sie" ? k.whatsapp_text_sie : k.whatsapp_text),
+        )
+      : inForm(k.email_cta_ohne_whatsapp, k.email_cta_ohne_whatsapp_du);
   const subject = subjectFor(
     pick(o.spamschutz.betreffe, seed, 11, variant).replace("{firma}", shortCompanyName(company.name)),
     form,
@@ -280,6 +295,7 @@ export async function draftEmail(
   const body = [
     salutationLine(form, { name, salutation }, company.name),
     lowerFirst(clean.text),
+    ...(draftSentence ? [draftSentence] : []),
     [prepared, slotSentence].filter(Boolean).join(" "),
     cta,
     `${greeting}\n${signature}`,
@@ -293,7 +309,14 @@ export async function draftEmail(
   const draft = await insertDraft(db, company.id, {
     channel: "email",
     body,
-    meta: { subject, to: email, slots: slots?.slots ?? [], prompt: CONTACT_PROMPT_VERSION, variant },
+    meta: {
+      subject,
+      to: email,
+      slots: slots?.slots ?? [],
+      prompt: CONTACT_PROMPT_VERSION,
+      variant,
+      preview_url: previewUrl,
+    },
     by,
     now,
   });

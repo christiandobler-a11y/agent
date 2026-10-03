@@ -315,6 +315,7 @@ export function createBot(options: BotOptions): Bot {
             branches: pipeline.lead.branches,
             now: pipeline.now,
             contact: options.outreach.contact,
+            previewBaseUrl: options.prototype?.baseUrl ?? null,
           },
           company,
           by(ctx.chat?.id),
@@ -410,6 +411,14 @@ export function createBot(options: BotOptions): Bot {
             now: pipeline.now,
             contact: options.outreach.contact,
             render: options.outreach.renderLetter ?? chromiumLetterRenderer(process.env.CHROMIUM_PATH),
+            ...(options.prototype
+              ? {
+                  prototype: {
+                    shotsDir: options.prototype.config.shots_dir,
+                    baseUrl: options.prototype.baseUrl,
+                  },
+                }
+              : {}),
             desktopScreenPx: crawl.desktop.height * crawl.desktop.scale,
           },
           company,

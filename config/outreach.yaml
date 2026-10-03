@@ -68,6 +68,9 @@ kontaktweg:
   brief_qr: whatsapp # QR-Code auf der Befund-Seite öffnet WhatsApp mit vorausgefülltem Text
   email_cta: Am einfachsten antworten Sie kurz hier oder schreiben mir per WhatsApp ({whatsapp}).
   email_cta_du: Am einfachsten antwortest du kurz hier oder schreibst mir per WhatsApp ({whatsapp}).
+  # Mit Prototyp (03.10.2026): Link zur Vorschau statt WhatsApp-Link (höchstens ein Link je Mail).
+  entwurf_satz: "Ich hab mir auch schon mal erlaubt zu skizzieren, wie Ihre Startseite aussehen könnte: {link}"
+  entwurf_satz_du: "Ich hab auch schon mal skizziert, wie eure Startseite aussehen könnte: {link}"
   email_cta_ohne_whatsapp: Am einfachsten antworten Sie kurz auf diese Mail.
   email_cta_ohne_whatsapp_du: Am einfachsten antwortest du kurz auf diese Mail.
   # Überleitung zum Terminvorschlag ("ich hab was vorbereitet"), wird abgewechselt.

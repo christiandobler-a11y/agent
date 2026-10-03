@@ -87,7 +87,7 @@ export interface SiteContent {
     mapsUrl: string | null;
   };
   cta: string;
-  /** Übergänge zwischen Sections (src/prototype/transitions.ts); Standard "waves". */
+  /** Übergänge zwischen Sections (src/prototype/transitions.ts); Standard "curve" (Christians Wahl, 03.10.2026). */
   transition?: "waves" | "curve";
   /** Hinweis oben auf der Seite, dass es ein Entwurf ist (nie weglassen). */
   previewNote: string;
