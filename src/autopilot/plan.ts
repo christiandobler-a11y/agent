@@ -12,6 +12,7 @@ import { draftLetter, type LetterDeps } from "../outreach/letter.js";
 import type { MxCheck } from "../outreach/mx.js";
 import { buildPrototype, type PrototypeDeps } from "../prototype/run.js";
 import { teaserForCompany, usesTeaser, type TeaserDeps } from "../prototype/teaser.js";
+import { recentSeedProblem } from "../outreach/seed.js";
 
 /**
  * Morgen-Paket (Phase 2): Avelio bereitet nachts den Tagesplan vor. Zuerst fällige Nachfass-Mails, dann neue Leads
@@ -108,6 +109,8 @@ export function dailyNewCount(
   now: Date,
   firstSentAt: Date | null,
   bounces: { sent: number; bounced: number } = { sent: 0, bounced: 0 },
+  /** Kontrollmail lag zuletzt im Spam (src/outreach/seed.ts). */
+  spamSeen = false,
 ): { count: number; braked: boolean } {
   const n = config.neue_kontakte;
   if (n.nur_werktags && !isWeekday(now)) return { count: 0, braked: false };
@@ -118,8 +121,10 @@ export function dailyNewCount(
     if (days >= s.ab_tag) stage = i;
   });
   const braked =
-    bounces.sent >= n.bremse.mindestens && bounces.bounced / bounces.sent > n.bremse.quote && stage > 0;
-  return { count: stages[braked ? stage - 1 : stage]!.pro_tag, braked };
+    spamSeen || (bounces.sent >= n.bremse.mindestens && bounces.bounced / bounces.sent > n.bremse.quote);
+  if (!braked) return { count: stages[stage]!.pro_tag, braked };
+  // Eine Stufe zurück; auf der ersten Stufe halbieren.
+  return { count: stage > 0 ? stages[stage - 1]!.pro_tag : Math.floor(stages[0]!.pro_tag / 2), braked };
 }
 
 /** Gesendete neue Mails und davon unzustellbare in den letzten `days` Tagen. */
@@ -276,10 +281,13 @@ export async function buildDailyPlan(deps: PlanDeps, by = "autopilot"): Promise<
 
     // 2. Neue Leads.
     const bounces = await recentBounces(db, now, config.neue_kontakte.bremse.tage);
-    const { count: target, braked } = dailyNewCount(config, now, await firstSentAt(db), bounces);
+    const spamSeen = await recentSeedProblem(db, now);
+    const { count: target, braked } = dailyNewCount(config, now, await firstSentAt(db), bounces, spamSeen);
     if (braked)
       result.warnings.push(
-        `Bremse: ${bounces.bounced} von ${bounces.sent} Mails der letzten ${config.neue_kontakte.bremse.tage} Tage waren unzustellbar, heute nur ${target} neue`,
+        spamSeen
+          ? `Bremse: Eine Kontrollmail der letzten Tage lag im Spam oder kam nicht an, heute nur ${target} neue`
+          : `Bremse: ${bounces.bounced} von ${bounces.sent} Mails der letzten ${config.neue_kontakte.bremse.tage} Tage waren unzustellbar, heute nur ${target} neue`,
       );
     const already = (await planItems(db, date)).filter((i) => i.kind === "new").length;
     let lettersLeft = config.briefe.pro_tag;

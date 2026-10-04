@@ -228,6 +228,31 @@ Lexware an und schickt den Link.
 
 Preise und Leistungen stehen in `config/angebot.yaml` (Endpreise inkl. 19 % MwSt.).
 
+## 14. Kontroll-Postfächer (Spam-Check)
+
+Ob eine Mail im Spam landet, erfährt der Absender nie. Deshalb schickt Avelio jeden Werktag eine Kopie der ersten
+echten Mail an eigene Test-Postfächer und schaut per IMAP nach, ob sie im Posteingang oder im Spam liegt. Ergebnis
+kommt in Telegram; liegt sie im Spam, verschickt das Morgen-Paket die nächsten Tage weniger.
+
+1. Zwei kostenlose Postfächer anlegen, z. B. Gmail und GMX (nur dafür, nicht dein privates).
+2. **Gmail:** Google-Konto → Sicherheit → 2-Faktor einschalten → „App-Passwörter“ → neues anlegen (16 Zeichen, ohne
+   Leerzeichen eintragen). **GMX:** Einstellungen → POP3/IMAP → „IMAP aktivieren“, dann unter Sicherheit ein
+   App-Passwort anlegen (oder das normale Passwort, wenn GMX keins anbietet).
+3. In die `.env` auf dem Server (`nano /opt/avelio/.env`):
+   ```
+   SEED_1_ADDRESS=deine.kontrolle@gmail.com
+   SEED_1_PASSWORD=…
+   SEED_2_ADDRESS=deine.kontrolle@gmx.de
+   SEED_2_PASSWORD=…
+   ```
+4. `bash /opt/avelio/scripts/deploy.sh`
+
+Wichtig: In den Kontroll-Postfächern Mails von Avelio **nicht** als „kein Spam“ markieren oder antworten, sonst lernt
+der Filter dort und der Test sagt nichts mehr über echte Empfänger. Nur nachsehen.
+
+Zahlen der Testphase (gesendet, Antworten, Termine, Kosten): Telegram `/zahlen`; bei 50, 100, 200, 300, 500 … Mails
+kommt der Zwischenstand von selbst, nach 60 Mails ohne Antwort eine Warnung.
+
 ## Betrieb
 
 | Was | Befehl (auf dem Server, nach `ssh root@<IP>`) |

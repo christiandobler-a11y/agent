@@ -20,6 +20,7 @@ import { loadAutopilotConfig } from "./autopilot/plan.js";
 import { loadOutreachConfig } from "./outreach/config.js";
 import { chromiumLetterRenderer } from "./outreach/letterPdf.js";
 import { loadMailConfig, mailboxFromEnv, type MailConfig, type Mailbox } from "./outreach/mail.js";
+import { seedBoxesFromEnv } from "./outreach/seed.js";
 import { createMxCheck } from "./outreach/mx.js";
 import { loadPrototypeConfig } from "./prototype/run.js";
 import { chromiumTeaserShooter } from "./prototype/teaser.js";
@@ -104,6 +105,7 @@ export async function createApp(options: { notifier?: Notifier; worker?: boolean
   const contact = { whatsapp: env.OUTREACH_WHATSAPP ?? null, phone: env.OUTREACH_PHONE ?? null };
   const desktopScreenPx = crawlConfig.desktop.height * crawlConfig.desktop.scale;
   ctx.mailbox = mailbox;
+  ctx.seedBoxes = seedBoxesFromEnv(env, mail);
   ctx.mail = mail;
   ctx.autopilot = {
     config: loadAutopilotConfig(),

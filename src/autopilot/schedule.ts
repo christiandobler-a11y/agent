@@ -3,6 +3,8 @@ import { countPlan, planItems, type PlanCounts } from "../db/plan.js";
 import { gameState, gameStats, loadGameConfig, xpOf, type GameState } from "../game/xp.js";
 import { loadCrmConfig } from "../crm/status.js";
 import { sendNextQueued } from "../outreach/queue.js";
+import { seedTick } from "../outreach/seed.js";
+import { statsTick } from "../outreach/stats.js";
 import { checkReplies } from "../outreach/send.js";
 import { PLAN_QUEUE } from "../queue/boss.js";
 import type { PipelineContext } from "../queue/pipeline.js";
@@ -152,4 +154,19 @@ export async function queueTick(ctx: PipelineContext): Promise<void> {
     followUpDays: (ctx.crm ?? loadCrmConfig()).follow_up_days,
     ...(notify ? { notify } : {}),
   });
+}
+
+/** Kontrollmail (Spam-Check) und Zahlen der Testphase (Meilensteine, Warnung ohne Antworten). */
+export async function monitorTick(ctx: PipelineContext): Promise<void> {
+  const notify = ctx.notifier.info?.bind(ctx.notifier);
+  if (ctx.mailbox && ctx.seedBoxes && ctx.seedBoxes.length > 0)
+    await seedTick({
+      db: ctx.db,
+      mailbox: ctx.mailbox,
+      boxes: ctx.seedBoxes,
+      now: ctx.now,
+      date: berlinDate(ctx.now()),
+      ...(notify ? { notify } : {}),
+    });
+  if (ctx.mailbox) await statsTick(ctx.db, notify);
 }

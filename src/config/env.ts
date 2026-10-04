@@ -43,6 +43,19 @@ const envSchema = z.object({
   PREVIEW_BASE_URL: optionalSecret.pipe(z.url().optional()),
   /** Optional: Ping-URL eines Uptime-Dienstes (z. B. Healthchecks.io). Enthält ein Token, nie loggen. */
   HEALTHCHECK_URL: optionalSecret.pipe(z.url().optional()),
+  /**
+   * Kontroll-Postfächer (src/outreach/seed.ts): eigene Test-Postfächer (z. B. Gmail, GMX) mit App-Passwort; Avelio
+   * schickt jeden Werktag eine Kopie der ersten Mail dorthin und prüft, ob sie im Spam landet.
+   */
+  SEED_1_ADDRESS: optionalSecret,
+  SEED_1_PASSWORD: optionalSecret,
+  SEED_1_PROVIDER: optionalSecret,
+  SEED_2_ADDRESS: optionalSecret,
+  SEED_2_PASSWORD: optionalSecret,
+  SEED_2_PROVIDER: optionalSecret,
+  SEED_3_ADDRESS: optionalSecret,
+  SEED_3_PASSWORD: optionalSecret,
+  SEED_3_PROVIDER: optionalSecret,
   /** Lexware Office Public API (Angebote als Entwurf anlegen), erstellt unter app.lexware.de/addons/public-api. */
   LEXWARE_API_KEY: optionalSecret,
 });

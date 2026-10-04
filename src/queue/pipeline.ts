@@ -19,7 +19,8 @@ import type { Notifier, RunSummary, TopLead } from "./notifier.js";
 import { dueReminders, markNotified } from "../db/crm.js";
 import { isQuietTime, loadCrmConfig, type CrmConfig } from "../crm/status.js";
 import { claimState } from "../db/appState.js";
-import { autopilotTick, mailTick, queueTick } from "../autopilot/schedule.js";
+import { autopilotTick, mailTick, monitorTick, queueTick } from "../autopilot/schedule.js";
+import type { SeedBox } from "../outreach/seed.js";
 import type { AutopilotConfig, PlanDeps } from "../autopilot/plan.js";
 import type { MailConfig, Mailbox } from "../outreach/mail.js";
 import { cleanupPrototypes, loadPrototypeConfig } from "../prototype/run.js";
@@ -67,6 +68,8 @@ export interface PipelineContext {
   crm?: CrmConfig;
   /** Christians Postfach: Antworten erkennen (Sweep). */
   mailbox?: Mailbox | null;
+  /** Kontroll-Postfächer für den Spam-Check (src/outreach/seed.ts). */
+  seedBoxes?: SeedBox[];
   mail?: MailConfig;
   /** Morgen-Paket: nachts planen, morgens melden, abends Bilanz. */
   autopilot?: { config: AutopilotConfig; planDeps: () => PlanDeps };
@@ -391,6 +394,15 @@ export async function sweep(ctx: PipelineContext): Promise<void> {
       JSON.stringify({
         level: "error",
         msg: "Verteilt senden fehlgeschlagen",
+        error: err instanceof Error ? err.message : String(err),
+      }),
+    ),
+  );
+  await monitorTick(ctx).catch((err: unknown) =>
+    console.error(
+      JSON.stringify({
+        level: "error",
+        msg: "Kontrollmail/Zahlen fehlgeschlagen",
         error: err instanceof Error ? err.message : String(err),
       }),
     ),

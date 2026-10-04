@@ -102,7 +102,9 @@ ausprobieren kann. Nach Schritt 6 ist ein Abstimmungstermin (Kalibrierung) vorge
   abends Bilanz. Jeder Schritt einmal je Tag über `claimState`. Menge neuer Kontakte in Stufen zum Aufwärmen der
   Adresse (`neue_kontakte.stufen`, Bremse bei Unzustellbaren). „Alle verteilt senden“ plant die Mails ein (Status
   `queued`, `send_after`, `config/mail.yaml → verteilt`), der Sweep schickt je Takt die nächste fällige
-  (`src/outreach/queue.ts`). **Nachtsuche** (`src/autopilot/search.ts`): ab
+  (`src/outreach/queue.ts`). Spam-Check: Kopie der ersten Mail des Tages an Kontroll-Postfächer (`SEED_n_*`),
+  IMAP-Suche nach Posteingang/Spam, Spam bremst (`src/outreach/seed.ts`); Zahlen und Meilensteine
+  (`src/outreach/stats.ts`, Telegram `/zahlen`). **Nachtsuche** (`src/autopilot/search.ts`): ab
   `suche.ab` die nächste nicht vollständig abgesuchte Kombination Region × Branche als Komplett-Suche
   (`requested_by = 'autopilot'`, keine Einzelmeldung in der Nacht), höchstens `pro_nacht`, nie zwei gleichzeitig.
 - **Spiel** (`src/game/xp.ts`, `config/game.yaml`, Telegram `/level`, `src/telegram/game.ts`): XP, Level und Abzeichen

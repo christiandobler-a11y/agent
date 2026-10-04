@@ -3,6 +3,7 @@ import type { UserFromGetMe } from "grammy/types";
 import { getState, setState } from "../db/appState.js";
 import { setRating } from "../db/calibration.js";
 import { addDesignNote, designNotes } from "../db/designNotes.js";
+import { outreachStats, statsText } from "../outreach/stats.js";
 import { findCompany, type Company } from "../db/companies.js";
 import {
   addReminder,
@@ -169,6 +170,7 @@ export const BOT_COMMANDS = [
   { command: "kosten", description: "Ausgaben und Budget" },
   { command: "kalibrieren", description: "Websites bewerten (A/B/C), gute als Vorbild merken" },
   { command: "vorbilder", description: "Gemerkte Vorbild-Websites" },
+  { command: "zahlen", description: "Mails, Antworten, Termine, Kosten" },
   { command: "hilfe", description: "Was ich kann" },
 ];
 
@@ -264,6 +266,10 @@ export function createBot(options: BotOptions): AvelioBot {
 
   // Vorbild-Notizen: Knopf auf der Kalibrier-Karte, die nächste Textnachricht ist die Notiz (30 Minuten gültig).
   const inspoKey = (chatId: number | undefined) => `inspo:pending:${chatId ?? "?"}`;
+  bot.command(["zahlen", "statistik", "stats"], async (ctx) => {
+    await ctx.reply(escapeHtml(statsText(await outreachStats(pipeline.db))), { parse_mode: "HTML" });
+  });
+
   bot.command(["vorbilder", "inspo"], async (ctx) => {
     const arg = ctx.match.trim().toLowerCase();
     const branch = arg === "alle" ? null : arg || "physiotherapie";
