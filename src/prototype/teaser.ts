@@ -775,6 +775,13 @@ h2{font-family:"Barlow Condensed",sans-serif;font-weight:600;font-size:30px;colo
 .hours{margin-top:16px;background:var(--petrol);color:#fff;border-radius:16px;padding:14px 16px}
 .hours small{display:block;font-weight:800;font-size:10px;letter-spacing:.18em;text-transform:uppercase;color:#f3b27f}
 .hours ul{list-style:none;margin-top:6px;font-weight:600;font-size:13px;line-height:1.6}
+.review{margin-top:16px;border:1px solid #e6eeee;border-radius:16px;padding:12px 14px}
+.rhead{display:flex;align-items:center;gap:8px}
+.rhead svg{width:20px;height:20px}
+.rstars{display:flex;color:#f5b400}
+.rstars svg{width:13px;height:13px}
+.review p{margin-top:8px;font-weight:600;font-size:13px;line-height:1.45;color:var(--ink)}
+.review small{display:block;margin-top:5px;font-weight:600;font-size:11px;color:#6c8a90}
 .fade{position:absolute;left:0;right:0;bottom:0;height:120px;background:linear-gradient(rgba(255,255,255,0),#fff 80%)}
 .stats{display:flex;justify-content:space-around;padding:4px 14px 14px;border-bottom:1px solid #eef2f2;margin-bottom:12px}
 .stats div{text-align:center}
@@ -795,7 +802,11 @@ ${statsHtml}
   <div class="eyebrow">Leistungen</div>
   <h2>Wobei wir Ihnen helfen</h2>
   <div class="grid">${tiles}</div>
-  <div class="hours"><small>Öffnungszeiten</small><ul>${info}</ul></div>
+  ${
+    d.quote
+      ? `<div class="review"><div class="rhead">${GOOGLE}<span class="rstars">${STAR.repeat(5)}</span></div><p>„${esc(teaserQuote(d.quote.text, 120))}“</p><small>${esc(d.quote.author)} auf Google</small></div>`
+      : `<div class="hours"><small>Öffnungszeiten</small><ul>${info}</ul></div>`
+  }
 </section>
 <div class="fade"></div>
 </body></html>`;
@@ -887,18 +898,6 @@ ${good ? `<div class="star"><svg viewBox="0 0 100 100" width="124" height="124" 
 </body></html>`;
 }
 
-/** Schwebende Karte mit einer echten Google-Bewertung (oder nur der Sterne-Zahl), fürs Geräte-Bild. */
-function quoteCard(d: TeaserData): string {
-  const good = d.rating !== null && d.rating >= 4.3 && (d.reviewCount ?? 0) >= 5;
-  if (!d.quote && !good) return "";
-  const stars = `<span class="qstars">${STAR.repeat(5)}</span>`;
-  const head = `<div class="qhead">${GOOGLE}<div>${stars}${good ? `<b>${de(d.rating!)} · ${d.reviewCount} Bewertungen</b>` : ""}</div></div>`;
-  const body = d.quote
-    ? `<p>„${esc(teaserQuote(d.quote.text))}“</p><small>${esc(d.quote.author)} auf Google</small>`
-    : "";
-  return `<div class="quote">${head}${body}</div>`;
-}
-
 /**
  * Geräte-Bild (04.10.2026, Christian): die Startseite auf einem Laptop, daneben dieselbe Seite auf einem Smartphone.
  * Wirkt wie ein fertiges Produkt und zeigt nebenbei, dass die Seite am Handy funktioniert. Beide Seiten stecken als
@@ -941,7 +940,6 @@ export function renderTeaserMockup(
                   veil: paletteOf(d).veil,
                 },
           );
-  const card = style === "vital" || style === "elementa" ? quoteCard(d) : "";
   const lw = 1060; // Bildschirmbreite Laptop
   const ls = lw / 1440;
   const pw = 250; // Bildschirmbreite Handy
@@ -965,17 +963,10 @@ body{background:radial-gradient(120% 90% at 30% 20%,#f4f8f8 0%,#e3ecee 55%,#d5e1
 .island{position:absolute;z-index:2;left:50%;top:10px;width:78px;height:22px;margin-left:-39px;background:#000;border-radius:999px}
 @font-face{font-family:"Manrope";src:url("${assets.font("Manrope 600")}") format("woff2");font-weight:600}
 @font-face{font-family:"Manrope";src:url("${assets.font("Manrope 800")}") format("woff2");font-weight:800}
-.quote{position:absolute;z-index:5;left:56px;top:560px;width:430px;background:#fff;border-radius:18px;padding:20px 24px 18px;box-shadow:0 30px 60px rgba(22,48,53,.28);font-family:Manrope,sans-serif;color:#24515a}
-.qhead{display:flex;align-items:center;gap:12px}
-.qhead b{display:block;font-weight:800;font-size:15px;margin-top:2px}
-.qstars{display:flex;color:#f5b400}
-.quote p{margin-top:12px;font-weight:600;font-size:17px;line-height:1.45;color:#1f3f45}
-.quote small{display:block;margin-top:8px;font-weight:600;font-size:13px;color:#6c8a90}
 </style></head>
 <body>
 <div class="laptop"><div class="lid"><div class="screen"><iframe srcdoc="${esc(desktop)}"></iframe></div></div><div class="base"></div></div>
 <div class="phone"><div class="screen"><span class="island"></span><iframe srcdoc="${esc(mobile)}"></iframe></div></div>
-${card}
 </body></html>`;
 }
 

@@ -24,7 +24,7 @@ ausprobieren kann. Nach Schritt 6 ist ein Abstimmungstermin (Kalibrierung) vorge
   (`src/prototype/templates/`: `physio`, `werkstatt`; Zuordnung je Branche in `config/prototype.yaml`), Texte/Farbe/Fotowahl per LLM (Rolle `prototype`), Seite unter `data/previews/<slug>/`,
   ausgeliefert von Caddy unter `PREVIEW_BASE_URL` (docs/DEPLOY.md, Abschnitt 11)
 - `npm run cli -- teaser <firma>`: einheitliches Vorschau-Bild für Physio (`src/prototype/teaser.ts`, ohne LLM,
-  Stockfotos in `assets/teaser/physio/`, Stil `welt`/`vital`/`rund`/`mix`/`elementa` in `config/prototype.yaml → teaser`; Geräte-Bild mit echten Leistungen, Öffnungszeiten und einer Google-Bewertung) nach
+  Stockfotos in `assets/teaser/physio/`, Stil `welt`/`vital`/`rund`/`mix`/`elementa` in `config/prototype.yaml → teaser`; Geräte-Bild: Handy mit echten Leistungen, Kennzahlen und einer Google-Bewertung als Abschnitt) nach
   `data/teasers/<id>.jpg`; das Morgen-Paket baut es für `teaser.branchen` statt eines Prototyps, die Mail bettet es als
   HTML-Bild unter `bild_satz` ein (`textToHtml`), die Befund-Seite nutzt es als „Nachher“
 - `npm run cli -- angebot <firma> [onepager|mehrseitig]` (Telegram: Lead-Karte → „📄 Angebot …“): ohne Lexware-API

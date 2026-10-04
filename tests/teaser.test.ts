@@ -105,8 +105,8 @@ describe("Vorschau-Bild Physio (rein)", () => {
     expect(mix.match(/class=&quot;tile&quot;/g)).toHaveLength(8);
   });
 
-  it("Vital-Geräte-Bild: am Handy ihre Leistungen, Öffnungszeiten und Kennzahlen, dazu eine echte Bewertung", () => {
-    const mock = renderTeaserMockup(
+  it("Geräte-Bild: am Handy ihre Leistungen und Kennzahlen, die echte Bewertung als Abschnitt (keine schwebende Karte)", () => {
+    const withQuote = renderTeaserMockup(
       data({
         services: ["Krankengymnastik am Gerät", "Kiefergelenksbehandlung (CMD)", "x", "Hausbesuche"],
         quote: { text: "Super <b>Team</b>, sehr empfehlenswert und immer pünktlich.", author: "Anna M." },
@@ -115,12 +115,17 @@ describe("Vorschau-Bild Physio (rein)", () => {
       assets,
       "vital",
     );
-    expect(mock).toContain("Wobei wir Ihnen helfen");
-    expect(mock).toContain("Kiefergelenksbehandlung"); // Klammerzusatz weg
-    expect(mock).toContain("Mo–Fr: 07:30–19:00 Uhr");
-    expect(mock).toContain("„Super &lt;b&gt;Team&lt;/b&gt;, sehr empfehlenswert");
-    expect(mock).toContain("Anna M. auf Google");
-    expect(mock).not.toContain("<script");
+    expect(withQuote).toContain("Wobei wir Ihnen helfen");
+    expect(withQuote).toContain("Kiefergelenksbehandlung"); // Klammerzusatz weg
+    expect(withQuote).toContain("Mo–Fr"); // Kennzahl aus den Öffnungszeiten
+    // Bewertung steht in der Handy-Seite (srcdoc, doppelt escaped), nicht als Karte über dem Bild
+    expect(withQuote).toContain("Super &amp;lt;b&amp;gt;Team&amp;lt;/b&amp;gt;, sehr empfehlenswert");
+    expect(withQuote).toContain("Anna M. auf Google");
+    expect(withQuote).not.toContain('class="quote"');
+    expect(withQuote).not.toContain("<script");
+    // Ohne Bewertungstext: Öffnungszeiten statt Bewertung
+    const noQuote = renderTeaserMockup(data({ hours: ["Mo–Fr: 07:30–19:00 Uhr"] }), assets, "vital");
+    expect(noQuote).toContain("Öffnungszeiten");
     expect(teaserServices(undefined)).toEqual([
       "Krankengymnastik",
       "Manuelle Therapie",
@@ -131,10 +136,6 @@ describe("Vorschau-Bild Physio (rein)", () => {
       teaserServices(["manuelle Therapie (MT)", "Wirbelsäulengymnastik nach Dorn und Breuß in Kombination"]),
     ).toEqual(["Manuelle Therapie", "Krankengymnastik", "Lymphdrainage", "Sportphysiotherapie"]);
     expect(teaserQuote("a".repeat(70) + ". " + "b ".repeat(80), 120)).toBe(`${"a".repeat(70)}.`);
-    // Ohne Bewertung und ohne Text: keine Karte
-    expect(renderTeaserMockup(data({ rating: null, reviewCount: null }), assets, "vital")).not.toContain(
-      'class="quote"',
-    );
   });
 
   it("Stil elementa: Farbflächen, Stern-Badge nur bei guter Note, Name escaped, auch als Geräte-Bild", () => {
