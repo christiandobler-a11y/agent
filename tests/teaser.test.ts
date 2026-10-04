@@ -149,6 +149,8 @@ describeDb("Vorschau-Bild in Mail und Versand", () => {
     if ("kind" in mail) throw new Error("kein Entwurf");
     const sentence = loadOutreachConfig().kontaktweg.bild_satz;
     expect(mail.body).toContain(sentence);
+    expect(mail.body).toMatch(/unverbindlich/);
+    expect(mail.body).not.toMatch(/kostenlos|gratis/i);
 
     // Adresse setzen und senden
     await db().query(`update interactions set meta = meta || '{"to":"info@physio-bild.de"}' where id = $1`, [

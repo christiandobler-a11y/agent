@@ -51,6 +51,16 @@ export const outreachConfigSchema = z.object({
     email_cta_ohne_whatsapp_du: z.string(),
     vorbereitet: z.array(z.string()).min(1),
     vorbereitet_du: z.array(z.string()).min(1),
+    unverbindlich: z
+      .array(z.string())
+      .default([
+        "Das Ganze ist unverbindlich und kostet Sie nichts. Wenn es Sie nicht überzeugt, ist das völlig in Ordnung.",
+      ]),
+    unverbindlich_du: z
+      .array(z.string())
+      .default([
+        "Das Ganze ist unverbindlich und kostet dich nichts. Wenn es dich nicht überzeugt, ist das völlig in Ordnung.",
+      ]),
     vorbereitet_mit_entwurf: z
       .array(z.string())
       .min(1)

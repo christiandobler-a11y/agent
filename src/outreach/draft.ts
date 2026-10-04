@@ -313,7 +313,13 @@ export async function draftEmail(
     salutationLine(form, { name, salutation }, company.name),
     lowerFirst(clean.text),
     ...(draftSentence ? [draftSentence] : []),
-    [prepared, slotSentence].filter(Boolean).join(" "),
+    [
+      prepared,
+      slotSentence,
+      inForm(pick(k.unverbindlich, seed, 17, variant), pick(k.unverbindlich_du, seed, 17, variant)),
+    ]
+      .filter(Boolean)
+      .join(" "),
     cta,
     `${greeting}\n${signature}`,
   ].join("\n\n");

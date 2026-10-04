@@ -51,8 +51,9 @@ spamschutz:
     - Ich hab mir dazu schon Gedanken gemacht und etwas vorbereitet. Wann hätten Sie diese Woche kurz 5 bis 10 Minuten?
   gruesse: [Viele Grüße, Beste Grüße, Grüße aus Peißenberg, Liebe Grüße]
   regeln:
-    - reiner Text, keine Bilder, kein HTML-Layout, kein Tracking-Pixel, keine Link-Kürzer
-    - höchstens ein Link (WhatsApp-Business-Link oder Kalender), keine Anhänge in der ersten Mail
+    - schlichter Text, kein HTML-Layout, kein Tracking-Pixel, keine Link-Kürzer; einzige Ausnahme ist das Vorschau-Bild
+      der Startseite (04.10.2026, Physio), eingebettet unter seinem Satz
+    - höchstens ein Link (WhatsApp-Business-Link oder Kalender), sonst keine Anhänge in der ersten Mail
     - keine Spam-Wörter (kostenlos, gratis, Angebot, Rabatt, garantiert, jetzt zuschlagen), keine Großbuchstaben-Wörter, kein "!!!"
     - persönliche Anrede mit Namen aus dem Impressum, sonst "Hallo zusammen" bzw. "Hallo Team {firma}"
     - "von Christians privatem Postfach (Adresse nur in der .env, OUTREACH_FROM), höchstens 10 bis 15 neue Mails am Tag, über den Tag verteilt"
@@ -88,6 +89,16 @@ kontaktweg:
   vorbereitet_mit_entwurf_du:
     - Den Rest zeig ich dir gern kurz, 5 bis 10 Minuten reichen.
     - Mehr dazu zeig ich dir gern in 5 bis 10 Minuten.
+  # Nach dem Terminvorschlag (04.10.2026, Christian): unverbindlich, kostet nichts, nichts zu verlieren. Bewusst ohne
+  # "kostenlos"/"gratis" (Spamfilter). Wird abgewechselt.
+  unverbindlich:
+    - Das Ganze ist unverbindlich und kostet Sie nichts. Wenn es Sie nicht überzeugt, ist das völlig in Ordnung.
+    - Für Sie ist das unverbindlich und ohne Kosten, und wenn es Sie nicht überzeugt, haben Sie nichts verloren.
+    - Das Gespräch ist unverbindlich und kostet nichts. Passt es für Sie nicht, ist das auch kein Problem.
+  unverbindlich_du:
+    - Das Ganze ist unverbindlich und kostet dich nichts. Wenn es dich nicht überzeugt, ist das völlig in Ordnung.
+    - Für dich ist das unverbindlich und ohne Kosten, und wenn es dich nicht überzeugt, hast du nichts verloren.
+    - Das Gespräch ist unverbindlich und kostet nichts. Passt es für dich nicht, ist das auch kein Problem.
   vorbereitet_du:
     - Ich hab dir dazu was vorbereitet und würd das gern kurz mit dir durchgehen, 5 bis 10 Minuten reichen.
     - Dazu hab ich schon was vorbereitet, das ich dir gern kurz zeigen würde. Dauert 5 bis 10 Minuten.
