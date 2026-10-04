@@ -31,17 +31,24 @@ export interface ProbeResult {
   warnings: string[];
 }
 
-/** Bester Lead fürs Morgen-Paket aus den Vorschau-Bild-Branchen (vorgemerkt zuerst, dann Score), mit Audit. */
-export async function pickProbeLead(db: Db, branches: readonly string[]): Promise<Company | null> {
+/**
+ * Zufällige Leads, wie sie ins Morgen-Paket kämen (Vorschau-Bild-Branche, qualifiziert, mit Audit), damit Probeläufe
+ * nicht immer dieselbe Praxis zeigen.
+ */
+export async function pickProbeLeads(db: Db, branches: readonly string[], count: number): Promise<Company[]> {
   const { rows } = await db.query<Company>(
     `select c.* from companies c
       where c.status in ('READY_FOR_CONTACT', 'QUALIFIED') and c.branch_key = any($1::text[])
         and exists (select 1 from audits a where a.company_id = c.id)
-      order by (c.status = 'READY_FOR_CONTACT') desc, c.current_score desc nulls last
-      limit 1`,
-    [branches],
+      order by random()
+      limit $2`,
+    [branches, count],
   );
-  return rows[0] ?? null;
+  return rows;
+}
+
+export async function pickProbeLead(db: Db, branches: readonly string[]): Promise<Company | null> {
+  return (await pickProbeLeads(db, branches, 1))[0] ?? null;
 }
 
 export async function runProbe(

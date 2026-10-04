@@ -9,7 +9,7 @@ import type { LlmGateway } from "../src/llm/gateway.js";
 import { loadOutreachConfig } from "../src/outreach/config.js";
 import { draftEmail } from "../src/outreach/draft.js";
 import { loadMailConfig, textToHtml, type Mailbox, type OutgoingMail } from "../src/outreach/mail.js";
-import { pickProbeLead, runProbe } from "../src/outreach/probe.js";
+import { pickProbeLead, pickProbeLeads, runProbe } from "../src/outreach/probe.js";
 import { sendDraft } from "../src/outreach/send.js";
 import {
   buildTeaser,
@@ -243,6 +243,19 @@ describeDb("Probelauf", () => {
     );
     const picked = await pickProbeLead(db(), ["physiotherapie"]);
     expect(picked?.id).toBe(c.id);
+    // Mehrere: verschiedene Praxen, nie mehr als vorhanden
+    const { company: c2 } = await upsertCompany(db(), { name: "Physio Probe 2", placeId: "probe-2" });
+    await db().query(
+      "update companies set branch_key = 'physiotherapie', status = 'QUALIFIED' where id = $1",
+      [c2.id],
+    );
+    await db().query(
+      `insert into audits (company_id, prompt_version, model, findings, rubric, commercial, summary)
+       values ($1, 'v1', 'm', '[]', '{}', '{}', 's')`,
+      [c2.id],
+    );
+    const several = await pickProbeLeads(db(), ["physiotherapie"], 3);
+    expect(new Set(several.map((x) => x.id))).toEqual(new Set([c.id, c2.id]));
     const sent: OutgoingMail[] = [];
     const box: Mailbox = {
       address: "christian@example.de",
