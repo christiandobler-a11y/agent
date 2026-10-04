@@ -43,8 +43,9 @@ roles:
 # Budget-Wächter: gilt für LLM-Aufrufe UND bezahlte APIs (Places) zusammen. Tag/Monat nach deutscher Zeit.
 # Ist ein Limit erreicht, startet kein neuer kostenpflichtiger Aufruf mehr (laufende werden fertig).
 budget:
-  daily_usd: 5
-  monthly_usd: 80 # Nachtsuche + Morgen-Paket (03.10.2026): grob 2 bis 3 $ am Tag
+  # 04.10.2026 (Christian): Testphase mit 20 → 30 → 45 Mails am Tag; Grenze für die Testphase ca. 150 €.
+  daily_usd: 10
+  monthly_usd: 160
 
 pricing:
   claude-haiku-4-5: { input: 1.0, output: 5.0, cache_read: 0.1 }
