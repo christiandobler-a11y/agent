@@ -16,7 +16,7 @@ import {
   sanitizeDraftText,
   whatsappLink,
 } from "../src/outreach/draft.js";
-import { personFromCompanyName } from "../src/outreach/names.js";
+import { personFromCompanyName, salutationFromFirstName } from "../src/outreach/names.js";
 import { duToIhr, lowerFirst, subjectFor } from "../src/outreach/form.js";
 import { loadBranches } from "../src/pipeline/research/branches.js";
 import { describeDb, useTestDb } from "./helpers/db.js";
@@ -81,7 +81,7 @@ describe("Entwurf (rein)", () => {
         "Physiotherapie Christina Heider",
         "Liebes Praxisteam,",
       ),
-    ).toBe("Liebes Praxisteam,");
+    ).toBe("Grüß Sie, Frau Heider,"); // eindeutiger Vorname
     expect(
       salutationLine(
         "sie",
@@ -89,7 +89,16 @@ describe("Entwurf (rein)", () => {
         "Max Huber Physiotherapeut",
         "Liebes Praxisteam,",
       ),
-    ).toBe("Liebes Praxisteam,");
+    ).toBe("Grüß Sie, Herr Huber,");
+    // Abgeschaltet: nur, was im Impressum steht
+    expect(personalContact("sie", { name: "Max Huber", salutation: null }, "x", false)).toBeNull();
+    // Mehrdeutige Vornamen gehen weiter ans Team
+    expect(salutationLine("sie", { name: "Toni Berger", salutation: null }, "x", "Liebes Praxisteam,")).toBe(
+      "Liebes Praxisteam,",
+    );
+    expect(salutationFromFirstName("Anna-Lena Berg")).toBe("Frau");
+    expect(salutationFromFirstName("Kim Weber")).toBeNull();
+    expect(salutationFromFirstName("Nicola Berg")).toBeNull();
     expect(
       personalContact("sie", { name: null, salutation: null }, "Christina Heider Physiotherapeutin"),
     ).toEqual({
@@ -98,11 +107,11 @@ describe("Entwurf (rein)", () => {
     });
     expect(
       personalContact("sie", { name: null, salutation: null }, "Physiotherapie Pickelmann Mike"),
-    ).toBeNull();
+    ).toEqual({ name: "Mike Pickelmann", salutation: "Herr" });
     expect(personalContact("du", { name: null, salutation: null }, "Physiotherapie Pickelmann Mike")).toEqual(
       {
         name: "Mike Pickelmann",
-        salutation: null,
+        salutation: "Herr",
       },
     );
     expect(
@@ -114,6 +123,7 @@ describe("Entwurf (rein)", () => {
         sie: "Guten Tag {anrede} {nachname},",
         du: "Hallo {vorname},",
         ohne_name: "Hallo zusammen,",
+        vorname_geschlecht: true,
       }),
     ).toBe("Guten Tag Herr Ernst,");
     expect(personFromCompanyName("Franz Physio Murnau")).toBeNull();
@@ -276,14 +286,14 @@ describeDb("E-Mail-Entwurf (Datenbank)", () => {
     expect(d.to).toMatch(/^info@/);
     expect(outreach.spamschutz.betreffe.map((b) => b.replace("{firma}", c.name))).toContain(d.subject);
     expect(d.subject).toContain("Physio Kagerer");
-    // Name im Impressum, aber kein Frau/Herr → Team-Anrede der Branche mit P.S.
-    expect(d.body).toMatch(/^Liebes Praxisteam,\n\nmir ist Ihre Praxis/);
-    expect(d.body).toContain("P.S. Falls sich bei Ihnen jemand anderes");
+    // Name im Impressum ohne Frau/Herr, aber eindeutiger Vorname → persönlich, kein P.S.
+    expect(d.body).toMatch(/^Grüß Sie, Frau Kagerer,\n\nmir ist Ihre Praxis/);
+    expect(d.body).not.toContain("P.S.");
     expect(d.body).not.toMatch(/[–—]/);
     expect(d.body).toMatch(/unverbindlich\. (Hätten Sie|Passt Ihnen) \w+/);
     expect(d.body).not.toContain("wa.me");
     expect(d.body).toMatch(
-      /Christian Dobler\nWebsites für lokale Betriebe · Avelio, Peißenberg\n0151 12345678\n\nP\.S\. /,
+      /Christian Dobler\nWebsites für lokale Betriebe · Avelio, Peißenberg\n0151 12345678$/,
     );
     expect(d.slots).toHaveLength(2);
     expect(d.warnings).toEqual([]);

@@ -11,7 +11,7 @@ import type { OutreachConfig } from "./config.js";
 import { proposeSlots, seedOf } from "./slots.js";
 import { duToIhr, lowerFirst, subjectFor, type Form } from "./form.js";
 import { teaserExists, teaserName, teaserPath } from "../prototype/teaser.js";
-import { personFromCompanyName, personInCompanyName } from "./names.js";
+import { personFromCompanyName, personInCompanyName, salutationFromFirstName } from "./names.js";
 
 /**
  * Kontakt-Entwurf per E-Mail (Phase 2, Stufe 2): Das LLM schreibt nur den Mittelteil (Einstieg, ein starker oder
@@ -116,22 +116,25 @@ const DEFAULT_ANREDE: AnredeConfig = {
   sie: "Grüß Sie, {anrede} {nachname},",
   du: "Servus {vorname},",
   ohne_name: "Hallo Team {firma},",
+  vorname_geschlecht: true,
 };
 
 /**
- * Wen die Mail persönlich anspricht: bei "sie" nur mit feststehendem Frau/Herr (Impressum oder weibliche
- * Berufsbezeichnung im Firmennamen), bei "du" reicht der Vorname. Das Geschlecht wird nie geraten; ohne geht die
- * Mail ans Team (04.10.2026, Christian: kein "Hallo Christina Heider,").
+ * Wen die Mail persönlich anspricht: bei "sie" nur mit Frau/Herr (Impressum, weibliche Berufsbezeichnung im
+ * Firmennamen oder eindeutiger Vorname), bei "du" reicht der Vorname. Sonst geht die Mail ans Team (04.10.2026,
+ * Christian: kein "Hallo Christina Heider,", aber auch nicht ständig "Liebes Praxisteam").
  */
 export function personalContact(
   form: Form,
   contact: { name: string | null; salutation: "Herr" | "Frau" | null },
   companyName: string,
+  byFirstName = DEFAULT_ANREDE.vorname_geschlecht,
 ): { name: string; salutation: "Herr" | "Frau" | null } | null {
   const fromName = contact.name?.trim() ? null : personInCompanyName(companyName);
   const name = contact.name?.trim() || fromName?.name;
   if (!name) return null;
-  const salutation = contact.salutation ?? fromName?.salutation ?? null;
+  const salutation =
+    contact.salutation ?? fromName?.salutation ?? (byFirstName ? salutationFromFirstName(name) : null);
   if (form === "sie" && !salutation) return null;
   if (form === "ihr") return null;
   return { name, salutation };
@@ -146,7 +149,7 @@ export function salutationLine(
   team?: string | null,
   anrede: AnredeConfig = DEFAULT_ANREDE,
 ): string {
-  const person = personalContact(form, contact, companyName);
+  const person = personalContact(form, contact, companyName, anrede.vorname_geschlecht);
   if (!person) return team ?? anrede.ohne_name.replace("{firma}", shortCompanyName(companyName));
   const parts = person.name.split(/\s+/);
   if (form !== "sie") return anrede.du.replace("{vorname}", parts[0]!);
@@ -257,7 +260,12 @@ export async function draftEmail(
   const name = impressumName ?? personFromCompanyName(company.name);
   const duBranch = company.branch_key !== null && o.du_branchen.includes(company.branch_key);
   const form: Form = !duBranch ? "sie" : name ? "du" : "ihr";
-  const personal = personalContact(form, { name: impressumName, salutation }, company.name);
+  const personal = personalContact(
+    form,
+    { name: impressumName, salutation },
+    company.name,
+    o.anrede.vorname_geschlecht,
+  );
   const team = !personal && company.branch_key ? (o.team_anrede[company.branch_key] ?? null) : null;
   const du = form !== "sie";
   const inForm = (sieText: string, duText: string) =>

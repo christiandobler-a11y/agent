@@ -50,11 +50,20 @@ export const outreachConfigSchema = z.object({
   // Warum eine gute Website für die Branche zählt (geht als Kontext an das LLM, Rolle contact).
   branche_kontext: z.record(z.string(), z.string()).default({}),
   // Grußzeile: {anrede} {nachname} nur mit feststehendem Frau/Herr, {vorname} bei du, sonst ans Team.
-  anrede: z.object({ sie: z.string(), du: z.string(), ohne_name: z.string() }).default({
-    sie: "Grüß Sie, {anrede} {nachname},",
-    du: "Servus {vorname},",
-    ohne_name: "Hallo Team {firma},",
-  }),
+  anrede: z
+    .object({
+      sie: z.string(),
+      du: z.string(),
+      ohne_name: z.string(),
+      // Frau/Herr aus einem eindeutigen Vornamen, wenn das Impressum es nicht sagt (src/outreach/names.ts).
+      vorname_geschlecht: z.boolean().default(true),
+    })
+    .default({
+      sie: "Grüß Sie, {anrede} {nachname},",
+      du: "Servus {vorname},",
+      ohne_name: "Hallo Team {firma},",
+      vorname_geschlecht: true,
+    }),
   // Ohne Ansprechpartner: Anrede ans Team und Bitte um Weiterleitung, je Branche (sonst anrede.ohne_name).
   team_anrede: z
     .record(

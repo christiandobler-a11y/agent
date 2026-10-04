@@ -32,6 +32,7 @@ ausprobieren kann. Nach Schritt 6 ist ein Abstimmungstermin (Kalibrierung) vorge
   in Lexware (`src/outreach/offer.ts`, Brutto-Preise und Inhalt in `config/angebot.yaml`)
 - Termin bestätigen: Antwort-Meldung zeigt die angebotenen Termine als Knöpfe; `src/outreach/confirm.ts` schreibt die
   Bestätigung (mit .ics) im Verlauf, nach dem Senden Status „interessiert“ und Erinnerung (`config/outreach.yaml → bestaetigung`)
+- `npm run cli -- anrede [N]`: Grußzeile der nächsten N Kandidaten fürs Morgen-Paket mit Quelle (ohne LLM)
 - `npm run cli -- chat "…"`: Manager-Agent ohne Telegram befragen (gleicher Verlauf wie der Chat)
 - `npm run cli -- calibrate [export|--file|rate <firma> <A|B|C|X>]`: Golden Set (Telegram `/kalibrieren`, standardmäßig
   nur die Branchen aus `autopilot.yaml → suche.branchen`, `/kalibrieren alle`; `/auswertung`); `tests/golden/golden.json`
@@ -88,7 +89,7 @@ ausprobieren kann. Nach Schritt 6 ist ein Abstimmungstermin (Kalibrierung) vorge
   Manager-Werkzeuge `set_status`/`add_note`/`add_reminder`/`pipeline`); jeder Wechsel, jede Notiz und Erinnerung steht
   in `interactions` (`src/db/crm.ts`). Erinnerungen stellt der Sweep zu, nie in der Ruhezeit (`config/crm.yaml`).
 - **Kontakt-Entwürfe:** Das LLM (Rolle `contact`) schreibt nur Anrede und Mittelteil; Betreff, Termine
-  (`src/outreach/slots.ts`), Kontaktweg, Grußzeile („Grüß Sie, Frau X,“ nur mit feststehendem Frau/Herr, sonst ans Team;
+  (`src/outreach/slots.ts`), Kontaktweg, Grußzeile („Grüß Sie, Frau X,“ mit Frau/Herr aus Impressum oder eindeutigem Vornamen `names.ts`, sonst ans Team;
   `anrede`), Gruß und Signatur setzt Code nach `config/outreach.yaml` (keine Gedankenstriche,
   ein Befund, Abwechslung gegen Spamfilter). Entwürfe stehen als `interactions.type = 'draft'` mit angebotenen Terminen
   in `meta`. **Avelio sendet nur auf Knopfdruck** (`sendDraft` in `src/outreach/send.ts`, über Christians Postfach aus

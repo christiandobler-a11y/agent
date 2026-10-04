@@ -6,6 +6,10 @@ import { dbStatus } from "./db/status.js";
 import { costReport } from "./db/costs.js";
 import { loadMailConfig } from "./outreach/mail.js";
 import { seedBoxesFromEnv } from "./outreach/seed.js";
+import { loadOutreachConfig } from "./outreach/config.js";
+import { recipient, salutationLine } from "./outreach/draft.js";
+import { personFromCompanyName } from "./outreach/names.js";
+import { loadAutopilotConfig } from "./autopilot/plan.js";
 import { createBudgetGuard } from "./llm/budget.js";
 import { loadModelsConfig } from "./llm/config.js";
 import { createAnthropicMessages, createLlmGateway } from "./llm/gateway.js";
@@ -294,7 +298,53 @@ async function seedCheck(): Promise<number> {
   process.exit(failed > 0 ? 1 : 0);
 }
 
+/** Anrede der nächsten Kandidaten fürs Morgen-Paket prüfen (ohne LLM, verschickt nichts). */
+async function greetings(args: string[]): Promise<number> {
+  const { DATABASE_URL } = requireKeys(loadEnv(), ["DATABASE_URL"]);
+  const n = Number(args[0] ?? 20) || 20;
+  const o = loadOutreachConfig();
+  const branches = loadAutopilotConfig().neue_kontakte.branchen ?? [];
+  const db = createDb(DATABASE_URL, { max: 1 });
+  try {
+    const { rows } = await db.query<Company>(
+      `select c.* from companies c
+        where c.status in ('READY_FOR_CONTACT', 'QUALIFIED')
+          and (cardinality($2::text[]) = 0 or c.branch_key = any($2))
+          and not exists (select 1 from interactions i
+                           where i.company_id = c.id and i.type = 'draft' and i.meta ? 'sent_at')
+        order by (c.status = 'READY_FOR_CONTACT') desc, c.current_score desc nulls last limit $1`,
+      [n, branches],
+    );
+    const counts = { persönlich: 0, team: 0 };
+    for (const c of rows) {
+      const person = await recipient(db, c.id);
+      const team = o.team_anrede[c.branch_key ?? ""]?.anrede ?? null;
+      const line = salutationLine("sie", person, c.name, team, o.anrede);
+      const toTeam = line === team || line.startsWith("Grüß Gott") || line.startsWith("Hallo Team");
+      const source = person.salutation
+        ? "Frau/Herr aus dem Impressum"
+        : person.name
+          ? toTeam
+            ? "Vorname mehrdeutig"
+            : "aus dem Vornamen"
+          : personFromCompanyName(c.name)
+            ? "aus dem Firmennamen"
+            : "kein Name im Impressum";
+      if (toTeam) counts.team++;
+      else counts.persönlich++;
+      console.log(
+        `${line.padEnd(34)} ${c.name.slice(0, 45).padEnd(46)} Name: ${person.name ?? "–"} (${source})${person.email ? "" : " · keine Mail"}`,
+      );
+    }
+    console.log(`\n${counts.persönlich} persönlich, ${counts.team} ans Team`);
+    return 0;
+  } finally {
+    await db.end();
+  }
+}
+
 const commands: Record<string, (args: string[]) => Promise<number>> = {
+  anrede: greetings,
   "seed-check": seedCheck,
   search,
   coverage,

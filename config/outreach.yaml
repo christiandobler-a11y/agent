@@ -38,11 +38,14 @@ bestaetigung:
 # Ohne Namen mit Frau/Herr (Impressum, Firmenname) geht die Mail ans Team, mit der Bitte, sie an die
 # Leitung weiterzugeben (04.10.2026, Christian: "Hallo Team Christina Heider Physiotherapeutin" ist zu generisch).
 # Grußzeile mit Namen (04.10.2026, Christian: kein Vor- und Nachname, lieber bayerisch "Grüß Sie, Frau Heider,").
-# Frau/Herr nur, wenn es feststeht (Impressum, "Inhaberin", "Physiotherapeutin"); sonst geht die Mail ans Team.
+# Frau/Herr aus dem Impressum ("Frau", "Inhaberin", "Physiotherapeutin") oder einem eindeutigen Vornamen, sonst ans Team.
 anrede:
   sie: "Grüß Sie, {anrede} {nachname},"
   du: "Servus {vorname},"
   ohne_name: "Grüß Gott, liebes Team von {firma},"
+  # Steht im Impressum nur "Inhaber: Max Huber": Frau/Herr aus eindeutigen Vornamen (src/outreach/names.ts);
+  # mehrdeutige (Toni, Kim …) gehen weiter ans Team. false = nur, was im Impressum steht.
+  vorname_geschlecht: true
 
 team_anrede:
   physiotherapie:
