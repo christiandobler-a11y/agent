@@ -27,5 +27,5 @@ teaser:
   # vital = großes Foto mit Petrol-Schleier und Bogen (angelehnt an revitalis-physio.de),
   # rund = Pillen-Kopfleiste, ovales Foto, Leistungs-Kacheln (Vorbilder CORPORE und Burkart),
   # mix = am Rechner rund, am Handy vital mit den vier Leistungen als runde Kacheln darunter
-  stil: rund # 04.10.2026 Christian: mix gefällt nicht, "lieber doch bei Version 1 bleiben" (rund)
+  stil: vital # 04.10.2026 Christian: rund und mix ausprobiert, "das vorherige hat mir am meisten gefallen"
   geraete: true # Startseite auf Laptop und Smartphone nebeneinander (alle Stile außer welt)
