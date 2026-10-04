@@ -170,9 +170,10 @@ export async function sendDraft(deps: SendDeps, draftId: string, by: string): Pr
     throw err;
   }
   await db.query(
-    `update interactions set meta = (meta - 'sending_at') || jsonb_build_object('sent_at', $2::text, 'message_id', $3::text)
+    `update interactions set meta = (meta - 'sending_at')
+        || jsonb_build_object('sent_at', $2::text, 'message_id', $3::text, 'from', $4::text)
       where id = $1`,
-    [draftId, now.toISOString(), messageId],
+    [draftId, now.toISOString(), messageId, deps.mailbox.address],
   );
 
   const { rows: companies } = await db.query<Company>("select * from companies where id = $1", [

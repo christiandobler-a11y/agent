@@ -13,6 +13,9 @@ neue_kontakte:
     - { ab_tag: 7, pro_tag: 30 }
     - { ab_tag: 14, pro_tag: 45 }
   nur_werktags: true # Mo bis Fr; am Wochenende nur Nachfassen
+  # Nur Leads dieser Branchen (04.10.2026: Fokus Physio). [] = alle Branchen. Von Christian vorgemerkte Leads
+  # ("bereit für Kontakt") kommen immer dran.
+  branchen: [physiotherapie]
   # Bremse: Kommen in den letzten `tage` Tagen mehr als `quote` der Mails als unzustellbar zurück (ab `mindestens`
   # gesendeten), geht es eine Stufe zurück und der Morgenbericht sagt es. Unzustellbare schaden dem Ruf am meisten.
   bremse: { quote: 0.05, mindestens: 20, tage: 7 }

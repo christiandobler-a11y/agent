@@ -26,6 +26,8 @@ export const autopilotConfigSchema = z.object({
   neue_kontakte: z.object({
     stufen: z.array(z.object({ ab_tag: z.number().int().min(0), pro_tag: z.number().int().min(0) })).min(1),
     nur_werktags: z.boolean(),
+    /** Nur Leads dieser Branchen (fehlt = Branchen der Nachtsuche, [] = alle). Vorgemerkte immer. */
+    branchen: z.array(z.string()).optional(),
     bremse: z
       .object({
         quote: z.number().min(0).max(1),
@@ -67,6 +69,8 @@ export interface PlanDeps {
   mx: MxCheck;
   /** Ablage der Brief-PDFs (z. B. data/letters). */
   lettersDir: string;
+  /** Absender-Adresse (OUTREACH_MAIL_ADDRESS): das Aufwärmen zählt je Adresse. */
+  senderAddress?: string | null;
 }
 
 export interface PlanBuildResult {
@@ -152,10 +156,16 @@ export function chooseChannel(
   return null;
 }
 
-async function firstSentAt(db: Db): Promise<Date | null> {
+/**
+ * Erste gesendete Mail dieser Absender-Adresse (Aufwärmen gilt je Adresse: Wechsel vom privaten Postfach auf
+ * christian@avelio.digital beginnt wieder bei der ersten Stufe). Ohne bekannte Adresse: erste Mail überhaupt.
+ */
+async function firstSentAt(db: Db, from: string | null | undefined): Promise<Date | null> {
   const { rows } = await db.query<{ first: Date | null }>(
     `select min((meta->>'sent_at')::timestamptz) as first from interactions
-      where type = 'draft' and channel = 'email' and meta ? 'sent_at'`,
+      where type = 'draft' and channel = 'email' and meta ? 'sent_at'
+        and ($1::text is null or lower(meta->>'from') = lower($1))`,
+    [from ?? null],
   );
   return rows[0]?.first ?? null;
 }
@@ -196,17 +206,24 @@ async function planLetter(
 }
 
 /** Neue Kandidaten: vorgemerkt zuerst, dann qualifiziert nach Score; nie schon angeschrieben oder heute geplant. */
-async function candidates(db: Db, date: string, limit: number): Promise<Company[]> {
+async function candidates(
+  db: Db,
+  date: string,
+  limit: number,
+  branches: readonly string[],
+): Promise<Company[]> {
+  // Von Christian vorgemerkte (READY_FOR_CONTACT) immer, sonst nur die Fokus-Branchen (leer = alle).
   const { rows } = await db.query<Company>(
     `select c.* from companies c
-      where c.status in ('READY_FOR_CONTACT', 'QUALIFIED')
+      where (c.status = 'READY_FOR_CONTACT'
+             or (c.status = 'QUALIFIED' and (cardinality($3::text[]) = 0 or c.branch_key = any($3))))
         and not exists (select 1 from outreach_plan p
                          where p.company_id = c.id and (p.plan_date = $1 or p.status in ('done', 'dropped')))
         and not exists (select 1 from interactions i
                          where i.company_id = c.id and i.type = 'draft' and i.meta ? 'sent_at')
       order by (c.status = 'READY_FOR_CONTACT') desc, c.current_score desc nulls last
       limit $2`,
-    [date, limit],
+    [date, limit, branches],
   );
   return rows;
 }
@@ -282,7 +299,13 @@ export async function buildDailyPlan(deps: PlanDeps, by = "autopilot"): Promise<
     // 2. Neue Leads.
     const bounces = await recentBounces(db, now, config.neue_kontakte.bremse.tage);
     const spamSeen = await recentSeedProblem(db, now);
-    const { count: target, braked } = dailyNewCount(config, now, await firstSentAt(db), bounces, spamSeen);
+    const { count: target, braked } = dailyNewCount(
+      config,
+      now,
+      await firstSentAt(db, deps.senderAddress),
+      bounces,
+      spamSeen,
+    );
     if (braked)
       result.warnings.push(
         spamSeen
@@ -291,7 +314,12 @@ export async function buildDailyPlan(deps: PlanDeps, by = "autopilot"): Promise<
       );
     const already = (await planItems(db, date)).filter((i) => i.kind === "new").length;
     let lettersLeft = config.briefe.pro_tag;
-    for (const company of await candidates(db, date, Math.max(0, target - already) * 3)) {
+    for (const company of await candidates(
+      db,
+      date,
+      Math.max(0, target - already) * 3,
+      config.neue_kontakte.branchen ?? config.suche.branchen,
+    )) {
       if (result.emails + result.letters + already >= target) break;
       await isolated(company, result, async () => {
         const person = await recipient(db, company.id);

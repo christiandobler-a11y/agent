@@ -147,6 +147,7 @@ export async function createApp(options: { notifier?: Notifier; worker?: boolean
       },
       mx: createMxCheck(),
       lettersDir: "data/letters",
+      senderAddress: mailbox?.address ?? null,
     }),
   };
 

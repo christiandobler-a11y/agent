@@ -273,7 +273,7 @@ describeDb("Morgen-Paket mit Datenbank", () => {
   const mail = { ...loadMailConfig(), max_per_day: 2 };
 
   async function lead(
-    over: { score?: number; email?: string | null; street?: string | null } = {},
+    over: { score?: number; email?: string | null; street?: string | null; branch?: string } = {},
   ): Promise<Company> {
     const { company } = await upsertCompany(db(), {
       name: `Praxis ${++n}`,
@@ -281,8 +281,13 @@ describeDb("Morgen-Paket mit Datenbank", () => {
       city: "Rosenheim",
     });
     await db().query(
-      "update companies set status = 'QUALIFIED', current_score = $2, street = $3, postal_code = '83022' where id = $1",
-      [company.id, over.score ?? 70, over.street === undefined ? "Hauptstr. 1" : over.street],
+      "update companies set status = 'QUALIFIED', current_score = $2, street = $3, postal_code = '83022', branch_key = $4 where id = $1",
+      [
+        company.id,
+        over.score ?? 70,
+        over.street === undefined ? "Hauptstr. 1" : over.street,
+        over.branch ?? "physiotherapie",
+      ],
     );
     if (over.email !== null)
       await db().query(
@@ -806,6 +811,8 @@ describeDb("Morgen-Paket mit Datenbank", () => {
     await db().query("delete from outreach_plan");
     const bad = await lead({ score: 79 });
     const good = await lead({ score: 70 });
+    // Andere Branche mit mehr Punkten: nicht im Fokus (autopilot.yaml → neue_kontakte.branchen), bleibt draußen.
+    await lead({ score: 95, branch: "hotel" });
     const structured = vi.fn((req: { companyId?: string }) =>
       req.companyId === bad.id
         ? Promise.reject(new Error("Modell überlastet"))
