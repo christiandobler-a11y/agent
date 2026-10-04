@@ -58,7 +58,9 @@ export type MailEvent =
       /** Angebotene Termine der ersten Mail (zum Bestätigen per Knopf). */
       offer?: { draftId: string; slots: string[] };
     }
-  | { kind: "bounce"; companyId: string; companyName: string; address: string };
+  | { kind: "bounce"; companyId: string; companyName: string; address: string }
+  /** Abwesenheitsnotiz o. Ä.: nur zur Info, Nachfassen bleibt aktiv. */
+  | { kind: "auto_reply"; companyId: string; companyName: string; subject: string | null; excerpt: string };
 
 const log = (msg: string, extra: Record<string, unknown>) =>
   console.log(JSON.stringify({ level: "info", msg, ...extra }));

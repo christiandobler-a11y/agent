@@ -27,10 +27,16 @@ export function telegramNotifier(
     const id = m ? Number(m[1]) : null;
     return id !== null && allowedChatIds.includes(id) ? [id] : [...allowedChatIds];
   };
-  const sendAll = async (ids: number[], text: string, keyboard?: InlineKeyboardButton[][]) => {
+  const sendAll = async (
+    ids: number[],
+    text: string,
+    keyboard?: InlineKeyboardButton[][],
+    silent = false,
+  ) => {
     for (const id of ids) {
       await api.sendMessage(id, text, {
         parse_mode: "HTML",
+        ...(silent ? { disable_notification: true } : {}),
         link_preview_options: { is_disabled: true },
         ...(keyboard && keyboard.length > 0 ? { reply_markup: { inline_keyboard: keyboard } } : {}),
       });
@@ -91,7 +97,9 @@ export function telegramNotifier(
     },
     async mailEvent(e) {
       const { text, keyboard } = mailEventMessage(e);
-      await sendAll(targets(), text, keyboard);
+      // Abwesenheitsnotizen still (ohne Ton), sie verlangen nichts sofort.
+      await sendAll(targets(), text, keyboard, e.kind === "auto_reply");
+      if (e.kind === "auto_reply") return;
       // Antwort = XP; neue Level oder Abzeichen gleich mitfeiern.
       if (opts.db) await reportProgress(api, targets(), opts.db, new Date());
     },

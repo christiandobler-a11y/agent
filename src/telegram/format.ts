@@ -486,6 +486,19 @@ export function mailEventMessage(e: MailEvent): { text: string; keyboard: Inline
       keyboard: open,
     };
   }
+  if (e.kind === "auto_reply") {
+    return {
+      text: [
+        `🏖️ <b>Automatische Antwort von ${escapeHtml(e.companyName)}</b>`,
+        e.subject ? `Betreff: ${escapeHtml(e.subject)}` : null,
+        e.excerpt ? `<blockquote expandable>${escapeHtml(e.excerpt)}</blockquote>` : null,
+        "Zählt nicht als Antwort, das Nachfassen bleibt geplant. 👍",
+      ]
+        .filter((l) => l !== null)
+        .join("\n"),
+      keyboard: open,
+    };
+  }
   // Angebotene Termine zum Bestätigen (Christian liest die Antwort und tippt den genannten Termin an).
   const slotButtons: InlineKeyboardButton[][] = [];
   const slots = e.offer?.slots ?? [];

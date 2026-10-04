@@ -90,6 +90,8 @@ export interface IncomingMail {
   subject: string | null;
   date: Date | null;
   text: string;
+  /** Kopfzeilen kennzeichnen die Mail als automatisch erzeugt (Auto-Submitted, X-Autoreply, Precedence …). */
+  autoHeaders?: boolean;
 }
 
 export interface Mailbox {
@@ -175,6 +177,31 @@ export function bounceOf(mail: IncomingMail): { bounced: true; ids: string[] } |
   if (!isBounce) return null;
   const ids = [...mail.text.matchAll(/Message-ID:\s*(<[^>\s]+>)/gi)].map((m) => m[1]!);
   return { bounced: true, ids };
+}
+
+/**
+ * Automatische Antwort (Abwesenheitsnotiz, Eingangsbestätigung)? Kopfzeilen oder typischer Betreff. Solche Mails
+ * zählen nicht als Antwort: kein Statuswechsel, Nachfassen bleibt aktiv (04.10.2026, Christian).
+ */
+export function isAutoReply(mail: Pick<IncomingMail, "subject" | "autoHeaders">): boolean {
+  if (mail.autoHeaders) return true;
+  return /(abwesen|out of (the )?office|automatische antwort|auto(matic)?[ -]?(reply|response|antwort)|autoreply|nicht im büro|eingangsbestätigung|urlaubsnotiz|im urlaub|praxisurlaub|\booo\b)/i.test(
+    mail.subject ?? "",
+  );
+}
+
+/** Kopfzeilen einer automatisch erzeugten Mail (RFC 3834 und gängige Varianten). Rein. */
+export function hasAutoHeaders(get: (name: string) => unknown): boolean {
+  const str = (name: string) => {
+    // mailparser liefert strukturierte Kopfzeilen als { value, params }.
+    const raw = get(name);
+    const v = raw && typeof raw === "object" && "value" in raw ? raw.value : raw;
+    return typeof v === "string" ? v.trim().toLowerCase() : v == null ? "" : JSON.stringify(v).toLowerCase();
+  };
+  const submitted = str("auto-submitted");
+  if (submitted && submitted !== "no") return true;
+  if (str("x-autoreply") || str("x-autorespond") || str("x-autoresponder")) return true;
+  return /auto[_-]reply/.test(str("precedence"));
 }
 
 /** Antworttext ohne zitierte Originalmail, gekürzt (nur zur Anzeige). */
@@ -285,6 +312,7 @@ export function createMailbox(s: MailboxSettings): Mailbox {
               subject: parsed.subject ?? null,
               date: parsed.date ?? null,
               text: (parsed.text ?? "").slice(0, 20_000),
+              autoHeaders: hasAutoHeaders((name) => parsed.headers.get(name)),
             });
           }
           return { uidValidity, maxUid, mails };

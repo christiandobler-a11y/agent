@@ -10,6 +10,7 @@ import { setSalesStatus } from "../db/crm.js";
 import type { MailEvent } from "../queue/notifier.js";
 import {
   bounceOf,
+  isAutoReply,
   matchReply,
   normalizeAddress,
   normalizeId,
@@ -279,7 +280,23 @@ export async function checkReplies(deps: ReplyDeps): Promise<MailEvent[]> {
       }
     } else {
       const companyId = matchReply(mail, sent);
-      if (companyId) {
+      if (companyId && isAutoReply(mail)) {
+        // Abwesenheitsnotiz: nur vermerken, kein Statuswechsel, Nachfassen bleibt (zählt nicht als Antwort).
+        const excerpt = replyExcerpt(mail.text, 300);
+        const company = await noteFor(
+          db,
+          companyId,
+          `Automatische Antwort von ${mail.from ?? "?"}: ${mail.subject ?? ""}\n\n${excerpt}`,
+          now,
+        );
+        events.push({
+          kind: "auto_reply",
+          companyId,
+          companyName: company.name,
+          subject: mail.subject,
+          excerpt,
+        });
+      } else if (companyId) {
         const excerpt = replyExcerpt(mail.text);
         let company = await noteFor(
           db,

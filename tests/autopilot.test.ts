@@ -36,6 +36,8 @@ import {
 import {
   bounceOf,
   loadMailConfig,
+  hasAutoHeaders,
+  isAutoReply,
   matchReply,
   replyExcerpt,
   replySubject,
@@ -220,6 +222,18 @@ describe("Morgen-Paket (rein)", () => {
       ),
     ).toEqual({ bounced: true, ids: ["<m2@example.de>"] });
     expect(bounceOf(incoming({}))).toBeNull();
+    // Abwesenheitsnotizen: Betreff oder Kopfzeilen (mailparser liefert manche als { value, params }).
+    expect(isAutoReply({ subject: "Automatische Antwort: Eine Idee für Ihre Startseite" })).toBe(true);
+    expect(isAutoReply({ subject: "Abwesenheitsnotiz" })).toBe(true);
+    expect(isAutoReply({ subject: "Out of Office: Re: Ein Entwurf" })).toBe(true);
+    expect(isAutoReply({ subject: "AW: Eine Idee für Ihre Startseite" })).toBe(false);
+    expect(isAutoReply({ subject: "AW: Ihre Startseite", autoHeaders: true })).toBe(true);
+    const headers = (h: Record<string, unknown>) => (n: string) => h[n];
+    expect(hasAutoHeaders(headers({ "auto-submitted": { value: "auto-replied", params: {} } }))).toBe(true);
+    expect(hasAutoHeaders(headers({ "auto-submitted": { value: "no", params: {} } }))).toBe(false);
+    expect(hasAutoHeaders(headers({ "x-autoreply": "yes" }))).toBe(true);
+    expect(hasAutoHeaders(headers({ precedence: "auto_reply" }))).toBe(true);
+    expect(hasAutoHeaders(headers({}))).toBe(false);
     expect(replyExcerpt(incoming({}).text)).toBe("Hallo Christian,\ngern, Dienstag passt.");
     expect(replySubject("Re: Hallo")).toBe("Re: Hallo");
     expect(replySubject("Hallo")).toBe("Re: Hallo");
@@ -350,8 +364,10 @@ describeDb("Morgen-Paket mit Datenbank", () => {
     const deps = { db: db(), mailbox: box, mail: { ...mail, max_per_day: 50 }, now: () => NOW, notify };
     const a = await lead();
     const b = await lead();
+    const c = await lead();
     await sendDraft({ ...deps, followUpDays: 5 }, (await emailDraft(a)).id, "test");
     await sendDraft({ ...deps, followUpDays: 5 }, (await emailDraft(b)).id, "test");
+    await sendDraft({ ...deps, followUpDays: 5 }, (await emailDraft(c)).id, "test");
     box.deliver(incoming({ uid: 5, inReplyTo: `<${idOf(box, 1)}>` })); // vor dem ersten Lauf: alt, zählt nicht
     expect(await checkReplies(deps)).toEqual([]);
     box.deliver(incoming({ uid: 11, inReplyTo: `<${idOf(box, 1)}>`, from: "chef@irgendwo.de" }));
@@ -363,9 +379,30 @@ describeDb("Morgen-Paket mit Datenbank", () => {
         text: `Message-ID: <${idOf(box, 2)}>`,
       }),
     );
+    box.deliver(
+      incoming({
+        uid: 13,
+        inReplyTo: `<${idOf(box, 3)}>`,
+        subject: "Abwesenheitsnotiz",
+        text: "Ich bin bis 16.10. im Urlaub.",
+        autoHeaders: true,
+      }),
+    );
     const events = await checkReplies(deps);
-    expect(events.map((e) => e.kind)).toEqual(["reply", "bounce"]);
-    expect(notify).toHaveBeenCalledTimes(2);
+    expect(events.map((e) => e.kind)).toEqual(["reply", "bounce", "auto_reply"]);
+    expect(notify).toHaveBeenCalledTimes(3);
+    // Abwesenheitsnotiz: kein Statuswechsel, Nachfassen bleibt.
+    const { rows: cRows } = await db().query<{ status: string }>(
+      "select status from companies where id = $1",
+      [c.id],
+    );
+    expect(cRows[0]!.status).toBe("CONTACTED");
+    const { rows: cRem } = await db().query<{ n: number }>(
+      "select count(*)::int as n from interactions where company_id = $1 and type = 'reminder' and done_at is null",
+      [c.id],
+    );
+    expect(cRem[0]!.n).toBe(1);
+    expect(mailEventMessage(events[2]!).text).toContain("Zählt nicht als Antwort");
     const { rows } = await db().query<{ id: string; status: string }>(
       "select id, status from companies where id = any($1)",
       [[a.id, b.id]],
