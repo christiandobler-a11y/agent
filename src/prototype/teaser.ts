@@ -686,6 +686,8 @@ interface RestTheme {
   /** Kopf-Streifen: Foto mit Farbschleier (vital) oder Farbflächen (elementa). */
   stub: "photo" | "shapes";
   veil?: string;
+  shapeAccent?: string;
+  shapeDark?: string;
 }
 const VITAL_THEME: RestTheme = { primary: "#1f5f68", accent: "#e46a1c", ink: "#24515a", stub: "photo" };
 const ELEMENTA_THEME: RestTheme = { primary: "#1f2633", accent: "#c48a00", ink: "#1f2633", stub: "shapes" };
@@ -778,7 +780,7 @@ h2{font-family:"Barlow Condensed",sans-serif;font-weight:600;font-size:30px;colo
 <div class="hero">${
     theme.stub === "photo"
       ? `<img src="${assets.photo(photo.file)}" alt="">`
-      : `<svg class="shapes" viewBox="0 0 390 120" preserveAspectRatio="none" aria-hidden="true"><rect width="390" height="120" fill="#a9aeb3"/><path d="M0 0H150L0 70Z" fill="#ffd24c"/><path d="M250 0H390V90Z" fill="#2b303b"/><path d="M390 60V120H200Z" fill="#ffd24c"/></svg>`
+      : `<svg class="shapes" viewBox="0 0 390 120" preserveAspectRatio="none" aria-hidden="true"><rect width="390" height="120" fill="#a9aeb3"/><path d="M0 0H150L0 70Z" fill="${theme.shapeAccent ?? "#ffd24c"}"/><path d="M250 0H390V90Z" fill="${theme.shapeDark ?? "#2b303b"}"/><path d="M390 60V120H200Z" fill="${theme.shapeAccent ?? "#ffd24c"}"/></svg>`
   }<span>Termin vereinbaren</span>
 <svg class="wave" viewBox="0 0 390 46" preserveAspectRatio="none" aria-hidden="true"><path fill="#fff" d="M0 18 C 110 0, 190 46, 300 34 S 370 12, 390 20 L390 46 L0 46 Z"/></svg></div>
 ${statsHtml}
@@ -798,6 +800,8 @@ ${statsHtml}
  * Knopf, Adresse und Telefon, grüner Anruf-Knopf. Das Praxisfoto liegt gedämpft dahinter.
  */
 function renderElementa(d: TeaserData, assets: TeaserAssets): string {
+  // Farben aus der Farbwelt (teaser.farbe): Dreiecke in Akzent, Hauptfarbe und Hellgrau.
+  const pal = paletteOf(d);
   const { title } = teaserName(d.name, d.city);
   const photo = photoFor(d);
   const city = d.city?.trim() || null;
@@ -825,25 +829,25 @@ function renderElementa(d: TeaserData, assets: TeaserAssets): string {
 ${fonts}
 *{box-sizing:border-box;margin:0;padding:0}
 html,body{width:1440px;height:900px;overflow:hidden}
-body{position:relative;font-family:Manrope,sans-serif;-webkit-font-smoothing:antialiased;color:#1f2633;background:#a9aeb3}
+body{position:relative;font-family:Manrope,sans-serif;-webkit-font-smoothing:antialiased;color:${pal.ink};background:#a9aeb3}
 .photo{position:absolute;inset:0;width:100%;height:100%;object-fit:cover;object-position:${photo.position};filter:grayscale(.35)}
-.veil{position:absolute;inset:0;background:rgba(58,63,72,.62)}
+.veil{position:absolute;inset:0;background:${pal.veil};opacity:.85}
 .shapes{position:absolute;inset:0;width:100%;height:100%}
 header{position:absolute;z-index:5;top:20px;left:70px;right:70px;height:78px;background:#fff;border-radius:18px;display:flex;align-items:center;justify-content:space-between;padding:0 16px 0 18px;box-shadow:0 10px 30px rgba(0,0,0,.08)}
 .brand{display:flex;align-items:center;gap:12px}
-.ring{width:56px;height:56px;border-radius:50%;border:2px solid #1f2633;display:grid;place-items:center}
-.ring i{width:22px;height:22px;border-radius:50%;border:4px solid #1f2633}
+.ring{width:56px;height:56px;border-radius:50%;border:2px solid ${pal.primary};display:grid;place-items:center}
+.ring i{width:22px;height:22px;border-radius:50%;border:4px solid ${pal.accent}}
 .brand b{display:block;font-weight:600;font-size:${title.length <= 24 ? 24 : 19}px;letter-spacing:-.01em;max-width:420px;line-height:1.1}
 .brand small{display:block;font-weight:800;font-size:9px;letter-spacing:.14em;margin-top:2px}
-nav{display:flex;align-items:center;gap:22px;font-weight:800;font-size:14px}
+nav{display:flex;align-items:center;gap:22px;font-weight:800;font-size:14px;color:${pal.ink}}
 .btn{border-radius:8px;padding:12px 16px;font-weight:800;font-size:14px}
-.dark{background:#1f2633;color:#fff}.yellow{background:#ffd24c;color:#fff}
+.dark{background:${pal.primary};color:#fff}.yellow{background:${pal.accent};color:#fff}
 .center{position:absolute;z-index:4;left:0;right:0;top:250px;text-align:center;color:#fff}
 h1{font-weight:800;font-size:${size}px;line-height:1.08;letter-spacing:-.01em;max-width:1050px;margin:0 auto}
 h2{font-weight:800;font-size:${Math.round(size * 0.62)}px;margin-top:6px}
 .row{display:flex;justify-content:center;gap:10px;margin-top:40px}
 .big{width:272px;height:52px;border-radius:8px;display:grid;place-items:center;font-weight:800;font-size:17px}
-.big.y{background:#ffd24c;color:#fff}.big.w{background:#fff;color:#1f2633}
+.big.y{background:${pal.accent};color:#fff}.big.w{background:#fff;color:${pal.ink}}
 .meta{margin-top:30px;font-weight:800;font-size:17px;line-height:1.7}
 .meta div{display:flex;align-items:center;justify-content:center;gap:8px}
 .star{position:absolute;z-index:6;right:150px;top:228px;width:124px;height:124px;transform:rotate(14deg)}
@@ -856,16 +860,16 @@ h2{font-weight:800;font-size:${Math.round(size * 0.62)}px;margin-top:6px}
 <img class="photo" src="${assets.photo(photo.file)}" alt="">
 <div class="veil"></div>
 <svg class="shapes" viewBox="0 0 1440 900" preserveAspectRatio="none" aria-hidden="true">
-  <path d="M0 0H430L0 185Z" fill="#ffd24c"/>
-  <path d="M730 0H1440V210Z" fill="#2b303b"/>
+  <path d="M0 0H430L0 185Z" fill="${pal.accent}"/>
+  <path d="M730 0H1440V210Z" fill="${pal.primary}"/>
   <path d="M0 595L715 900H0Z" fill="#cfd3d9"/>
-  <path d="M1440 720V900H1010Z" fill="#ffd24c"/>
+  <path d="M1440 720V900H1010Z" fill="${pal.accent}"/>
 </svg>
 <header>
   <div class="brand"><span class="ring"><i></i></span><span><b>${esc(title)}</b><small>PHYSIOTHERAPIE</small></span></div>
   <nav><span>Leistungen</span><span>Praxis</span><span>Team</span><span>Kontakt</span><span class="btn dark">Rezept einreichen</span><span class="btn yellow">Termin vereinbaren</span></nav>
 </header>
-${good ? `<div class="star"><svg viewBox="0 0 100 100" width="124" height="124" aria-hidden="true"><path fill="#ffd24c" d="M50 4l13 30 32 3-24 21 7 32-28-17-28 17 7-32L5 37l32-3z"/></svg><b>${de(d.rating!)}</b><small>Bei Google</small></div>` : ""}
+${good ? `<div class="star"><svg viewBox="0 0 100 100" width="124" height="124" aria-hidden="true"><path fill="${pal.accent}" d="M50 4l13 30 32 3-24 21 7 32-28-17-28 17 7-32L5 37l32-3z"/></svg><b>${de(d.rating!)}</b><small>Bei Google</small></div>` : ""}
 <div class="center">
   <h1>${esc(title)}</h1>
   ${/physio/i.test(title) && !city ? "" : `<h2>${/physio/i.test(title) ? "" : "Physiotherapie "}${city ? `in ${esc(city)}` : ""}</h2>`}
@@ -914,7 +918,14 @@ export function renderTeaserMockup(
             d,
             assets,
             style === "elementa"
-              ? ELEMENTA_THEME
+              ? {
+                  ...ELEMENTA_THEME,
+                  primary: paletteOf(d).primary,
+                  ink: paletteOf(d).ink,
+                  accent: paletteOf(d).accent,
+                  shapeAccent: paletteOf(d).accent,
+                  shapeDark: paletteOf(d).primary,
+                }
               : {
                   ...VITAL_THEME,
                   primary: paletteOf(d).primary,
