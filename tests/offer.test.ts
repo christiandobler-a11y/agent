@@ -1,39 +1,31 @@
-import { existsSync, mkdtempSync } from "node:fs";
-import { tmpdir } from "node:os";
-import { join } from "node:path";
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 import { upsertCompany } from "../src/db/companies.js";
 import {
+  createLexwareQuotation,
   createOffer,
+  grossSplit,
+  LexwareError,
   loadOfferConfig,
   offerSalutation,
-  offerTotals,
-  renderOfferHtml,
+  quotationBody,
 } from "../src/outreach/offer.js";
 import { crmCallback, parseCrmCallback } from "../src/telegram/format.js";
 import { describeDb, useTestDb } from "./helpers/db.js";
 
 const c = loadOfferConfig();
-const data = {
-  number: "A-2026-001",
-  date: new Date("2026-10-04T10:00:00Z"),
+const input = {
   paket: "onepager",
-  company: { name: "Physio <Test>", street: "Hauptstr. 1", postalCode: "82362", city: "Weilheim" },
+  now: new Date("2026-10-04T10:00:00Z"),
+  company: { name: "Physio Test", street: "Hauptstr. 1", postalCode: "82362", city: "Weilheim" },
   salutation: "Sehr geehrte Frau Heider,",
-  sender: {
-    name: "Christian Dobler",
-    line: "Avelio, Peißenberg",
-    address: null,
-    phone: "0151 1",
-    email: null,
-  },
 };
 
 describe("Angebot (rein)", () => {
-  it("Preise netto plus 19 % MwSt., Pakete wie besprochen", () => {
-    expect(offerTotals(c, "onepager")).toEqual({ net: 990, vat: 188.1, gross: 1178.1 });
-    expect(offerTotals(c, "mehrseitig").net).toBe(1290);
-    expect(c.hosting.preis_monat_netto).toBe(29.9);
+  it("Preise sind Endpreise inkl. 19 % MwSt.", () => {
+    expect(c.pakete.onepager!.preis_brutto).toBe(990);
+    expect(c.pakete.mehrseitig!.preis_brutto).toBe(1290);
+    expect(c.hosting.preis_monat_brutto).toBe(29.9);
+    expect(grossSplit(990, 19)).toEqual({ net: 831.93, vat: 158.07 });
   });
 
   it("Anrede förmlich, Geschlecht nur wenn angegeben", () => {
@@ -44,20 +36,58 @@ describe("Angebot (rein)", () => {
     expect(offerSalutation({ name: null, salutation: null })).toBe("Sehr geehrtes Praxisteam,");
   });
 
-  it("Seite: Leistungen einzeln, Summen, Hosting, Fotos, Option, alles escaped", () => {
-    const html = renderOfferHtml(data, c);
-    expect(html).toContain("Physio &lt;Test&gt;");
-    expect(html).toContain("SEO-Grundoptimierung");
-    expect(html).toContain("990,00");
-    expect(html).toContain("1.178,10");
-    expect(html).toContain("29,90");
-    expect(html).toContain("Der erste Monat nach dem Livegang ist kostenlos");
-    expect(html).toContain("Fotos der Praxis und des Teams");
-    expect(html).toContain("KI-Telefonassistent");
-    expect(html).toContain("50 % bei Auftrag, 50 % beim Livegang");
-    expect(html).toContain("Gültig bis: 03.11.2026");
-    expect(html).not.toContain("<script");
-    expect(() => renderOfferHtml({ ...data, paket: "gibtsnicht" }, c)).toThrow();
+  it("Lexware-Entwurf: Brutto-Preis, Leistungen einzeln, Hosting/Fotos/Option als Text, Gültigkeit", () => {
+    const body = quotationBody(c, input) as {
+      voucherDate: string;
+      expirationDate: string;
+      address: Record<string, string>;
+      lineItems: { type: string; name: string; description?: string; unitPrice?: Record<string, unknown> }[];
+      taxConditions: { taxType: string };
+      introduction: string;
+      remark: string;
+    };
+    expect(body.taxConditions.taxType).toBe("gross");
+    expect(body.voucherDate).toBe("2026-10-04T00:00:00.000+02:00");
+    expect(body.expirationDate).toBe("2026-11-03T00:00:00.000+01:00");
+    expect(body.address).toEqual({
+      name: "Physio Test",
+      street: "Hauptstr. 1",
+      zip: "82362",
+      city: "Weilheim",
+      countryCode: "DE",
+    });
+    const [main, ...texts] = body.lineItems;
+    expect(main).toMatchObject({
+      type: "custom",
+      name: "Neue Website (Onepager)",
+      unitPrice: { currency: "EUR", grossAmount: 990, taxRatePercentage: 19 },
+    });
+    expect(main!.description).toContain("• SEO-Grundoptimierung");
+    expect(texts.every((t) => t.type === "text")).toBe(true);
+    expect(texts[0]!.name).toContain("29,90");
+    expect(texts[0]!.description).toContain("erste Monat nach dem Livegang ist kostenlos");
+    expect(texts.map((t) => t.name)).toContain("Was ich von Ihnen brauche");
+    expect(texts.at(-1)!.description).toContain("KI-Telefonassistent");
+    expect(body.introduction.startsWith("Sehr geehrte Frau Heider,")).toBe(true);
+    expect(body.remark).toContain("50 % bei Auftrag, 50 % beim Livegang");
+    expect(() => quotationBody(c, { ...input, paket: "gibtsnicht" })).toThrow();
+  });
+
+  it("API: Bearer-Schlüssel, Entwurf, verständliche Fehler", async () => {
+    const ok = vi.fn((_url: string, _init: RequestInit) =>
+      Promise.resolve(new Response(JSON.stringify({ id: "q-1", resourceUri: "x" }), { status: 200 })),
+    );
+    expect(await createLexwareQuotation(ok as unknown as typeof fetch, "key", { a: 1 })).toBe("q-1");
+    const [url, init] = ok.mock.calls[0]!;
+    expect(url).toBe("https://api.lexware.io/v1/quotations");
+    expect((init.headers as Record<string, string>).Authorization).toBe("Bearer key");
+    const denied = () => Promise.resolve(new Response('{"message":"no"}', { status: 401 }));
+    await expect(createLexwareQuotation(denied as unknown as typeof fetch, "key", {})).rejects.toThrow(
+      LexwareError,
+    );
+    await expect(createLexwareQuotation(denied as unknown as typeof fetch, "key", {})).rejects.toThrow(
+      /Schlüssel ungültig/,
+    );
   });
 
   it("Knöpfe auf der Lead-Karte", () => {
@@ -70,33 +100,39 @@ describe("Angebot (rein)", () => {
 describeDb("Angebot mit Datenbank", () => {
   const db = useTestDb();
 
-  it("legt PDF ab, nummeriert je Jahr fortlaufend und vermerkt es im Verlauf", async () => {
+  it("legt den Entwurf an, gibt den Lexware-Link zurück und vermerkt es im Verlauf", async () => {
     const { company } = await upsertCompany(db(), {
       name: "Christina Heider Physiotherapeutin",
       placeId: "offer-1",
     });
-    const dir = mkdtempSync(join(tmpdir(), "avelio-offer-"));
-    const deps = {
-      db: db(),
-      render: (html: string) =>
-        Promise.resolve({ pdf: Buffer.from(`%PDF ${html.length}`), png: Buffer.from("png") }),
-      config: c,
-      sender: data.sender,
-      dir,
-      now: () => new Date("2026-10-04T10:00:00Z"),
-    };
-    const a = await createOffer(deps, company, "onepager", "test");
-    const b = await createOffer(deps, company, "mehrseitig", "test");
-    expect([a.number, b.number]).toEqual(["A-2026-001", "A-2026-002"]);
-    expect(existsSync(a.pdf)).toBe(true);
-    expect(a.filename).toBe("Angebot-A-2026-001-christina-heider-physiotherapeutin.pdf");
+    const fetchFn = vi.fn((_url: string, init: RequestInit) => {
+      const body = JSON.parse(init.body as string) as { introduction: string };
+      expect(body.introduction.startsWith("Sehr geehrte Frau Heider,")).toBe(true);
+      return Promise.resolve(new Response(JSON.stringify({ id: "abc-123" }), { status: 200 }));
+    });
+    const r = await createOffer(
+      {
+        db: db(),
+        config: c,
+        apiKey: "key",
+        fetch: fetchFn as unknown as typeof fetch,
+        now: () => new Date("2026-10-04T10:00:00Z"),
+      },
+      company,
+      "mehrseitig",
+      "test",
+    );
+    expect(r).toEqual({
+      id: "abc-123",
+      url: "https://app.lexware.de/permalink/quotations/edit/abc-123",
+      gross: 1290,
+    });
     const { rows } = await db().query<{ body: string }>(
-      "select body from interactions where company_id = $1 and type = 'note' order by created_at, body",
+      "select body from interactions where company_id = $1 and type = 'note'",
       [company.id],
     );
-    expect(rows.map((r) => r.body.replace(/\u00a0/g, " "))).toEqual([
-      "Angebot A-2026-001 erstellt: Neue Website (Onepager), 1.178,10 € brutto",
-      "Angebot A-2026-002 erstellt: Neue Website (mehrseitig), 1.535,10 € brutto",
+    expect(rows.map((x) => x.body.replace(/\u00a0/g, " "))).toEqual([
+      "Angebot in Lexware angelegt (Entwurf): Neue Website (mehrseitig), 1.290,00 €",
     ]);
   });
 });

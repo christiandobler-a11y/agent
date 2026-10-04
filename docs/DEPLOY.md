@@ -212,6 +212,23 @@ Danach `bash /opt/avelio/scripts/deploy.sh`. Ab dem nächsten Morgen um 7 Uhr ko
 geht es mit `/heute`. Grenzen: höchstens 40 neue Mails am Tag (`config/mail.yaml`), geplant sind 15, nach zwei Wochen
 30 (`config/autopilot.yaml`). Ohne App-Passwort funktioniert alles auch, nur mit „✅ Selbst gesendet“ statt „Senden“.
 
+## 13. Lexware verbinden (Angebote per Knopf)
+
+Avelio legt Angebote als **Entwurf** in Lexware an (Lead-Karte → „📄 Angebot Onepager“ bzw. „mehrseitig“). Du öffnest
+den Entwurf per Link, prüfst ihn und verschickst ihn aus Lexware. Avelio verschickt selbst nichts.
+
+1. In Lexware: [app.lexware.de/addons/public-api](https://app.lexware.de/addons/public-api) → Schlüssel erstellen und
+   kopieren (nur einmal sichtbar).
+2. Auf dem Server in die `.env` (`nano /opt/avelio/.env`), nicht in den Chat:
+
+   ```
+   LEXWARE_API_KEY=der-schlüssel
+   ```
+
+3. `bash /opt/avelio/scripts/deploy.sh`
+
+Preise und Leistungen stehen in `config/angebot.yaml` (Endpreise inkl. 19 % MwSt.).
+
 ## Betrieb
 
 | Was | Befehl (auf dem Server, nach `ssh root@<IP>`) |

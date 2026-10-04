@@ -29,7 +29,7 @@ import { gameState, loadGameConfig } from "../game/xp.js";
 import { buildPrototype, type PrototypeDeps } from "../prototype/run.js";
 import { chromiumTeaserShooter } from "../prototype/teaser.js";
 import { pickProbeLead, runProbe } from "../outreach/probe.js";
-import { createOffer, loadOfferConfig } from "../outreach/offer.js";
+import { createOffer, LexwareError, loadOfferConfig } from "../outreach/offer.js";
 import { chromiumLetterRenderer, type LetterRenderer } from "../outreach/letterPdf.js";
 import { raiseBudgetToday } from "../llm/budget.js";
 import { askManager, type ManagerDeps } from "../manager/agent.js";
@@ -529,35 +529,31 @@ export function createBot(options: BotOptions): AvelioBot {
         return;
       }
       if (crm.kind === "offer") {
-        await ctx.answerCallbackQuery({ text: "Erstelle Angebot …" });
-        await ctx.replyWithChatAction("upload_document").catch(() => undefined);
-        const o = options.outreach?.config;
+        const apiKey = process.env.LEXWARE_API_KEY?.trim();
+        if (!apiKey) {
+          await ctx.answerCallbackQuery({
+            text: "Lexware ist noch nicht verbunden: LEXWARE_API_KEY in die .env (siehe docs/DEPLOY.md).",
+            show_alert: true,
+          });
+          return;
+        }
+        await ctx.answerCallbackQuery({ text: "Lege das Angebot in Lexware an …" });
         try {
           const offer = await createOffer(
-            {
-              db: pipeline.db,
-              render: options.outreach?.renderLetter ?? chromiumLetterRenderer(process.env.CHROMIUM_PATH),
-              config: loadOfferConfig(),
-              sender: {
-                name: o?.absender_name ?? "Christian Dobler",
-                line: o?.absender_zusatz ?? null,
-                address: process.env.AVELIO_ANSCHRIFT?.trim() || null,
-                phone: options.outreach?.contact.phone ?? null,
-                email: mailbox?.address ?? (process.env.OUTREACH_MAIL_ADDRESS?.trim() || null),
-              },
-              dir: "data/angebote",
-              now: pipeline.now,
-            },
+            { db: pipeline.db, config: loadOfferConfig(), apiKey, now: pipeline.now },
             company,
             crm.paket,
             by(ctx.chat?.id),
           );
-          await ctx.replyWithDocument(new InputFile(offer.pdf, offer.filename), {
-            caption: `📄 Angebot ${offer.number} für ${company.name}: ${offer.gross.toLocaleString("de-DE", { style: "currency", currency: "EUR" })} brutto einmalig plus Hosting. Kurz prüfen und an die Praxis schicken.`,
-          });
+          await ctx.reply(
+            `📄 Angebot für ${company.name} liegt als Entwurf in Lexware (${offer.gross.toLocaleString("de-DE", { style: "currency", currency: "EUR" })} inkl. MwSt.). Öffnen, prüfen und von dort verschicken.`,
+            { reply_markup: { inline_keyboard: [[{ text: "🧾 In Lexware öffnen", url: offer.url }]] } },
+          );
         } catch (err) {
           log("error", "Angebot fehlgeschlagen", { error: err instanceof Error ? err.message : String(err) });
-          await ctx.reply("Das Angebot hat gerade nicht geklappt. Versuch es bitte gleich noch einmal.");
+          await ctx.reply(
+            `Das Angebot hat nicht geklappt: ${err instanceof LexwareError ? err.message : "bitte gleich noch einmal versuchen"}`,
+          );
         }
         return;
       }

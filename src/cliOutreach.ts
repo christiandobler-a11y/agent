@@ -143,7 +143,7 @@ export async function teaser(argv: string[]): Promise<number> {
   }
 }
 
-/** Angebot als PDF: `avelio angebot <Firma> [onepager|mehrseitig]` schreibt nach data/angebote/. */
+/** Angebot als Entwurf in Lexware: `avelio angebot <Firma> [onepager|mehrseitig]`. */
 export async function angebot(argv: string[]): Promise<number> {
   const last = argv.at(-1);
   const paket = last === "onepager" || last === "mehrseitig" ? last : "onepager";
@@ -164,27 +164,17 @@ export async function angebot(argv: string[]): Promise<number> {
       );
       return 1;
     }
-    const o = loadOutreachConfig();
+    if (!env.LEXWARE_API_KEY) {
+      console.error("LEXWARE_API_KEY fehlt (Schlüssel unter https://app.lexware.de/addons/public-api).");
+      return 1;
+    }
     const offer = await createOffer(
-      {
-        db: app.ctx.db,
-        render: chromiumLetterRenderer(process.env.CHROMIUM_PATH),
-        config: loadOfferConfig(),
-        sender: {
-          name: o.absender_name,
-          line: o.absender_zusatz ?? null,
-          address: process.env.AVELIO_ANSCHRIFT?.trim() || null,
-          phone: env.OUTREACH_PHONE ?? null,
-          email: process.env.OUTREACH_MAIL_ADDRESS?.trim() || null,
-        },
-        dir: "data/angebote",
-        now: app.ctx.now,
-      },
+      { db: app.ctx.db, config: loadOfferConfig(), apiKey: env.LEXWARE_API_KEY, now: app.ctx.now },
       found.company,
       paket,
       "cli",
     );
-    console.log(`Angebot ${offer.number}: ${offer.pdf}`);
+    console.log(`Angebot als Entwurf in Lexware: ${offer.url}`);
     return 0;
   } finally {
     await app.close();

@@ -43,6 +43,8 @@ const envSchema = z.object({
   PREVIEW_BASE_URL: optionalSecret.pipe(z.url().optional()),
   /** Optional: Ping-URL eines Uptime-Dienstes (z. B. Healthchecks.io). Enthält ein Token, nie loggen. */
   HEALTHCHECK_URL: optionalSecret.pipe(z.url().optional()),
+  /** Lexware Office Public API (Angebote als Entwurf anlegen), erstellt unter app.lexware.de/addons/public-api. */
+  LEXWARE_API_KEY: optionalSecret,
 });
 
 export type Env = z.infer<typeof envSchema>;
@@ -52,6 +54,7 @@ export const SECRET_KEYS = [
   "ANTHROPIC_API_KEY",
   "GOOGLE_API_KEY",
   "TELEGRAM_BOT_TOKEN",
+  "LEXWARE_API_KEY",
 ] as const satisfies readonly (keyof Env)[];
 
 export type SecretKey = (typeof SECRET_KEYS)[number];
