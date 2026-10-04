@@ -12,7 +12,7 @@ import {
   loadAutopilotConfig,
   type AutopilotConfig,
 } from "../src/autopilot/plan.js";
-import { autopilotTick, berlinTime } from "../src/autopilot/schedule.js";
+import { autopilotTick, berlinTime, middayText } from "../src/autopilot/schedule.js";
 import { nightOf, nightReport, pickNextSearch, searchTick } from "../src/autopilot/search.js";
 import { loadBranches } from "../src/pipeline/research/branches.js";
 import { loadResearchConfig } from "../src/pipeline/research/run.js";
@@ -237,6 +237,21 @@ describe("Morgen-Paket (rein)", () => {
     expect(replyExcerpt(incoming({}).text)).toBe("Hallo Christian,\ngern, Dienstag passt.");
     expect(replySubject("Re: Hallo")).toBe("Re: Hallo");
     expect(replySubject("Hallo")).toBe("Re: Hallo");
+  });
+
+  it("Mittags-Zwischenstand", () => {
+    const m = { sent: 9, total: 20, queued: 8, lastAt: "15:40", followDone: 0, followTotal: 0, replies: [] };
+    const text = middayText(m, "2026-10-05")!;
+    expect(text).toContain("Mahlzeit");
+    expect(text).toContain("sind 9 gute Dinger raus");
+    expect(text).toContain("8 weitere gehen automatisch raus, die letzte gegen 15:40 Uhr");
+    expect(text).toContain("3 warten noch auf deinen Knopfdruck");
+    expect(text).toContain("Gemeldet hat sich noch keiner");
+    expect(middayText({ ...m, replies: ["Physio Inn"] }, "2026-10-05")).toContain(
+      "Gemeldet hat sich schon Physio Inn 🎉",
+    );
+    expect(middayText({ ...m, sent: 0, queued: 0 }, "2026-10-05")).toContain("20 Mails liegen bereit");
+    expect(middayText({ ...m, total: 0 }, "2026-10-05")).toBeNull();
   });
 
   it("MX-Prüfung: ohne MX kein Versand, Ergebnis je Domain gemerkt", async () => {

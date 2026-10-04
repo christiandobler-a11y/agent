@@ -3,6 +3,7 @@
 zeiten:
   vorbereiten: "05:00" # Plan bauen (Prototypen, Mails, Befund-Seiten, Nachfassen); dauert bis zu einer Stunde
   morgens: "07:00" # Telegram-Nachricht "Heute: …"
+  mittags: "12:00" # kurzer Zwischenstand ("Mahlzeit, Chef!"), 04.10.2026 Christians Wunsch
   abends: "19:00" # kurze Bilanz des Tages
 
 # 04.10.2026 (Christian: mehr als 15, aber nicht im Spam landen): Die neue Adresse wird langsam aufgewärmt.

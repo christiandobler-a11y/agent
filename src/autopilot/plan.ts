@@ -22,7 +22,13 @@ import { recentSeedProblem } from "../outreach/seed.js";
 
 const hm = z.string().regex(/^\d{2}:\d{2}$/);
 export const autopilotConfigSchema = z.object({
-  zeiten: z.object({ vorbereiten: hm, morgens: hm, abends: hm }),
+  zeiten: z.object({
+    vorbereiten: hm,
+    morgens: hm,
+    /** Kurzer Zwischenstand am Mittag (fehlt = keiner). */
+    mittags: hm.optional(),
+    abends: hm,
+  }),
   neue_kontakte: z.object({
     stufen: z.array(z.object({ ab_tag: z.number().int().min(0), pro_tag: z.number().int().min(0) })).min(1),
     nur_werktags: z.boolean(),

@@ -55,6 +55,18 @@ export async function autopilotTick(ctx: PipelineContext): Promise<void> {
 
   if (
     built &&
+    z.mittags &&
+    time >= z.mittags &&
+    time < z.abends &&
+    ctx.notifier.info &&
+    (await claimState(ctx.db, `plan-midday:${date}`, true))
+  ) {
+    const text = middayText(await middayStatus(ctx, date), date);
+    if (text) await ctx.notifier.info(text);
+  }
+
+  if (
+    built &&
     time >= z.abends &&
     ctx.notifier.eveningSummary &&
     (await claimState(ctx.db, `plan-evening:${date}`, true))
@@ -62,6 +74,81 @@ export async function autopilotTick(ctx: PipelineContext): Promise<void> {
     const items = await planItems(ctx.db, date);
     if (items.length > 0) await ctx.notifier.eveningSummary(await eveningSummary(ctx, date, items));
   }
+}
+
+export interface MiddayStatus {
+  /** Neue Mails aus dem Plan: gesendet, gesamt. */
+  sent: number;
+  total: number;
+  /** Davon eingeplant (verteilt senden) und bis wann. */
+  queued: number;
+  lastAt: string | null;
+  followDone: number;
+  followTotal: number;
+  /** Firmen, die heute geantwortet haben. */
+  replies: string[];
+}
+
+async function middayStatus(ctx: PipelineContext, date: string): Promise<MiddayStatus> {
+  const items = await planItems(ctx.db, date);
+  const counts = countPlan(items);
+  const { rows } = await ctx.db.query<{ n: number; last: Date | null }>(
+    "select count(*)::int as n, max(send_after) as last from outreach_plan where plan_date = $1 and status = 'queued'",
+    [date],
+  );
+  const { rows: replies } = await ctx.db.query<{ name: string }>(
+    `select distinct c.name from interactions i join companies c on c.id = i.company_id
+      where i.type = 'note' and i.created_by = 'mail' and i.body like 'Antwort%'
+        and (i.created_at at time zone 'Europe/Berlin')::date = $1::date`,
+    [date],
+  );
+  const last = rows[0]?.last ?? null;
+  return {
+    sent: counts.email.done,
+    total: counts.email.total,
+    queued: rows[0]?.n ?? 0,
+    lastAt: last ? berlinTime(last) : null,
+    followDone: counts.followup.done,
+    followTotal: counts.followup.total,
+    replies: replies.map((r) => r.name),
+  };
+}
+
+/** Zwischenstand am Mittag im lockeren Ton (reiner Text); `null`, wenn heute nichts ansteht. */
+export function middayText(m: MiddayStatus, date: string): string | null {
+  if (m.total === 0 && m.followTotal === 0) return null;
+  const hello = [
+    "🍽️ Mahlzeit, Chef!",
+    "🥨 Mahlzeit!",
+    "☀️ Halbzeit, Chef!",
+    "🍝 Mahlzeit, kurzer Zwischenstand:",
+  ];
+  const lines = [hello[Number(date.slice(-2)) % hello.length]!];
+  const follow = m.followTotal > 0 ? ` (+ ${m.followDone}/${m.followTotal} Nachfass-Mails)` : "";
+  if (m.sent === 0 && m.queued === 0)
+    lines.push(
+      `Das Morgen-Paket wartet noch auf dich: ${m.total} Mails liegen bereit${follow}. Ein Tipp auf /heute genügt 😉`,
+    );
+  else {
+    lines.push(
+      `Bis jetzt ${m.sent === 1 ? "ist 1 gutes Ding" : `sind ${m.sent} gute Dinger`} raus${follow} 📤`,
+    );
+    if (m.queued > 0)
+      lines.push(
+        `${m.queued} weitere gehen automatisch raus${m.lastAt ? `, die letzte gegen ${m.lastAt} Uhr` : ""}.`,
+      );
+    const open = m.total - m.sent - m.queued;
+    if (open > 0) lines.push(`${open} warten noch auf deinen Knopfdruck (/heute).`);
+  }
+  if (m.replies.length > 0)
+    lines.push(
+      `💬 ${m.replies.length === 1 ? "Gemeldet hat sich schon" : `${m.replies.length} haben sich schon gemeldet:`} ${m.replies.join(", ")} 🎉`,
+    );
+  else if (m.sent > 0)
+    lines.push(
+      "Gemeldet hat sich noch keiner. Ganz normal, die meisten antworten abends oder am nächsten Tag ☕",
+    );
+  return lines.join("\n");
 }
 
 async function eveningSummary(
