@@ -207,7 +207,7 @@ html,body{width:1440px;height:900px;overflow:hidden}
 body{position:relative;background:linear-gradient(180deg,#fff 0%,var(--bg) 100%);color:var(--ink);font-family:Manrope,sans-serif;-webkit-font-smoothing:antialiased}
 .topo{position:absolute;inset:0;width:100%;height:100%;opacity:.9}
 header{position:absolute;z-index:3;top:0;left:72px;right:72px;height:68px;background:#fff;border-radius:0 0 18px 18px;box-shadow:0 10px 30px rgba(29,36,51,.07);display:flex;align-items:center;padding:0 18px 0 16px;gap:40px}
-.logo-mark{display:flex;align-items:center;gap:10px;font-weight:800;font-size:16px;letter-spacing:-.01em;white-space:nowrap;max-width:300px;overflow:hidden;text-overflow:ellipsis}
+.logo-mark{display:flex;align-items:center;gap:10px;font-weight:800;font-size:${title.length > 28 ? 14 : 16}px;line-height:1.15;letter-spacing:-.01em;max-width:340px}
 .logo-mark i{flex:none;width:44px;height:44px;border-radius:50%;background:#2a4f8f;color:#fff;font-style:normal;display:grid;place-items:center;font-size:17px;letter-spacing:-.04em}
 nav{display:flex;gap:34px;font-size:16px;font-weight:600}
 .right{margin-left:auto;display:flex;align-items:center;gap:30px;font-weight:600;font-size:16px}
@@ -303,7 +303,7 @@ body{background:#fff;font-family:"Barlow Condensed",sans-serif;-webkit-font-smoo
 header{height:100px;display:flex;align-items:center;justify-content:space-between;padding:0 116px}
 .brand{display:flex;align-items:center;gap:14px}
 .mark{width:62px;height:62px;border-radius:50%;border:3px solid var(--petrol);display:grid;place-items:center;color:var(--orange);font-weight:600;font-size:26px}
-.brand b{display:block;font-weight:300;font-size:34px;letter-spacing:.04em;text-transform:uppercase;line-height:1;max-width:420px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.brand b{display:block;font-weight:300;font-size:${title.length <= 20 ? 34 : title.length <= 30 ? 28 : 24}px;letter-spacing:.04em;text-transform:uppercase;line-height:1.02;max-width:560px}
 .brand small{display:block;color:var(--orange);font-family:Manrope,sans-serif;font-weight:800;font-size:12px;letter-spacing:.2em;margin-top:5px}
 nav{display:flex;gap:30px;font-size:21px;font-weight:300;color:var(--ink)}
 .hero{position:relative;height:760px;overflow:hidden}

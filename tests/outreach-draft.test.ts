@@ -59,9 +59,16 @@ describe("Entwurf (rein)", () => {
     expect(salutationLine("sie", { name: "Kai Ernst", salutation: null }, "x")).toBe("Hallo Kai Ernst,");
     expect(salutationLine("du", { name: "Josef Kerscher", salutation: "Herr" }, "x")).toBe("Hallo Josef,");
     // Inhaberin im Firmennamen (ohne Geschlecht zu raten), Vorname auch hinten; sonst Team bzw. Team-Anrede der Branche.
+    // Weibliche Berufsbezeichnung im Namen ist eine Angabe, kein Raten → "Frau"; sonst voller Name.
     expect(
       salutationLine("sie", { name: null, salutation: null }, "Christina Heider Physiotherapeutin"),
-    ).toBe("Hallo Christina Heider,");
+    ).toBe("Hallo Frau Heider,");
+    expect(salutationLine("sie", { name: null, salutation: null }, "Physiotherapie Christina Heider")).toBe(
+      "Hallo Christina Heider,",
+    );
+    expect(salutationLine("sie", { name: null, salutation: null }, "Max Huber Physiotherapeut")).toBe(
+      "Hallo Max Huber,",
+    );
     expect(salutationLine("sie", { name: null, salutation: null }, "Physiotherapie Pickelmann Mike")).toBe(
       "Hallo Mike Pickelmann,",
     );

@@ -11,6 +11,16 @@ absender_zusatz: Avelio, Peißenberg
 # Du für diese Branchen, sonst Sie.
 du_branchen: [fahrrad, gastro, friseur, kosmetik]
 
+# Warum eine gute Website für diese Branche zählt (04.10.2026, Christian): kein Angriff, sondern Tatsache. Viele
+# Praxen sind ausgebucht, "mehr Patienten" zieht also nicht. Das LLM nimmt genau einen Nutzen, der zum Befund passt.
+branche_kontext:
+  physiotherapie: >-
+    Patienten vergleichen Praxen heute zuerst bei Google und auf der Website, bevor sie anrufen; der erste Eindruck
+    sollte zur Qualität der Behandlung passen und gegenüber anderen Praxen in der Nähe bestehen. Viele Praxen sind
+    ausgelastet, mehr Patienten sind nicht das Ziel. Nutzen stattdessen: die passenden Patienten (Schwerpunkte,
+    Selbstzahler und Privatpatienten finden die Praxis), Bewerber (Physiotherapeuten sind gesucht und schauen sich
+    zuerst die Website an), weniger Anrufe mit immer gleichen Fragen an der Anmeldung.
+
 # Ohne Namen im Impressum (und ohne Vornamen im Firmennamen) geht die Mail ans Team, mit der Bitte, sie an die
 # Leitung weiterzugeben (04.10.2026, Christian: "Hallo Team Christina Heider Physiotherapeutin" ist zu generisch).
 team_anrede:

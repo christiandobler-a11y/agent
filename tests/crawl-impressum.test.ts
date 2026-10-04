@@ -90,6 +90,12 @@ describe("Hilfsfunktionen Impressum", () => {
     expect(parseImpressum("Vertreten durch:\nGeschäftsführender Gesellschafter")).toMatchObject({
       person: null,
     });
+    // Weibliche Rolle ist eine Angabe → Frau; männliche Rolle nie → Herr.
+    expect(parseImpressum("Praxisinhaberin: Christina Heider")).toMatchObject({
+      person: "Christina Heider",
+      salutation: "Frau",
+    });
+    expect(parseImpressum("Inhaber: Max Huber")).toMatchObject({ person: "Max Huber", salutation: null });
     expect(parseImpressum("Geschäftsführer: Herrn Josef Kerscher")).toMatchObject({
       person: "Josef Kerscher",
       salutation: "Herr",

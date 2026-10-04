@@ -16,7 +16,7 @@ export interface ImpressumData {
 }
 
 const ROLES: [RegExp, string][] = [
-  [/^(?:inhaber(?:in)?|inh\.)/i, "Inhaber"],
+  [/^(?:(?:praxis)?inhaber(?:in)?|inh\.)/i, "Inhaber"],
   [/^geschäftsführ(?:er(?:in)?|ung|ender gesellschafter)/i, "Geschäftsführer"],
   [
     /^(?:vertreten durch|vertretungsberechtigt(?:e|er)?(?: geschäftsführer(?:in)?| gesellschafter(?:in)?)?)/i,
@@ -35,6 +35,13 @@ const NOT_A_NAME =
 /** Berufsbezeichnungen vor dem Namen ("Malermeister Kai Ernst", "Physiotherapeutin Anna Berg"). */
 const TRADE_PREFIX =
   /^(?:(?:staatl\.?\s*)?(?:gepr\.?|geprüfte?r?)\s+)?(?:maler|schreiner|tischler|elektro(?:techniker)?|installateur|zimmerer|zweiradmechaniker|kfz-?\w*|friseur|konditor|bäcker|metzger|physiotherapeut|heilpraktiker|masseur|kosmetiker|hotelier|gastronom|koch|küchenchef|bodenleger|fliesenleger|dachdecker)(?:meister)?(?:in)?\s+/i;
+
+/**
+ * Weibliche Berufs- oder Rollenbezeichnung ("Inhaberin:", "Physiotherapeutin") ist eine Angabe, keine Vermutung →
+ * "Frau". Männliche Formen werden oft für alle benutzt ("Inhaber"), daraus folgt nie "Herr".
+ */
+export const FEMININE_ROLE =
+  /\b(?:Inhaberin|Praxisinhaberin|Geschäftsführerin|Betreiberin|Physiotherapeutin|Therapeutin|Heilpraktikerin|Osteopathin|Masseurin|Ergotherapeutin|Logopädin|Meisterin)\b/;
 
 /** "Herr"/"Frau" aus einer Zeile wie "Inhaberin: Frau Anna Berg". */
 export function salutationOf(raw: string): "Herr" | "Frau" | null {
@@ -75,7 +82,12 @@ function findPerson(
       // Mehrere Namen ("Max Muster, Erika Muster" oder "und") → der erste zählt.
       const first = c.split(/,| und | & /)[0] ?? "";
       const person = cleanPersonName(first);
-      if (person) return { person, role: role[1], salutation: salutationOf(first) };
+      if (person)
+        return {
+          person,
+          role: role[1],
+          salutation: salutationOf(first) ?? (FEMININE_ROLE.test(line) ? "Frau" : null),
+        };
     }
   }
   // Ohne Rollen-Angabe: Einzelunternehmer stehen meist direkt unter "Angaben gemäß § 5 …".

@@ -20,6 +20,8 @@ export const outreachConfigSchema = z.object({
   absender_name: z.string().min(1),
   absender_zusatz: z.string().default(""),
   du_branchen: z.array(z.string()).default([]),
+  // Warum eine gute Website für die Branche zählt (geht als Kontext an das LLM, Rolle contact).
+  branche_kontext: z.record(z.string(), z.string()).default({}),
   // Ohne Ansprechpartner: Anrede ans Team und Bitte um Weiterleitung, je Branche (sonst "Hallo Team {Firma}").
   team_anrede: z
     .record(

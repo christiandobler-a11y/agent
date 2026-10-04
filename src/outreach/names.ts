@@ -1,3 +1,5 @@
+import { FEMININE_ROLE } from "../pipeline/crawl/impressum.js";
+
 /**
  * Ansprechpartner aus dem Firmennamen (04.10.2026, Christian: "Hallo Team Christina Heider Physiotherapeutin" ist zu
  * generisch). Viele Praxen heißen wie ihre Inhaberin; erkannt wird ein gängiger Vorname direkt neben einem Nachnamen.
@@ -34,6 +36,17 @@ const WORD = /^[A-ZÄÖÜ][a-zäöüß]+(?:-[A-ZÄÖÜ][a-zäöüß]+)?$/;
 
 /** "Christina Heider Physiotherapeutin" → "Christina Heider"; "Physiotherapie Pickelmann Mike" → "Mike Pickelmann". */
 export function personFromCompanyName(companyName: string): string | null {
+  return personInCompanyName(companyName)?.name ?? null;
+}
+
+/** Wie oben, dazu "Frau", wenn eine weibliche Berufsbezeichnung im Namen steht ("… Physiotherapeutin"). */
+export function personInCompanyName(companyName: string): { name: string; salutation: "Frau" | null } | null {
+  const name = findName(companyName);
+  if (!name) return null;
+  return { name, salutation: FEMININE_ROLE.test(companyName) ? "Frau" : null };
+}
+
+function findName(companyName: string): string | null {
   const words = companyName
     .replace(/["„“”]/g, "")
     .split(/\s+[|–—-]\s+|\s*\|\s*|,|:/)[0]!

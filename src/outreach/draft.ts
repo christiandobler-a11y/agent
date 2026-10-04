@@ -11,7 +11,7 @@ import type { OutreachConfig } from "./config.js";
 import { proposeSlots, seedOf } from "./slots.js";
 import { duToIhr, lowerFirst, subjectFor, type Form } from "./form.js";
 import { teaserExists, teaserPath } from "../prototype/teaser.js";
-import { personFromCompanyName } from "./names.js";
+import { personFromCompanyName, personInCompanyName } from "./names.js";
 
 /**
  * Kontakt-Entwurf per E-Mail (Phase 2, Stufe 2): Das LLM schreibt nur den Mittelteil (Einstieg, ein starker oder
@@ -20,7 +20,7 @@ import { personFromCompanyName } from "./names.js";
  * nichts; Christian sendet selbst.
  */
 
-export const CONTACT_PROMPT_VERSION = "v3";
+export const CONTACT_PROMPT_VERSION = "v4";
 
 export const contactOutputSchema = z.object({
   absatz: z.string().min(40).max(1000),
@@ -99,9 +99,12 @@ export function salutationLine(
   /** Anrede ohne bekannten Namen, z. B. "Liebes Praxisteam," (config/outreach.yaml → team_anrede). */
   team?: string | null,
 ): string {
-  // Ohne Namen im Impressum: Inhaber aus dem Firmennamen ("Christina Heider Physiotherapeutin"), sonst das Team.
-  const name = contact.name?.trim() || personFromCompanyName(companyName);
+  // Ohne Namen im Impressum: Inhaberin aus dem Firmennamen ("Christina Heider Physiotherapeutin" → Frau Heider),
+  // sonst das Team.
+  const fromName = contact.name?.trim() ? null : personInCompanyName(companyName);
+  const name = contact.name?.trim() || fromName?.name;
   if (!name) return team ?? `Hallo Team ${shortCompanyName(companyName)},`;
+  if (!contact.salutation && fromName?.salutation) contact = { ...contact, salutation: fromName.salutation };
   const parts = name.split(/\s+/);
   if (form === "du") return `Hallo ${parts[0]},`;
   if (contact.salutation) return `Hallo ${contact.salutation} ${parts.at(-1)},`;
@@ -197,7 +200,13 @@ export async function draftEmail(
   const { db, outreach: o } = deps;
   const now = deps.now();
   const audit = await latestAudit(db, company.id);
-  const findings = pickFindings((audit?.findings as Finding[] | undefined) ?? []);
+  const allFindings = (audit?.findings as Finding[] | undefined) ?? [];
+  const findings = pickFindings(allFindings);
+  // Falls der stärkste Befund nur eine Kleinigkeit ist, darf das LLM einen anderen zum Gesamteindruck nehmen.
+  const moreFindings = [...allFindings]
+    .sort(byImpact)
+    .filter((f) => !findings.includes(f))
+    .slice(0, 2);
   if (!audit && company.segment !== "NO_WEBSITE") return { kind: "no_audit" };
 
   const places = await latestPlacesSnapshot(db, company.id);
@@ -240,6 +249,19 @@ export async function draftEmail(
               },
             ]
           : [],
+    ...(moreFindings.length > 0
+      ? {
+          weitere_befunde: moreFindings.map((f) => ({
+            titel: f.title,
+            detail: f.detail,
+            beleg: f.evidence,
+            schwere: f.severity,
+          })),
+        }
+      : {}),
+    ...(company.branch_key && o.branche_kontext[company.branch_key]
+      ? { branche_kontext: o.branche_kontext[company.branch_key] }
+      : {}),
     kompliment_fakt: complimentFact(places),
     ...(previous ? { vorheriger_text: previous } : {}),
   };
