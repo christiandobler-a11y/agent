@@ -30,7 +30,9 @@ export async function insertDraft(
  */
 export async function takenSlots(db: DbClient, now: Date): Promise<Map<string, number>> {
   const { rows } = await db.query<{ slot: string; n: number }>(
-    `select s.slot, count(distinct i.company_id)::int as n
+    // Bestätigte Termine (gesendete Bestätigung) sind für alle belegt.
+    `select s.slot,
+            (count(distinct i.company_id) + 1000 * count(*) filter (where i.meta ? 'termin' and i.meta ? 'sent_at'))::int as n
        from interactions i
        join companies c on c.id = i.company_id
        cross join lateral jsonb_array_elements_text(coalesce(i.meta->'slots', '[]'::jsonb)) as s(slot)

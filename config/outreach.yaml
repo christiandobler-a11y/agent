@@ -21,6 +21,19 @@ branche_kontext:
     Selbstzahler und Privatpatienten finden die Praxis), Bewerber (Physiotherapeuten sind gesucht und schauen sich
     zuerst die Website an), weniger Anrufe mit immer gleichen Fragen an der Anmeldung.
 
+# Termin bestätigen (04.10.2026): Lead antwortet, Christian tippt den genannten Termin an, Avelio schreibt die
+# Bestätigung (mit Kalender-Einladung) im selben Verlauf; gesendet wird per Knopf. Mit OUTREACH_MEETING_URL in der
+# .env (z. B. ein fester Google-Meet- oder Zoom-Link) steht der Link gleich drin, sonst ruft Christian an.
+bestaetigung:
+  text: "super, dann machen wir {termin}. {ablauf} Eine Kalender-Einladung hängt an, ich freu mich drauf."
+  text_du: "super, dann machen wir {termin}. {ablauf} Eine Kalender-Einladung hängt an, ich freu mich drauf."
+  ablauf_telefon: Ich rufe Sie dann kurz an und zeige Ihnen den Entwurf dabei am Bildschirm, den Link dazu schicke ich Ihnen ein paar Minuten vorher.
+  ablauf_telefon_du: Ich ruf dich dann kurz an und zeig dir den Entwurf dabei am Bildschirm, den Link dazu schick ich dir ein paar Minuten vorher.
+  ablauf_link: "Hier schon mal der Link für das kurze Gespräch, das läuft einfach im Browser: {link}"
+  ablauf_link_du: "Hier schon mal der Link für das kurze Gespräch, das läuft einfach im Browser: {link}"
+  erinnerung_minuten: 30 # Telegram-Erinnerung vor dem Gespräch
+  dauer_minuten: 15 # Länge des Kalendereintrags
+
 # Ohne Namen im Impressum (und ohne Vornamen im Firmennamen) geht die Mail ans Team, mit der Bitte, sie an die
 # Leitung weiterzugeben (04.10.2026, Christian: "Hallo Team Christina Heider Physiotherapeutin" ist zu generisch).
 team_anrede:

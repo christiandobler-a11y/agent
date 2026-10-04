@@ -286,6 +286,7 @@ export function createBot(options: BotOptions): AvelioBot {
           outreach,
           letter: letterDeps(),
           followUpDays: crmConfig().follow_up_days,
+          meetingUrl: process.env.OUTREACH_MEETING_URL?.trim() || null,
         }
       : null;
   };

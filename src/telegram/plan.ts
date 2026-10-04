@@ -20,6 +20,7 @@ import { berlinDate } from "../autopilot/plan.js";
 import { draftEmail, type OutreachDeps } from "../outreach/draft.js";
 import { draftLetter, type LetterDeps } from "../outreach/letter.js";
 import type { MailConfig, Mailbox } from "../outreach/mail.js";
+import { createConfirmDraft, icsInvite, terminLabel } from "../outreach/confirm.js";
 import { sendDraft } from "../outreach/send.js";
 import { gameState } from "../game/xp.js";
 import { callbackData, escapeHtml } from "./format.js";
@@ -184,6 +185,8 @@ export interface PlanBotDeps {
   outreach: OutreachDeps;
   letter: LetterDeps | null;
   followUpDays: number;
+  /** Link für Video-Gespräche in der Termin-Bestätigung (OUTREACH_MEETING_URL). */
+  meetingUrl?: string | null;
 }
 
 const HEADER_KEY = (date: string) => `plan-header:${date}`;
@@ -338,6 +341,45 @@ export async function handlePlanCallback(ctx: Context, deps: PlanBotDeps, by: st
   const data = ctx.callbackQuery?.data;
   const { db } = deps;
   const now = deps.now();
+  // Termin aus einer Antwort bestätigen: Bestätigung schreiben und zum Senden zeigen.
+  const confirm = data ? new RegExp(`^tb:(${UUID}):(\\d)$`).exec(data) : null;
+  if (confirm) {
+    await ctx.answerCallbackQuery({ text: "Schreibe die Bestätigung …" });
+    const r = await createConfirmDraft(
+      {
+        db,
+        outreach: deps.outreach.outreach,
+        contact: { phone: deps.outreach.contact.phone },
+        meetingUrl: deps.meetingUrl ?? null,
+        now,
+      },
+      confirm[1]!,
+      Number(confirm[2]),
+      by,
+    );
+    if (!r) {
+      await ctx.reply("Den Termin finde ich nicht mehr (oder es fehlt die Empfänger-Adresse).");
+      return true;
+    }
+    await ctx.reply(
+      [
+        `📅 <b>Bestätigung an ${escapeHtml(r.company.name)}</b> · ${escapeHtml(terminLabel(r.termin))}`,
+        `<b>Betreff:</b> ${escapeHtml(r.subject)}`,
+        "",
+        `<blockquote expandable>${escapeHtml(r.body)}</blockquote>`,
+        "Mit Kalender-Einladung im Anhang. Nach dem Senden: Status „interessiert“ und eine Erinnerung vor dem Gespräch.",
+      ].join("\n"),
+      {
+        parse_mode: "HTML",
+        reply_markup: {
+          inline_keyboard: deps.mailbox
+            ? [[{ text: "📤 Bestätigung senden", callback_data: `sd:${r.draftId}` }]]
+            : [],
+        },
+      },
+    );
+    return true;
+  }
   // Einzelner Entwurf aus der Lead-Karte: "Jetzt senden".
   const single = data ? new RegExp(`^sd:(${UUID})$`).exec(data) : null;
   if (single) {
@@ -369,6 +411,33 @@ export async function handlePlanCallback(ctx: Context, deps: PlanBotDeps, by: st
       show_alert: r.kind !== "sent" && r.kind !== "already_sent",
     });
     if (r.kind === "sent" || r.kind === "already_sent") await closeCard(ctx, `✅ ${text}${xpSuffix(p)}`);
+    // Termin-Bestätigung: Einladung auch für Christians Kalender.
+    if (r.kind === "sent") {
+      const { rows } = await db.query<{ termin: string | null }>(
+        "select meta->>'termin' as termin from interactions where id = $1",
+        [single[1]],
+      );
+      const termin = rows[0]?.termin;
+      if (termin)
+        await ctx.replyWithDocument(
+          new InputFile(
+            Buffer.from(
+              icsInvite({
+                uid: `${single[1]}-christian@avelio.digital`,
+                start: new Date(termin),
+                minutes: deps.outreach.outreach.bestaetigung.dauer_minuten,
+                summary: `Gespräch ${r.company.name}`,
+                description: [r.company.phone ? `Tel. ${r.company.phone}` : null, r.to]
+                  .filter(Boolean)
+                  .join("\n"),
+                now,
+              }),
+            ),
+            "termin.ics",
+          ),
+          { caption: `📅 ${terminLabel(termin)} · für deinen Kalender (antippen)` },
+        );
+    }
     return true;
   }
   // Alle offenen Mails auf einmal (mit Rückfrage).

@@ -53,6 +53,8 @@ export type MailEvent =
       from: string | null;
       subject: string | null;
       excerpt: string;
+      /** Angebotene Termine der ersten Mail (zum Bestätigen per Knopf). */
+      offer?: { draftId: string; slots: string[] };
     }
   | { kind: "bounce"; companyId: string; companyName: string; address: string };
 

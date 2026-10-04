@@ -1,6 +1,8 @@
 import { randomUUID } from "node:crypto";
 import { existsSync } from "node:fs";
 import sharp from "sharp";
+import { loadOutreachConfig } from "./config.js";
+import { afterConfirmSent, icsInvite } from "./confirm.js";
 import type { Db, DbClient } from "../db/client.js";
 import type { Company } from "../db/companies.js";
 import { getState, setState } from "../db/appState.js";
@@ -55,6 +57,8 @@ interface DraftRow {
     /** Vorschau-Bild (Pfad) und der Absatz, unter dem es steht. */
     teaser?: string;
     teaser_after?: string | null;
+    /** Termin-Bestätigung: bestätigter Termin (ISO). */
+    termin?: string;
   };
 }
 
@@ -101,6 +105,31 @@ export async function withTeaser(
   };
 }
 
+/** Kalender-Einladung für eine Termin-Bestätigung. */
+function inviteAttachment(
+  termin: string,
+  draftId: string,
+  now: Date,
+): NonNullable<OutgoingMail["attachments"]>[number] {
+  const b = loadOutreachConfig().bestaetigung;
+  const o = loadOutreachConfig();
+  return {
+    filename: "termin.ics",
+    content: Buffer.from(
+      icsInvite({
+        uid: `${draftId}@avelio.digital`,
+        start: new Date(termin),
+        minutes: b.dauer_minuten,
+        summary: `Kurzes Gespräch mit ${o.absender_name} (${o.absender_zusatz ?? "Avelio"})`,
+        description: "Website-Entwurf, 10 Minuten",
+        now,
+      }),
+    ),
+    contentType: "text/calendar; charset=utf-8; method=PUBLISH",
+    contentDisposition: "attachment",
+  };
+}
+
 export async function sendDraft(deps: SendDeps, draftId: string, by: string): Promise<SendResult> {
   const { db } = deps;
   const now = deps.now();
@@ -134,6 +163,7 @@ export async function sendDraft(deps: SendDeps, draftId: string, by: string): Pr
       text: draft.body,
       inReplyTo: draft.meta.in_reply_to ?? null,
       ...(await withTeaser(draft)),
+      ...(draft.meta.termin ? { attachments: [inviteAttachment(draft.meta.termin, draftId, now)] } : {}),
     }));
   } catch (err) {
     await db.query("update interactions set meta = meta - 'sending_at' where id = $1", [draftId]);
@@ -149,7 +179,7 @@ export async function sendDraft(deps: SendDeps, draftId: string, by: string): Pr
     draft.company_id,
   ]);
   let company = companies[0]!;
-  const note = `${followUp ? "Nachfass-Mail" : "E-Mail"} an ${to} gesendet: ${draft.meta.subject}`;
+  const note = `${draft.meta.termin ? "Termin-Bestätigung" : followUp ? "Nachfass-Mail" : "E-Mail"} an ${to} gesendet: ${draft.meta.subject}`;
   if (!ACTIVE_OR_LATER.has(company.status)) {
     ({ company } = await setSalesStatus(db, company.id, "CONTACTED", {
       by,
@@ -172,6 +202,15 @@ export async function sendDraft(deps: SendDeps, draftId: string, by: string): Pr
         where company_id = $1 and type = 'reminder' and done_at is null and created_by = 'system'`,
       [company.id, now],
     );
+  }
+  if (draft.meta.termin) {
+    await afterConfirmSent(db, company, draft.meta.termin, {
+      by,
+      now,
+      reminderMinutes: loadOutreachConfig().bestaetigung.erinnerung_minuten,
+    });
+    const { rows: fresh } = await db.query<Company>("select * from companies where id = $1", [company.id]);
+    company = fresh[0]!;
   }
   return { kind: "sent", company, to, subject: draft.meta.subject, followUp };
 }
@@ -246,6 +285,8 @@ export async function checkReplies(deps: ReplyDeps): Promise<MailEvent[]> {
           companyId,
           `Antwort per Mail von ${mail.from ?? "?"}: ${mail.subject ?? ""}\n\n${excerpt}`,
           now,
+          // Für die Termin-Bestätigung im selben Verlauf.
+          mail.messageId ? { message_id: mail.messageId } : {},
         );
         if (["READY_FOR_CONTACT", "CONTACTED", "QUALIFIED"].includes(company.status)) {
           ({ company } = await setSalesStatus(db, companyId, "REPLIED", {
@@ -261,6 +302,14 @@ export async function checkReplies(deps: ReplyDeps): Promise<MailEvent[]> {
             where company_id = $1 and type = 'reminder' and done_at is null and created_by = 'system'`,
           [companyId, now],
         );
+        // Angebotene Termine der ersten Mail, damit Christian den genannten per Knopf bestätigen kann.
+        const { rows: offered } = await db.query<{ id: string; slots: string[] | null }>(
+          `select id, meta->'slots' as slots from interactions
+            where company_id = $1 and type = 'draft' and channel = 'email' and meta ? 'sent_at'
+              and coalesce((meta->>'follow_up')::boolean, false) = false
+            order by (meta->>'sent_at')::timestamptz desc limit 1`,
+          [companyId],
+        );
         events.push({
           kind: "reply",
           companyId,
@@ -268,6 +317,9 @@ export async function checkReplies(deps: ReplyDeps): Promise<MailEvent[]> {
           from: mail.from,
           subject: mail.subject,
           excerpt,
+          ...(offered[0]?.slots?.length
+            ? { offer: { draftId: offered[0].id, slots: offered[0].slots } }
+            : {}),
         });
       }
     }
@@ -279,11 +331,17 @@ export async function checkReplies(deps: ReplyDeps): Promise<MailEvent[]> {
   return events;
 }
 
-async function noteFor(db: DbClient, companyId: string, body: string, now: Date): Promise<Company> {
+async function noteFor(
+  db: DbClient,
+  companyId: string,
+  body: string,
+  now: Date,
+  meta: Record<string, unknown> = {},
+): Promise<Company> {
   await db.query(
-    `insert into interactions (company_id, type, channel, body, created_by, created_at)
-     values ($1, 'note', 'email', $2, 'mail', $3)`,
-    [companyId, body, now],
+    `insert into interactions (company_id, type, channel, body, meta, created_by, created_at)
+     values ($1, 'note', 'email', $2, $4, 'mail', $3)`,
+    [companyId, body, now, JSON.stringify(meta)],
   );
   const { rows } = await db.query<Company>("select * from companies where id = $1", [companyId]);
   return rows[0]!;

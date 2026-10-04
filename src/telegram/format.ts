@@ -1,3 +1,4 @@
+import { terminShort } from "../outreach/confirm.js";
 import type { EveningSummary } from "../autopilot/schedule.js";
 import type { MailEvent } from "../queue/notifier.js";
 import type { InlineKeyboardButton } from "grammy/types";
@@ -442,6 +443,16 @@ export function mailEventMessage(e: MailEvent): { text: string; keyboard: Inline
       keyboard: open,
     };
   }
+  // Angebotene Termine zum Bestätigen (Christian liest die Antwort und tippt den genannten Termin an).
+  const slotButtons: InlineKeyboardButton[][] = [];
+  const slots = e.offer?.slots ?? [];
+  for (let i = 0; i < slots.length; i += 2)
+    slotButtons.push(
+      slots.slice(i, i + 2).map((s, k) => ({
+        text: `✅ ${terminShort(s)}`,
+        callback_data: `tb:${e.offer!.draftId}:${i + k}`,
+      })),
+    );
   return {
     text: [
       `💬 <b>Antwort von ${escapeHtml(e.companyName)}!</b>`,
@@ -450,10 +461,13 @@ export function mailEventMessage(e: MailEvent): { text: string; keyboard: Inline
       "",
       e.excerpt ? `<blockquote>${escapeHtml(e.excerpt)}</blockquote>` : "",
       "Status steht jetzt auf „geantwortet“, Nachfassen ist gestoppt.",
+      slots.length
+        ? "Nennt die Antwort einen der Termine? Dann antippen, ich schreibe die Bestätigung:"
+        : null,
     ]
       .filter((l) => l !== null)
       .join("\n"),
-    keyboard: open,
+    keyboard: [...slotButtons, ...open],
   };
 }
 

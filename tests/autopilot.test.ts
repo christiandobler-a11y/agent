@@ -19,7 +19,9 @@ import { loadResearchConfig } from "../src/pipeline/research/run.js";
 import { loadRegion } from "../src/pipeline/research/tiling.js";
 import { getState, setState } from "../src/db/appState.js";
 import { upsertCompany, type Company } from "../src/db/companies.js";
-import { insertDraft } from "../src/db/drafts.js";
+import { insertDraft, takenSlots } from "../src/db/drafts.js";
+import { createConfirmDraft, icsInvite, terminLabel } from "../src/outreach/confirm.js";
+import { mailEventMessage } from "../src/telegram/format.js";
 import { countPlan, planItems, type PlanItem } from "../src/db/plan.js";
 import { insertWebsiteSnapshot } from "../src/db/websiteSnapshots.js";
 import type { LlmGateway } from "../src/llm/gateway.js";
@@ -97,6 +99,24 @@ const config = (over: Partial<AutopilotConfig["neue_kontakte"]> = {}): Autopilot
   const c = loadAutopilotConfig();
   return { ...c, neue_kontakte: { ...c.neue_kontakte, ...over } };
 };
+
+describe("Termin-Bestätigung (rein)", () => {
+  it("Termin lesbar und als Kalender-Einladung", () => {
+    expect(terminLabel("2026-10-13T10:30:00.000Z")).toBe("Dienstag, 13.10., um 12:30 Uhr");
+    expect(terminLabel("2026-10-13T10:00:00.000Z")).toBe("Dienstag, 13.10., um 12 Uhr");
+    const ics = icsInvite({
+      uid: "x@avelio.digital",
+      start: new Date("2026-10-13T10:30:00.000Z"),
+      minutes: 15,
+      summary: "Gespräch, kurz",
+      description: "Zeile 1\nZeile 2",
+      now: new Date("2026-10-05T07:00:00.000Z"),
+    });
+    expect(ics).toContain("DTSTART:20261013T103000Z\r\nDTEND:20261013T104500Z");
+    expect(ics).toContain("SUMMARY:Gespräch\\, kurz");
+    expect(ics).toContain("DESCRIPTION:Zeile 1\\nZeile 2");
+  });
+});
 
 describe("Morgen-Paket (rein)", () => {
   it("Menge je Tag: Start, später mehr, am Wochenende keine neuen", () => {
@@ -318,6 +338,62 @@ describeDb("Morgen-Paket mit Datenbank", () => {
     );
     expect(reminders[0]!.n).toBe(0);
     expect(await checkReplies(deps)).toEqual([]); // nichts doppelt
+  });
+
+  it("Termin bestätigen: Knöpfe aus der Antwort, Bestätigung im Verlauf mit Einladung, Status und Erinnerung", async () => {
+    const box = fakeMailbox();
+    const deps = { db: db(), mailbox: box, mail: { ...mail, max_per_day: 50 }, now: () => NOW };
+    const a = await lead();
+    const slots = ["2026-10-07T10:30:00.000Z", "2026-10-08T11:15:00.000Z"];
+    const first = await insertDraft(db(), a.id, {
+      channel: "email",
+      body: "Hallo,\n\nText",
+      meta: { subject: "Ihr erster Eindruck online", to: "info@termin.de", slots },
+      by: "test",
+      now: NOW,
+    });
+    await sendDraft({ ...deps, followUpDays: 5 }, first.id, "test");
+    await checkReplies(deps); // erster Lauf: nur Stand merken
+    box.deliver(
+      incoming({
+        uid: 21,
+        messageId: "<antwort-1@termin.de>",
+        inReplyTo: `<${idOf(box, 1)}>`,
+        from: "info@termin.de",
+      }),
+    );
+    const [event] = await checkReplies(deps);
+    expect(event).toMatchObject({ kind: "reply", offer: { draftId: first.id, slots } });
+    const msg = mailEventMessage(event!);
+    expect(msg.keyboard[0]!.map((b) => ("callback_data" in b ? b.callback_data : null))).toEqual([
+      `tb:${first.id}:0`,
+      `tb:${first.id}:1`,
+    ]);
+
+    const confirm = (await createConfirmDraft(
+      { db: db(), outreach: loadOutreachConfig(), contact: { phone: "0151 1" }, now: NOW },
+      first.id,
+      1,
+      "test",
+    ))!;
+    expect(confirm.body).toContain("Donnerstag, 8.10., um 13:15 Uhr");
+    expect(confirm.subject).toBe("Re: Ihr erster Eindruck online");
+    const r = await sendDraft({ ...deps, followUpDays: 5 }, confirm.draftId, "test");
+    expect(r.kind).toBe("sent");
+    const sent = box.sent.at(-1)!;
+    expect(sent.inReplyTo).toBe("<antwort-1@termin.de>");
+    expect(sent.attachments?.[0]?.filename).toBe("termin.ics");
+    expect(String(sent.attachments?.[0]?.content)).toContain("DTSTART:20261008T111500Z");
+    const { rows } = await db().query<{ status: string; due: Date }>(
+      `select c.status, (select due_at from interactions where company_id = c.id and type = 'reminder'
+                          and done_at is null order by due_at desc limit 1) as due
+         from companies c where c.id = $1`,
+      [a.id],
+    );
+    expect(rows[0]!.status).toBe("INTERESTED");
+    expect(rows[0]!.due.toISOString()).toBe("2026-10-08T10:45:00.000Z");
+    // Der bestätigte Termin ist für alle anderen belegt.
+    expect((await takenSlots(db(), NOW)).get(slots[1]!)).toBeGreaterThanOrEqual(1000);
   });
 
   it("Nachfassen: fällig nach 5 Tagen, im selben Verlauf, nur einmal", async () => {

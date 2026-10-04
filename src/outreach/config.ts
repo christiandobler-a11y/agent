@@ -20,6 +20,31 @@ export const outreachConfigSchema = z.object({
   absender_name: z.string().min(1),
   absender_zusatz: z.string().default(""),
   du_branchen: z.array(z.string()).default([]),
+  // Termin-Bestätigung per Knopf (src/outreach/confirm.ts); {termin} und {ablauf} setzt der Code.
+  bestaetigung: z
+    .object({
+      text: z.string(),
+      text_du: z.string(),
+      ablauf_telefon: z.string(),
+      ablauf_telefon_du: z.string(),
+      ablauf_link: z.string(),
+      ablauf_link_du: z.string(),
+      erinnerung_minuten: z.number().int().min(0).default(30),
+      dauer_minuten: z.number().int().min(5).default(15),
+    })
+    .default({
+      text: "super, dann machen wir {termin}. {ablauf} Eine Kalender-Einladung hängt an, ich freu mich drauf.",
+      text_du:
+        "super, dann machen wir {termin}. {ablauf} Eine Kalender-Einladung hängt an, ich freu mich drauf.",
+      ablauf_telefon:
+        "Ich rufe Sie dann kurz an und zeige Ihnen den Entwurf dabei am Bildschirm, den Link dazu schicke ich Ihnen ein paar Minuten vorher.",
+      ablauf_telefon_du:
+        "Ich ruf dich dann kurz an und zeig dir den Entwurf dabei am Bildschirm, den Link dazu schick ich dir ein paar Minuten vorher.",
+      ablauf_link: "Hier schon mal der Link für das kurze Gespräch, das läuft einfach im Browser: {link}",
+      ablauf_link_du: "Hier schon mal der Link für das kurze Gespräch, das läuft einfach im Browser: {link}",
+      erinnerung_minuten: 30,
+      dauer_minuten: 15,
+    }),
   // Warum eine gute Website für die Branche zählt (geht als Kontext an das LLM, Rolle contact).
   branche_kontext: z.record(z.string(), z.string()).default({}),
   // Ohne Ansprechpartner: Anrede ans Team und Bitte um Weiterleitung, je Branche (sonst "Hallo Team {Firma}").
