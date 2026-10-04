@@ -362,8 +362,10 @@ export function createBot(options: BotOptions): AvelioBot {
       await ctx.reply("Der Probelauf braucht die Outreach- und Prototyp-Einstellungen.");
       return;
     }
-    // "/probelauf3" bzw. "/probelauf 3": mehrere zufällige Praxen; "/probelauf Name": gezielt einen Lead.
-    const ref = ctx.match.trim();
+    // "/probelauf3" bzw. "/probelauf 3": mehrere zufällige Praxen; "/probelauf Name": gezielt einen Lead;
+    // "/probelauf an test-xyz@srv1.mail-tester.com": eine Mail an diese Adresse (Spam-Test), sonst an dich selbst.
+    const target = /^an\s+(\S+@\S+\.\S+)$/i.exec(ctx.match.trim());
+    const ref = target ? "" : ctx.match.trim();
     const count = /^[1-5]$/.test(ref) ? Number(ref) : ctx.message?.text?.startsWith("/probelauf3") ? 3 : 1;
     let companies: Company[];
     if (ref && !/^[1-5]$/.test(ref)) {
@@ -392,6 +394,7 @@ export function createBot(options: BotOptions): AvelioBot {
             db: pipeline.db,
             outreach,
             mailbox,
+            to: target?.[1] ?? null,
             teaser: {
               dir: teaserConfig.dir,
               branches: teaserConfig.branchen,

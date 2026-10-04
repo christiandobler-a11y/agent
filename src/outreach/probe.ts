@@ -16,6 +16,8 @@ export interface ProbeDeps {
   outreach: OutreachDeps;
   mailbox: Mailbox | null;
   teaser: TeaserDeps | null;
+  /** Andere Empfänger-Adresse, z. B. die Test-Adresse von mail-tester.com (dann ohne "[Probe]" im Betreff). */
+  to?: string | null;
 }
 
 export interface ProbeResult {
@@ -68,13 +70,14 @@ export async function runProbe(
   await deps.db.query("delete from interactions where id = $1", [draft.draftId]);
   let sentTo: string | null = null;
   if (deps.mailbox) {
+    const to = deps.to?.trim() || deps.mailbox.address;
     await deps.mailbox.send({
-      to: deps.mailbox.address,
-      subject: `[Probe] ${draft.subject}`,
+      to,
+      subject: deps.to ? draft.subject : `[Probe] ${draft.subject}`,
       text: draft.body,
       ...(await withTeaser({ body: rows[0]?.body ?? draft.body, meta: rows[0]?.meta ?? {} })),
     });
-    sentTo = deps.mailbox.address;
+    sentTo = to;
   }
   return {
     company,
