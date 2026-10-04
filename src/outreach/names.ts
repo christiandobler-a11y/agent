@@ -9,15 +9,16 @@ import { FEMININE_ROLE } from "../pipeline/crawl/impressum.js";
 /**
  * Eindeutige Vornamen (04.10.2026, Christian: drei Probeläufe hintereinander "Liebes Praxisteam", weil im Impressum
  * nur "Inhaber: Max Huber" steht). Nur Namen, die in Deutschland praktisch immer zu einem Geschlecht gehören;
- * mehrdeutige (Toni, Kim, Nicola, Sascha, Maxi, Luca, Robin …) stehen in keiner Liste und gehen weiter ans Team.
+ * mehrdeutige (Toni, Kim, Nicola, Sascha, Luca, Robin; Andrea, Simone, Jasmin, die je nach Herkunft auch Männer
+ * tragen) stehen in keiner Liste und gehen weiter ans Team.
  */
 const FEMALE = new Set(
-  `Alexandra Alina Andrea Angelika Anja Anna Anne Annette Antje Barbara Bea Beate Bettina Birgit Brigitte Carina
+  `Alexandra Alina  Angelika Anja Anna Anne Annette Antje Barbara Bea Beate Bettina Birgit Brigitte Carina
   Carmen Carolin Caroline Christa Christiane Christina Christine Claudia Cornelia Dagmar Daniela Denise Doris Elena
   Elisabeth Elke Eva Franziska Gabriele Gisela Hannah Hanna Heike Helena Ines Ingrid Iris Isabel Isabella Isabell Jana
-  Janina Jasmin Jennifer Jessica Johanna Julia Juliane Karin Katharina Kathrin Katja Katrin Kerstin Kristina Laura Lea
+  Janina  Jennifer Jessica Johanna Julia Juliane Karin Katharina Kathrin Katja Katrin Kerstin Kristina Laura Lea
   Lena Leonie Lisa Magdalena Maike Manuela Maren Maria Marie Marina Marion Martina Melanie Michaela Miriam Monika
-  Nadine Natalie Nicole Nina Patricia Petra Ramona Regina Renate Sabine Sabrina Sandra Sara Sarah Silke Simone Sonja
+  Nadine Natalie Nicole Nina Patricia Petra Ramona Regina Renate Sabine Sabrina Sandra Sara Sarah Silke  Sonja
   Sophia Sophie Stefanie Stephanie Susanne Svenja Sylvia Tamara Tanja Teresa Theresa Tina Ulrike Ursula Valerie
   Vanessa Verena Veronika Viktoria Yvonne Vroni Resi Leni Corinna Nora Larissa Selina Vera Judith Lydia Theresia
   Rosemarie Gertrud Kathrin Anke Astrid Bianca Diana Elena Evelyn Gudrun Heidi Helga Ilse Irene Jacqueline Jutta
@@ -41,7 +42,18 @@ const MALE = new Set(
     .split(/\s+/)
     .filter(Boolean),
 );
-const FIRST_NAMES = new Set([...FEMALE, ...MALE, ...["Toni", "Nicola"]]);
+// Zum Erkennen eines Namens im Firmennamen zählen auch die mehrdeutigen (ohne Frau/Herr).
+const FIRST_NAMES = new Set([
+  ...FEMALE,
+  ...MALE,
+  "Toni",
+  "Nicola",
+  "Andrea",
+  "Jasmin",
+  "Simone",
+  "Kim",
+  "Sascha",
+]);
 
 /** "Herr"/"Frau" aus einem eindeutigen Vornamen ("Anna Berg" → Frau), sonst `null`. Doppelnamen nach dem ersten Teil. */
 export function salutationFromFirstName(fullName: string): "Herr" | "Frau" | null {

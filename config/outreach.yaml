@@ -84,10 +84,11 @@ kanaele:
 spamschutz:
   abwechseln: [einstieg, betreff, aufhaenger, gruss] # je Mail eine andere Kombination; nie zwei gleiche Mails am selben Tag
   # 04.10.2026: mit Praxisname, das wird deutlich häufiger geöffnet als ein allgemeiner Betreff.
+  # 04.10.2026 (Christian): kein Praxisname im Betreff, gleich das Anliegen. {firma} wäre weiter möglich.
   betreffe:
-    - "Ein Entwurf für {firma}"
-    - "{firma}: eine Idee für Ihre Startseite"
-    - "Ihre Startseite, neu gedacht ({firma})"
+    - "Eine Idee für Ihre Startseite"
+    - "Ein Entwurf für Ihre Website"
+    - "Ihre Startseite, neu gedacht"
   aufhaenger_varianten:
     - Ich hab Ihnen dazu etwas vorbereitet und würde es gern kurz mit Ihnen durchgehen, 5 bis 10 Minuten reichen. Wann passt es Ihnen diese Woche am besten?
     - Dazu hab ich schon was vorbereitet. Hätten Sie diese Woche 10 Minuten, damit ich es Ihnen kurz zeigen kann?

@@ -99,6 +99,7 @@ describe("Entwurf (rein)", () => {
     expect(salutationFromFirstName("Anna-Lena Berg")).toBe("Frau");
     expect(salutationFromFirstName("Kim Weber")).toBeNull();
     expect(salutationFromFirstName("Nicola Berg")).toBeNull();
+    expect(salutationFromFirstName("Jasmin Nukić")).toBeNull(); // im Bosnischen ein Männername
     expect(
       personalContact("sie", { name: null, salutation: null }, "Christina Heider Physiotherapeutin"),
     ).toEqual({
@@ -285,7 +286,7 @@ describeDb("E-Mail-Entwurf (Datenbank)", () => {
     expect(structured.mock.calls[0]![0].role).toBe("contact");
     expect(d.to).toMatch(/^info@/);
     expect(outreach.spamschutz.betreffe.map((b) => b.replace("{firma}", c.name))).toContain(d.subject);
-    expect(d.subject).toContain("Physio Kagerer");
+    expect(d.subject).not.toContain("Kagerer"); // kein Praxisname im Betreff
     // Name im Impressum ohne Frau/Herr, aber eindeutiger Vorname → persönlich, kein P.S.
     expect(d.body).toMatch(/^Grüß Sie, Frau Kagerer,\n\nmir ist Ihre Praxis/);
     expect(d.body).not.toContain("P.S.");
