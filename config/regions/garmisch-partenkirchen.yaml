@@ -1,0 +1,20 @@
+# Landkreis Garmisch-Partenkirchen (04.10.2026, mit Christian: Physio-Fokus, Nachbar von Weilheim-Schongau).
+# Ortsmitten gerundet, größere Orte zuerst. Zugehörigkeit siehe config/regions/rosenheim.yaml.
+name: Landkreis Garmisch-Partenkirchen
+admin_areas: [Garmisch-Partenkirchen]
+search_radius_km: 5
+fallback_max_km: 8
+tiles:
+  - { name: Garmisch-Partenkirchen, lat: 47.4921, lng: 11.0958 }
+  - { name: Murnau am Staffelsee, lat: 47.68, lng: 11.2 }
+  - { name: Mittenwald, lat: 47.4425, lng: 11.2614 }
+  - { name: Oberammergau, lat: 47.5978, lng: 11.0672 }
+  - { name: Grainau, lat: 47.4764, lng: 11.0244 }
+  - { name: Farchant, lat: 47.5297, lng: 11.1114 }
+  - { name: Oberau, lat: 47.56, lng: 11.1333 }
+  - { name: Krün, lat: 47.5056, lng: 11.2783 }
+  - { name: Ohlstadt, lat: 47.6333, lng: 11.2333 }
+  - { name: Uffing am Staffelsee, lat: 47.7167, lng: 11.15 }
+  - { name: Bad Kohlgrub, lat: 47.6667, lng: 11.05 }
+  - { name: Unterammergau, lat: 47.6167, lng: 11.0333 }
+  - { name: Ettal, lat: 47.5689, lng: 11.0939 }

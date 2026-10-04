@@ -250,6 +250,7 @@ export function createBot(options: BotOptions): AvelioBot {
           now: pipeline.now,
           contact: options.outreach.contact,
           previewBaseUrl: options.prototype?.baseUrl ?? null,
+          teaserDir: options.prototype?.config.teaser.dir ?? null,
         }
       : null;
   const letterDeps = (): LetterDeps | null => {

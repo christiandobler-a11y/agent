@@ -1,3 +1,4 @@
+import { existsSync } from "node:fs";
 import type { Db, DbClient } from "../db/client.js";
 import type { Company } from "../db/companies.js";
 import { getState, setState } from "../db/appState.js";
@@ -9,8 +10,10 @@ import {
   normalizeAddress,
   normalizeId,
   replyExcerpt,
+  textToHtml,
   type MailConfig,
   type Mailbox,
+  type OutgoingMail,
   type SentRef,
 } from "./mail.js";
 
@@ -47,6 +50,9 @@ interface DraftRow {
     sent_at?: string;
     sending_at?: string;
     message_id?: string;
+    /** Vorschau-Bild (Pfad) und der Absatz, unter dem es steht. */
+    teaser?: string;
+    teaser_after?: string | null;
   };
 }
 
@@ -64,6 +70,21 @@ export async function sentToday(db: DbClient, now: Date): Promise<number> {
 }
 
 const ACTIVE_OR_LATER = new Set(["CONTACTED", "REPLIED", "INTERESTED", "PROTOTYPE", "WON", "LOST"]);
+
+/** Vorschau-Bild als eingebettetes Bild unter seinem Satz; fehlt die Datei, geht die Mail als reiner Text raus. */
+function withTeaser(draft: DraftRow): Pick<OutgoingMail, "html" | "attachments"> {
+  const path = draft.meta.teaser;
+  if (!path || !existsSync(path) || !draft.body) return {};
+  const cid = "startseite-entwurf@avelio";
+  return {
+    html: textToHtml(draft.body, {
+      cid,
+      alt: "Entwurf Ihrer neuen Startseite",
+      after: draft.meta.teaser_after ?? null,
+    }),
+    attachments: [{ filename: "startseite-entwurf.jpg", path, cid }],
+  };
+}
 
 export async function sendDraft(deps: SendDeps, draftId: string, by: string): Promise<SendResult> {
   const { db } = deps;
@@ -97,6 +118,7 @@ export async function sendDraft(deps: SendDeps, draftId: string, by: string): Pr
       subject: draft.meta.subject,
       text: draft.body,
       inReplyTo: draft.meta.in_reply_to ?? null,
+      ...withTeaser(draft),
     }));
   } catch (err) {
     await db.query("update interactions set meta = meta - 'sending_at' where id = $1", [draftId]);

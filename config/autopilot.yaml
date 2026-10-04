@@ -14,7 +14,8 @@ neue_kontakte:
 briefe:
   pro_tag: 3
   ab_score: 80
-# Prototyp für jeden neuen Lead mit Website (ca. 5 Cent je Stück); Vorher/Nachher in Brief und Mail.
+# Prototyp für jeden neuen Lead mit Website (ca. 5 Cent je Stück); Vorher/Nachher in Brief und Mail. Branchen mit
+# Vorschau-Bild (config/prototype.yaml → teaser, derzeit Physio) bekommen stattdessen das Bild, ohne LLM.
 prototyp_fuer_neue: true
 
 nachfassen:
@@ -30,6 +31,6 @@ suche:
   ab: "22:00"
   pro_nacht: 1 # eine Komplett-Suche kostet grob 1 bis 3 $ (Google) plus Audits
   # Reihenfolge = Priorität. Regionen aus config/regions/, Branchen aus config/branches.yaml.
-  regionen: [weilheim-schongau, rosenheim]
-  branchen:
-    [physiotherapie, fahrrad, maler, schreiner, sanitaer, elektriker, kosmetik, friseur, gastro, hotel, kfz]
+  # 04.10.2026 (Christian): erst einmal nur Physiotherapie, dafür mehr Regionen. Weitere Branchen später wieder dazu.
+  regionen: [weilheim-schongau, rosenheim, starnberg, garmisch-partenkirchen]
+  branchen: [physiotherapie]

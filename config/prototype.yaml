@@ -16,3 +16,13 @@ templates:
   elektriker: werkstatt
   kfz: werkstatt
 fallback: physio # Gastro und Hotel bekommen später eine eigene Vorlage
+
+# Erstkontakt-Bild (04.10.2026, Christian: auf Physio spezialisieren, ein einheitliches starkes Hero, nur Name und Bild
+# tauschen; der echte Prototyp entsteht erst bei Interesse). Kein LLM, kostet nichts. Für diese Branchen baut das
+# Morgen-Paket statt eines Prototyps das Bild data/teasers/<Firmen-ID>.jpg; es steht in der Mail und auf der Befund-Seite.
+teaser:
+  dir: data/teasers
+  branchen: [physiotherapie]
+  # welt = helle Seite mit Foto-Collage und Google-Bewertung (angelehnt an therapie-welt.de),
+  # vital = großes Foto mit Petrol-Schleier und Bogen (angelehnt an revitalis-physio.de)
+  stil: welt

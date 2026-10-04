@@ -10,6 +10,7 @@ import type { Branches } from "../pipeline/research/branches.js";
 import type { OutreachConfig } from "./config.js";
 import { proposeSlots, seedOf } from "./slots.js";
 import { duToIhr, lowerFirst, subjectFor, type Form } from "./form.js";
+import { teaserExists, teaserPath } from "../prototype/teaser.js";
 
 /**
  * Kontakt-Entwurf per E-Mail (Phase 2, Stufe 2): Das LLM schreibt nur den Mittelteil (Einstieg, ein starker oder
@@ -33,6 +34,8 @@ export interface OutreachDeps {
   contact: { whatsapp: string | null; phone: string | null };
   /** Vorschau-Adresse der Prototypen; gibt es einen, kommt der Link in die Mail (statt WhatsApp). */
   previewBaseUrl?: string | null;
+  /** Ordner der Vorschau-Bilder (config/prototype.yaml → teaser.dir); gibt es eins, steht es in der Mail. */
+  teaserDir?: string | null;
 }
 
 export interface EmailDraft {
@@ -273,15 +276,23 @@ export async function draftEmail(
       )
     : { rows: [] };
   const previewUrl = proto[0] && deps.previewBaseUrl ? `${deps.previewBaseUrl}/${proto[0].slug}/` : null;
+  // Ohne Vorschau-Link: das einheitliche Vorschau-Bild, falls es eins gibt (steht in der Mail unter dem Satz).
+  const teaser =
+    !previewUrl && deps.teaserDir && teaserExists(deps.teaserDir, company.id)
+      ? teaserPath(deps.teaserDir, company.id)
+      : null;
   const draftSentence = previewUrl
     ? inForm(k.entwurf_satz, k.entwurf_satz_du).replace("{link}", previewUrl)
-    : null;
-  const prepared = previewUrl
-    ? inForm(
-        pick(k.vorbereitet_mit_entwurf, seed, 7, variant),
-        pick(k.vorbereitet_mit_entwurf_du, seed, 7, variant),
-      )
-    : inForm(pick(k.vorbereitet, seed, 7, variant), pick(k.vorbereitet_du, seed, 7, variant));
+    : teaser
+      ? inForm(k.bild_satz, k.bild_satz_du)
+      : null;
+  const prepared =
+    previewUrl || teaser
+      ? inForm(
+          pick(k.vorbereitet_mit_entwurf, seed, 7, variant),
+          pick(k.vorbereitet_mit_entwurf_du, seed, 7, variant),
+        )
+      : inForm(pick(k.vorbereitet, seed, 7, variant), pick(k.vorbereitet_du, seed, 7, variant));
   // Höchstens ein Link je Mail: mit Entwurfs-Link wird per Antwort-Mail geantwortet statt per WhatsApp.
   const cta = previewUrl
     ? inForm(k.email_cta_ohne_whatsapp, k.email_cta_ohne_whatsapp_du)
@@ -322,6 +333,7 @@ export async function draftEmail(
       prompt: CONTACT_PROMPT_VERSION,
       variant,
       preview_url: previewUrl,
+      ...(teaser ? { teaser, teaser_after: draftSentence } : {}),
     },
     by,
     now,

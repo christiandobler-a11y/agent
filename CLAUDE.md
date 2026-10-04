@@ -23,6 +23,10 @@ ausprobieren kann. Nach Schritt 6 ist ein Abstimmungstermin (Kalibrierung) vorge
 - `npm run cli -- prototype <firma>` (Telegram: Lead-Karte → „🎨 Prototyp bauen“): Website-Entwurf aus Branchen-Vorlage
   (`src/prototype/templates/`: `physio`, `werkstatt`; Zuordnung je Branche in `config/prototype.yaml`), Texte/Farbe/Fotowahl per LLM (Rolle `prototype`), Seite unter `data/previews/<slug>/`,
   ausgeliefert von Caddy unter `PREVIEW_BASE_URL` (docs/DEPLOY.md, Abschnitt 11)
+- `npm run cli -- teaser <firma>`: einheitliches Vorschau-Bild für Physio (`src/prototype/teaser.ts`, ohne LLM,
+  Stockfotos in `assets/teaser/physio/`, Stil `welt`/`vital` in `config/prototype.yaml → teaser`) nach
+  `data/teasers/<id>.jpg`; das Morgen-Paket baut es für `teaser.branchen` statt eines Prototyps, die Mail bettet es als
+  HTML-Bild unter `bild_satz` ein (`textToHtml`), die Befund-Seite nutzt es als „Nachher“
 - `npm run cli -- chat "…"`: Manager-Agent ohne Telegram befragen (gleicher Verlauf wie der Chat)
 - `npm run cli -- calibrate [export|--file|rate <firma> <A|B|C|X>]`: Golden Set (Telegram `/kalibrieren`,
   `/auswertung`); `tests/golden/golden.json` ist Regressionstest für Gewichte und Prompts (`tests/golden.test.ts`)

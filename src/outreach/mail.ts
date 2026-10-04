@@ -33,6 +33,37 @@ export interface OutgoingMail {
   text: string;
   /** Message-ID der Mail, auf die geantwortet wird (Nachfassen im selben Verlauf). */
   inReplyTo?: string | null;
+  /** HTML-Fassung (z. B. mit eingebettetem Vorschau-Bild); `text` bleibt die Textfassung. */
+  html?: string;
+  /** Eingebettete Bilder (`cid` wie im HTML) bzw. Anhänge. */
+  attachments?: { filename: string; path: string; cid?: string }[];
+}
+
+const escapeHtml = (s: string) =>
+  s.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;");
+
+/**
+ * Text-Mail als schlichtes HTML (wirkt wie von Hand geschrieben): Absätze, Zeilenumbrüche, klickbare Links. Nach dem
+ * Absatz `after` (oder am Ende) steht das Bild `cid`.
+ */
+export function textToHtml(
+  text: string,
+  image: { cid: string; alt: string; after: string | null } | null,
+): string {
+  const paragraphs = text.split(/\n{2,}/);
+  let index = image?.after ? paragraphs.findIndex((p) => p.trim() === image.after!.trim()) : -1;
+  if (image && index < 0) index = paragraphs.length - 1;
+  const html = paragraphs.map((p, i) => {
+    const body = escapeHtml(p)
+      .replace(/https?:\/\/[^\s<]+[^\s<.,;:!?)]/g, (url) => `<a href="${url}">${url}</a>`)
+      .replace(/\n/g, "<br>");
+    const img =
+      image && i === index
+        ? `<p><img src="cid:${image.cid}" alt="${escapeHtml(image.alt)}" width="600" style="width:100%;max-width:600px;height:auto;border:1px solid #e3e3e3;border-radius:8px"></p>`
+        : "";
+    return `<p>${body}</p>${img}`;
+  });
+  return `<!doctype html><html><body style="font-family:-apple-system,Helvetica,Arial,sans-serif;font-size:15px;line-height:1.5;color:#1d1d1f">${html.join("")}</body></html>`;
 }
 
 export interface IncomingMail {
@@ -188,6 +219,8 @@ export function createMailbox(s: MailboxSettings): Mailbox {
         to: mail.to,
         subject: mail.subject,
         text: mail.text,
+        ...(mail.html ? { html: mail.html } : {}),
+        ...(mail.attachments?.length ? { attachments: mail.attachments } : {}),
         messageId,
         ...(mail.inReplyTo ? { inReplyTo: mail.inReplyTo, references: [mail.inReplyTo] } : {}),
       };

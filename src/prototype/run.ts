@@ -35,6 +35,14 @@ const configSchema = z.object({
   keep_days: z.number().int().min(1),
   templates: z.record(z.string(), z.string()),
   fallback: z.string(),
+  // Einheitliches Vorschau-Bild statt Prototyp (src/prototype/teaser.ts) für diese Branchen.
+  teaser: z
+    .object({
+      dir: z.string(),
+      branchen: z.array(z.string()),
+      stil: z.enum(["welt", "vital"]).default("welt"),
+    })
+    .default({ dir: "data/teasers", branchen: [], stil: "welt" }),
 });
 export type PrototypeConfig = z.infer<typeof configSchema>;
 export const loadPrototypeConfig = () => loadYamlConfig("prototype.yaml", configSchema);

@@ -10,6 +10,7 @@ import { latestAudit, latestOkSnapshotId, latestPlacesSnapshot } from "../db/lea
 import { loadPrompt } from "../llm/config.js";
 import { screenRegion } from "../pipeline/audit/images.js";
 import type { Finding } from "../pipeline/audit/schema.js";
+import { teaserExists, teaserPath } from "../prototype/teaser.js";
 import {
   byImpact,
   complimentFact,
@@ -136,6 +137,12 @@ const slug = (s: string) =>
     .slice(0, 40)
     .toLowerCase();
 
+/** Für den Druck verkleinert (ca. 80 mm breit) als data:-URI. */
+async function printImage(path: string): Promise<string> {
+  const jpg = await sharp(path).resize({ width: 1100 }).jpeg({ quality: 82 }).toBuffer();
+  return `data:image/jpeg;base64,${jpg.toString("base64")}`;
+}
+
 /** Hero-Screenshot und Adresse des neuesten Prototyps (oder `null`). */
 async function prototypeHero(
   db: OutreachDeps["db"],
@@ -149,13 +156,8 @@ async function prototypeHero(
   const slug = rows[0]?.slug;
   if (!slug) return null;
   try {
-    // Für den Druck verkleinert (ca. 80 mm breit), der schwarze Entwurfs-Hinweis oben bleibt sichtbar.
-    const jpg = await sharp(join(p.shotsDir, slug, "hero.jpg"))
-      .resize({ width: 1100 })
-      .jpeg({ quality: 82 })
-      .toBuffer();
     return {
-      dataUri: `data:image/jpeg;base64,${jpg.toString("base64")}`,
+      dataUri: await printImage(join(p.shotsDir, slug, "hero.jpg")),
       url: p.baseUrl ? `${p.baseUrl}/${slug}/` : null,
     };
   } catch {
@@ -198,7 +200,15 @@ export async function draftLetter(deps: LetterDeps, company: Company, by: string
   const previous = prior[0]?.meta?.zeilen ?? null;
 
   // Nachher: Kopfbereich des letzten Prototyps, falls es einen gibt.
-  const after = deps.prototype ? await prototypeHero(db, company.id, deps.prototype) : null;
+  // Sonst das einheitliche Vorschau-Bild (ohne QR-Code, es gibt keine Seite dazu).
+  const after =
+    (deps.prototype ? await prototypeHero(db, company.id, deps.prototype) : null) ??
+    (deps.teaserDir && teaserExists(deps.teaserDir, company.id)
+      ? await printImage(teaserPath(deps.teaserDir, company.id)).then(
+          (dataUri) => ({ dataUri, url: null, teaser: true }),
+          () => null,
+        )
+      : null);
 
   const branch = company.branch_key ? deps.branches[company.branch_key] : undefined;
   const data = {
@@ -307,7 +317,7 @@ export async function draftLetter(deps: LetterDeps, company: Company, by: string
   if (marks.filter((m) => m.box).length === 0) warnings.push("Keine Stelle im Bild markiert, bitte prüfen");
   if (!company.street || !company.postal_code)
     warnings.push("Anschrift unvollständig, bitte im Impressum prüfen");
-  if (after && !after.url)
+  if (after && !after.url && !("teaser" in after))
     warnings.push("Vorschau-Adresse fehlt (PREVIEW_BASE_URL), daher kein QR-Code zum Entwurf");
   if (!whatsapp) warnings.push("WhatsApp-Nummer fehlt (OUTREACH_WHATSAPP), daher kein QR-Code");
 

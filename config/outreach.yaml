@@ -71,6 +71,9 @@ kontaktweg:
   # Mit Prototyp (03.10.2026): Link zur Vorschau statt WhatsApp-Link (höchstens ein Link je Mail).
   entwurf_satz: "Ich hab mir auch schon mal erlaubt zu skizzieren, wie Ihre Startseite aussehen könnte: {link}"
   entwurf_satz_du: "Ich hab auch schon mal skizziert, wie eure Startseite aussehen könnte: {link}"
+  # Mit Vorschau-Bild (04.10.2026, Physio): das Bild steht in der Mail direkt unter diesem Satz.
+  bild_satz: "Ich hab mir auch schon mal erlaubt zu skizzieren, wie Ihre Startseite aussehen könnte:"
+  bild_satz_du: "Ich hab auch schon mal skizziert, wie eure Startseite aussehen könnte:"
   email_cta_ohne_whatsapp: Am einfachsten antworten Sie kurz auf diese Mail.
   email_cta_ohne_whatsapp_du: Am einfachsten antwortest du kurz auf diese Mail.
   # Überleitung zum Terminvorschlag ("ich hab was vorbereitet"), wird abgewechselt.

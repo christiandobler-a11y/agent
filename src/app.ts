@@ -22,6 +22,7 @@ import { chromiumLetterRenderer } from "./outreach/letterPdf.js";
 import { loadMailConfig, mailboxFromEnv, type MailConfig, type Mailbox } from "./outreach/mail.js";
 import { createMxCheck } from "./outreach/mx.js";
 import { loadPrototypeConfig } from "./prototype/run.js";
+import { chromiumTeaserShooter } from "./prototype/teaser.js";
 import { loadCrmConfig } from "./crm/status.js";
 import type { PipelineContext } from "./queue/pipeline.js";
 
@@ -118,6 +119,7 @@ export async function createApp(options: { notifier?: Notifier; worker?: boolean
         now: ctx.now,
         contact,
         previewBaseUrl: baseUrl,
+        teaserDir: prototypeConfig.teaser.dir,
         render: chromiumLetterRenderer(process.env.CHROMIUM_PATH),
         prototype: { shotsDir: prototypeConfig.shots_dir, baseUrl },
         desktopScreenPx,
@@ -133,6 +135,12 @@ export async function createApp(options: { notifier?: Notifier; worker?: boolean
         googleApiKey: keys.GOOGLE_API_KEY,
         baseUrl,
         desktopScreenPx,
+      },
+      teaser: {
+        dir: prototypeConfig.teaser.dir,
+        branches: prototypeConfig.teaser.branchen,
+        style: prototypeConfig.teaser.stil,
+        shoot: chromiumTeaserShooter(process.env.CHROMIUM_PATH),
       },
       mx: createMxCheck(),
       lettersDir: "data/letters",

@@ -99,6 +99,7 @@ interface DraftRow {
     subject?: string;
     to?: string | null;
     preview_url?: string | null;
+    teaser?: string;
     pdf?: string;
     png?: string;
     envelope?: string[];
@@ -260,6 +261,9 @@ export async function sendNextCard(api: Api, chatId: number, deps: PlanBotDeps):
     }
   } else {
     const card = planEmailCard(next, draft, pos, deps.mailbox !== null);
+    // Vorschau-Bild, das in der Mail steht, direkt über der Karte zeigen.
+    if (draft.meta.teaser && existsSync(draft.meta.teaser))
+      await api.sendPhoto(chatId, new InputFile(draft.meta.teaser), { disable_notification: true });
     await api.sendMessage(chatId, card.text, {
       parse_mode: "HTML",
       link_preview_options: { is_disabled: true },

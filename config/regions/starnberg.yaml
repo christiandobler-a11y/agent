@@ -1,0 +1,21 @@
+# Landkreis Starnberg (04.10.2026, mit Christian: Physio-Fokus, Nachbar von Weilheim-Schongau). Ortsmitten gerundet,
+# größere Orte zuerst. Zugehörigkeit siehe config/regions/rosenheim.yaml.
+name: Landkreis Starnberg
+admin_areas: [Starnberg]
+search_radius_km: 5
+fallback_max_km: 8
+tiles:
+  - { name: Starnberg, lat: 47.999, lng: 11.341 }
+  - { name: Gauting, lat: 48.0688, lng: 11.378 }
+  - { name: Gilching, lat: 48.1088, lng: 11.2939 }
+  - { name: Herrsching am Ammersee, lat: 47.9998, lng: 11.1729 }
+  - { name: Tutzing, lat: 47.9097, lng: 11.2786 }
+  - { name: Krailling, lat: 48.0997, lng: 11.4058 }
+  - { name: Pöcking, lat: 47.9644, lng: 11.3014 }
+  - { name: Weßling, lat: 48.075, lng: 11.25 }
+  - { name: Berg, lat: 47.9686, lng: 11.3556 }
+  - { name: Feldafing, lat: 47.9447, lng: 11.2964 }
+  - { name: Inning am Ammersee, lat: 48.0753, lng: 11.1547 }
+  - { name: Wörthsee, lat: 48.0722, lng: 11.2017 }
+  - { name: Seefeld, lat: 48.0353, lng: 11.2128 }
+  - { name: Andechs, lat: 47.9747, lng: 11.1828 }

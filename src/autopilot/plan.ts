@@ -11,6 +11,7 @@ import { createFollowUpDraft, dueFollowUps } from "../outreach/followup.js";
 import { draftLetter, type LetterDeps } from "../outreach/letter.js";
 import type { MxCheck } from "../outreach/mx.js";
 import { buildPrototype, type PrototypeDeps } from "../prototype/run.js";
+import { teaserForCompany, usesTeaser, type TeaserDeps } from "../prototype/teaser.js";
 
 /**
  * Morgen-Paket (Phase 2): Avelio bereitet nachts den Tagesplan vor. Zuerst fällige Nachfass-Mails, dann neue Leads
@@ -50,6 +51,8 @@ export interface PlanDeps {
   /** Für Mails (draftEmail) und Briefe (draftLetter, mit Renderer und Prototyp-Screenshots). */
   letter: LetterDeps;
   prototype: PrototypeDeps | null;
+  /** Einheitliches Vorschau-Bild statt Prototyp für bestimmte Branchen (Physio). */
+  teaser?: TeaserDeps | null;
   mx: MxCheck;
   /** Ablage der Brief-PDFs (z. B. data/letters). */
   lettersDir: string;
@@ -209,7 +212,14 @@ export async function buildDailyPlan(deps: PlanDeps, by = "autopilot"): Promise<
           result.skipped.push({ name: company.name, reason: "keine gültige E-Mail und keine Anschrift" });
           return;
         }
-        if (deps.prototype && config.prototyp_fuer_neue && company.segment !== "NO_WEBSITE") {
+        if (usesTeaser(deps.teaser, company)) {
+          try {
+            await teaserForCompany(db, deps.teaser!, company);
+            result.prototypes++;
+          } catch (err) {
+            result.warnings.push(`Vorschau-Bild ${company.name}: ${String(err).slice(0, 120)}`);
+          }
+        } else if (deps.prototype && config.prototyp_fuer_neue && company.segment !== "NO_WEBSITE") {
           try {
             const p = await buildPrototype(deps.prototype, company, by);
             if (!("kind" in p)) result.prototypes++;

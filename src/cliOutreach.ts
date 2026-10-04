@@ -7,6 +7,7 @@ import { loadOutreachConfig } from "./outreach/config.js";
 import { draftLetter } from "./outreach/letter.js";
 import { chromiumLetterRenderer } from "./outreach/letterPdf.js";
 import { buildPrototype, loadPrototypeConfig, type PrototypeDeps } from "./prototype/run.js";
+import { chromiumTeaserShooter, teaserForCompany } from "./prototype/teaser.js";
 
 /** Befund-Seite als PDF: `avelio letter <Firma>` schreibt PDF und Vorschau nach data/letters/. */
 export async function letter(argv: string[]): Promise<number> {
@@ -41,6 +42,7 @@ export async function letter(argv: string[]): Promise<number> {
           shotsDir: loadPrototypeConfig().shots_dir,
           baseUrl: env.PREVIEW_BASE_URL?.replace(/\/$/, "") ?? null,
         },
+        teaserDir: loadPrototypeConfig().teaser.dir,
         desktopScreenPx: crawl.desktop.height * crawl.desktop.scale,
       },
       found.company,
@@ -98,6 +100,42 @@ export async function prototype(argv: string[]): Promise<number> {
     console.log(`Screenshots: ${result.shots.hero}, ${result.shots.full}, ${result.shots.mobile}`);
     if (result.warnings.length) console.log(`⚠️ ${result.warnings.join(" · ")}`);
     console.log(`Kosten ${result.costUsd.toFixed(3).replace(".", ",")} $`);
+    return 0;
+  } finally {
+    await app.close();
+  }
+}
+
+/** Vorschau-Bild (Physio, ohne LLM): `avelio teaser <Firma>` schreibt data/teasers/<Firmen-ID>.jpg. */
+export async function teaser(argv: string[]): Promise<number> {
+  const ref = argv.join(" ").trim();
+  if (!ref) {
+    console.error("Verwendung: avelio teaser <Firmen-ID|Domain|Name>");
+    return 2;
+  }
+  const app = await createApp();
+  try {
+    const found = await findLead(app.ctx.db, ref);
+    if (found.kind !== "found") {
+      console.log(
+        found.kind === "none"
+          ? `Keine Firma gefunden für "${ref}".`
+          : `Mehrere Treffer: ${found.candidates.map((c) => c.name).join(", ")}`,
+      );
+      return 1;
+    }
+    const config = loadPrototypeConfig().teaser;
+    const path = await teaserForCompany(
+      app.ctx.db,
+      {
+        ...config,
+        branches: config.branchen,
+        style: config.stil,
+        shoot: chromiumTeaserShooter(process.env.CHROMIUM_PATH),
+      },
+      found.company,
+    );
+    console.log(`Vorschau-Bild: ${path}`);
     return 0;
   } finally {
     await app.close();

@@ -22,7 +22,7 @@ import { createPageSpeedClient } from "./pipeline/crawl/pagespeed.js";
 import { crawlCompany, type CrawlOutcome } from "./pipeline/crawl/run.js";
 import { mapLimit } from "./util/mapLimit.js";
 import { audit, explain, score } from "./cliLeads.js";
-import { letter, prototype } from "./cliOutreach.js";
+import { letter, prototype, teaser } from "./cliOutreach.js";
 import { chat, coverage, failed, runs, search, worker } from "./cliQueue.js";
 import { calibrate } from "./cliCalibrate.js";
 
@@ -283,6 +283,7 @@ const commands: Record<string, (args: string[]) => Promise<number>> = {
   crawl,
   letter,
   prototype,
+  teaser,
   costs: showCosts,
   "check-env": checkEnv,
   migrate: runMigrations,
