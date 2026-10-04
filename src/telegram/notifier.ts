@@ -10,6 +10,7 @@ import {
   reminderMessage,
   runCompletedMessage,
 } from "./format.js";
+import { levelLine, reportProgress } from "./game.js";
 import { sendPlanHeader } from "./plan.js";
 
 /**
@@ -80,11 +81,16 @@ export function telegramNotifier(
         );
     },
     async eveningSummary(s) {
-      await sendAll(targets(), eveningSummaryText(s));
+      const game = s.game
+        ? `\n\n${s.game.gained > 0 ? `⭐ Heute <b>+${s.game.gained} XP</b>\n` : ""}${levelLine(s.game.state)}`
+        : "";
+      await sendAll(targets(), eveningSummaryText(s) + game);
     },
     async mailEvent(e) {
       const { text, keyboard } = mailEventMessage(e);
       await sendAll(targets(), text, keyboard);
+      // Antwort = XP; neue Level oder Abzeichen gleich mitfeiern.
+      if (opts.db) await reportProgress(api, targets(), opts.db, new Date());
     },
   };
 }

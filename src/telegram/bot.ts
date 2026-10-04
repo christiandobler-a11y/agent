@@ -24,6 +24,8 @@ import {
   sendPlanHeader,
   type PlanBotDeps,
 } from "./plan.js";
+import { levelText, reportProgress, xpSuffix } from "./game.js";
+import { gameState, loadGameConfig } from "../game/xp.js";
 import { buildPrototype, type PrototypeDeps } from "../prototype/run.js";
 import { chromiumLetterRenderer, type LetterRenderer } from "../outreach/letterPdf.js";
 import { raiseBudgetToday } from "../llm/budget.js";
@@ -138,6 +140,7 @@ export function telegramFetch(fetchFn: typeof globalThis.fetch) {
 /** Befehlsmenü in Telegram (setMyCommands). */
 export const BOT_COMMANDS = [
   { command: "heute", description: "Morgen-Paket: heute vorbereitete Kontakte" },
+  { command: "level", description: "Dein Level, XP und Abzeichen" },
   { command: "leads", description: "Beste Leads mit Buttons" },
   { command: "lead", description: "Lead-Karte öffnen, z. B. /lead Ariadne" },
   { command: "pipeline", description: "Vertrieb und offene Erinnerungen" },
@@ -338,6 +341,11 @@ export function createBot(options: BotOptions): AvelioBot {
     });
   });
 
+  bot.command(["level", "xp"], async (ctx) => {
+    const c = loadGameConfig();
+    await ctx.reply(levelText(await gameState(pipeline.db, pipeline.now(), c), c), { parse_mode: "HTML" });
+  });
+
   bot.command(["heute", "paket"], async (ctx) => {
     if (!planDeps()) {
       await ctx.reply("Das Morgen-Paket ist noch nicht eingerichtet.");
@@ -502,8 +510,9 @@ export function createBot(options: BotOptions): AvelioBot {
           now,
           followUpDays: crmConfig().follow_up_days,
         });
+        const p = await reportProgress(ctx.api, ctx.chat ? [ctx.chat.id] : [], pipeline.db, now);
         await ctx.answerCallbackQuery({
-          text: `Vermerkt: ${SALES_LABELS[crm.status]} (es wurde nichts verschickt)${reminder ? ` · Nachfassen in ${crmConfig().follow_up_days} Tagen` : ""}`,
+          text: `Vermerkt: ${SALES_LABELS[crm.status]} (es wurde nichts verschickt)${reminder ? ` · Nachfassen in ${crmConfig().follow_up_days} Tagen` : ""}${xpSuffix(p)}`,
         });
       } else if (crm.kind === "remind") {
         await addReminder(pipeline.db, company.id, {

@@ -92,6 +92,9 @@ ausprobieren kann. Nach Schritt 6 ist ein Abstimmungstermin (Kalibrierung) vorge
   abends Bilanz. Jeder Schritt einmal je Tag über `claimState`. **Nachtsuche** (`src/autopilot/search.ts`): ab
   `suche.ab` die nächste nicht vollständig abgesuchte Kombination Region × Branche als Komplett-Suche
   (`requested_by = 'autopilot'`, keine Einzelmeldung in der Nacht), höchstens `pro_nacht`, nie zwei gleichzeitig.
+- **Spiel** (`src/game/xp.ts`, `config/game.yaml`, Telegram `/level`, `src/telegram/game.ts`): XP, Level und Abzeichen
+  werden nur aus dem Verlauf berechnet (Status-Wechsel je Firma einmal, Nachfass-Mails, perfekte Tage im Morgen-Paket),
+  nie extra gezählt. `checkProgress` merkt sich in `app_state` (`game:seen`), was schon gefeiert wurde.
 - Recherche-Reihenfolge: Places → Dubletten → **Gate (Code) → Prefilter (LLM)**. Das Gate läuft zuerst, weil es
   nichts kostet. Skip-Gründe entsprechen den Schlüsseln in `config/recheck.yaml`.
 

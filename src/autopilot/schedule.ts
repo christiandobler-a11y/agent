@@ -1,5 +1,6 @@
 import { claimState, getState, setState } from "../db/appState.js";
 import { countPlan, planItems, type PlanCounts } from "../db/plan.js";
+import { gameState, gameStats, loadGameConfig, xpOf, type GameState } from "../game/xp.js";
 import { checkReplies } from "../outreach/send.js";
 import { PLAN_QUEUE } from "../queue/boss.js";
 import type { PipelineContext } from "../queue/pipeline.js";
@@ -18,6 +19,8 @@ export interface EveningSummary {
   counts: PlanCounts;
   replies: string[];
   bounces: string[];
+  /** Spielstand und XP von heute (fehlt, wenn die Spiel-Konfiguration nicht lesbar ist). */
+  game?: { gained: number; state: GameState } | null;
 }
 
 export async function autopilotTick(ctx: PipelineContext): Promise<void> {
@@ -68,7 +71,22 @@ async function eveningSummary(
         and (i.created_at at time zone 'Europe/Berlin')::date = $1::date`,
     [date],
   );
+  let game: EveningSummary["game"] = null;
+  try {
+    const c = loadGameConfig();
+    const now = ctx.now();
+    const state = await gameState(ctx.db, now, c);
+    const { rows: start } = await ctx.db.query<{ t: Date }>(
+      "select ($1::date::timestamp at time zone 'Europe/Berlin') as t",
+      [date],
+    );
+    const before = xpOf(await gameStats(ctx.db, now, start[0]!.t), c);
+    game = { gained: state.xp - before, state };
+  } catch {
+    // ohne Spielstand
+  }
   return {
+    game,
     date,
     counts: countPlan(items),
     replies: rows.filter((r) => r.body.startsWith("Antwort")).map((r) => r.name),

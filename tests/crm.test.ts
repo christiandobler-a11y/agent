@@ -193,9 +193,10 @@ describeDb("CRM mit Datenbank", () => {
     const contacted = keyboard.flat().find((b) => b.text.includes("kontaktiert"))!;
 
     await bot.handleUpdate(callbackUpdate(contacted.callback_data));
-    expect(last("answerCallbackQuery")).toMatchObject({
-      text: "Vermerkt: kontaktiert (es wurde nichts verschickt) · Nachfassen in 5 Tagen",
-    });
+    // Dazu XP fürs Spiel (Höhe hängt von den übrigen Leads in dieser Test-Datenbank ab).
+    expect(String(last("answerCallbackQuery").text)).toMatch(
+      /^Vermerkt: kontaktiert \(es wurde nichts verschickt\) · Nachfassen in 5 Tagen · \+\d+ XP$/,
+    );
     expect(String(last("editMessageText").text)).toContain("Status: 📤 kontaktiert");
     expect(String(last("editMessageText").text)).toContain("⏰ Nachfassen: noch keine Antwort?");
 

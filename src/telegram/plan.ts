@@ -21,7 +21,9 @@ import { draftEmail, type OutreachDeps } from "../outreach/draft.js";
 import { draftLetter, type LetterDeps } from "../outreach/letter.js";
 import type { MailConfig, Mailbox } from "../outreach/mail.js";
 import { sendDraft } from "../outreach/send.js";
+import { gameState } from "../game/xp.js";
 import { callbackData, escapeHtml } from "./format.js";
+import { levelLine, reportProgress, xpSuffix } from "./game.js";
 
 /**
  * Morgen-Paket in Telegram: Kopf mit Zähler ("Mails 3/15"), darunter eine Karte nach der anderen. Je Karte ein Knopf
@@ -53,7 +55,12 @@ const WEEKDAY = new Intl.DateTimeFormat("de-DE", {
   timeZone: "Europe/Berlin",
 });
 
-export function planHeaderText(date: string, counts: PlanCounts, night: readonly string[] = []): string {
+export function planHeaderText(
+  date: string,
+  counts: PlanCounts,
+  night: readonly string[] = [],
+  game: string | null = null,
+): string {
   const line = (emoji: string, label: string, c: { done: number; total: number }) =>
     c.total > 0 ? `${emoji} ${label}: <b>${c.done}/${c.total}</b>${c.done === c.total ? " ✅" : ""}` : null;
   const lines = [
@@ -65,7 +72,9 @@ export function planHeaderText(date: string, counts: PlanCounts, night: readonly
   const done = counts.email.done + counts.letter.done + counts.followup.done;
   const title = `☀️ <b>Morgen-Paket</b> · ${escapeHtml(WEEKDAY.format(new Date(`${date}T12:00:00Z`)))}`;
   const nightBlock = night.length > 0 ? ["", "🌙 <b>Heute Nacht:</b>", ...night.map(escapeHtml)] : [];
-  if (total === 0) return [title, "", "Heute ist nichts vorbereitet.", ...nightBlock].join("\n");
+  const gameBlock = game ? ["", game] : [];
+  if (total === 0)
+    return [title, "", "Heute ist nichts vorbereitet.", ...nightBlock, ...gameBlock].join("\n");
   return [
     title,
     "",
@@ -75,6 +84,7 @@ export function planHeaderText(date: string, counts: PlanCounts, night: readonly
       ? "🎉 Alles erledigt für heute."
       : "Alles ist vorbereitet. Einmal drüberlesen, dann ein Knopf.",
     ...nightBlock,
+    ...gameBlock,
   ].join("\n");
 }
 
@@ -180,6 +190,15 @@ const HEADER_KEY = (date: string) => `plan-header:${date}`;
 const NIGHT_KEY = (date: string) => `plan-night:${date}`;
 type HeaderRef = { chatId: number; messageId: number }[];
 
+/** Level-Zeile für den Kopf (fehlt die Spiel-Konfiguration o. Ä., einfach ohne). */
+async function gameLine(db: Db): Promise<string | null> {
+  try {
+    return levelLine(await gameState(db, new Date()));
+  } catch {
+    return null;
+  }
+}
+
 /** Kopf-Nachricht schicken und merken (für spätere Zähler-Updates). */
 export async function sendPlanHeader(
   api: Api,
@@ -192,9 +211,10 @@ export async function sendPlanHeader(
   if (nightReport) await setState(db, NIGHT_KEY(date), nightReport);
   const night = (await getState<string[]>(db, NIGHT_KEY(date))) ?? [];
   const counts = countPlan(await planItems(db, date));
+  const game = await gameLine(db);
   const refs: HeaderRef = [];
   for (const chatId of chatIds) {
-    const m = await api.sendMessage(chatId, planHeaderText(date, counts, night), {
+    const m = await api.sendMessage(chatId, planHeaderText(date, counts, night, game), {
       parse_mode: "HTML",
       reply_markup: { inline_keyboard: planHeaderKeyboard(counts, canSend) },
     });
@@ -207,9 +227,10 @@ async function refreshHeader(api: Api, db: Db, date: string, canSend: boolean): 
   const refs = (await getState<HeaderRef>(db, HEADER_KEY(date))) ?? [];
   const night = (await getState<string[]>(db, NIGHT_KEY(date))) ?? [];
   const counts = countPlan(await planItems(db, date));
+  const game = await gameLine(db);
   for (const r of refs) {
     await api
-      .editMessageText(r.chatId, r.messageId, planHeaderText(date, counts, night), {
+      .editMessageText(r.chatId, r.messageId, planHeaderText(date, counts, night, game), {
         parse_mode: "HTML",
         reply_markup: { inline_keyboard: planHeaderKeyboard(counts, canSend) },
       })
@@ -308,6 +329,10 @@ async function closeCard(ctx: Context, note: string): Promise<void> {
   }
 }
 
+/** XP prüfen und neue Level/Abzeichen in diesem Chat feiern. */
+const progress = (ctx: Context, deps: PlanBotDeps) =>
+  ctx.chat ? reportProgress(ctx.api, [ctx.chat.id], deps.db, deps.now()) : Promise.resolve(null);
+
 /** Callback des Morgen-Pakets verarbeiten; `false`, wenn es keiner war. */
 export async function handlePlanCallback(ctx: Context, deps: PlanBotDeps, by: string): Promise<boolean> {
   const data = ctx.callbackQuery?.data;
@@ -338,8 +363,12 @@ export async function handlePlanCallback(ctx: Context, deps: PlanBotDeps, by: st
             : r.kind === "error"
               ? `Senden fehlgeschlagen: ${r.message.slice(0, 150)}`
               : "Keine Empfänger-Adresse";
-    await ctx.answerCallbackQuery({ text, show_alert: r.kind !== "sent" && r.kind !== "already_sent" });
-    if (r.kind === "sent" || r.kind === "already_sent") await closeCard(ctx, `✅ ${text}`);
+    const p = r.kind === "sent" ? await progress(ctx, deps) : null;
+    await ctx.answerCallbackQuery({
+      text: text + xpSuffix(p),
+      show_alert: r.kind !== "sent" && r.kind !== "already_sent",
+    });
+    if (r.kind === "sent" || r.kind === "already_sent") await closeCard(ctx, `✅ ${text}${xpSuffix(p)}`);
     return true;
   }
   // Alle offenen Mails auf einmal (mit Rückfrage).
@@ -392,8 +421,11 @@ export async function handlePlanCallback(ctx: Context, deps: PlanBotDeps, by: st
         );
       }
     }
+    const p = sent > 0 ? await progress(ctx, deps) : null;
     await ctx
-      .editMessageText(`📤 ${sent} Mails gesendet.${problems.length ? `\n⚠️ ${problems.join("\n⚠️ ")}` : ""}`)
+      .editMessageText(
+        `📤 ${sent} Mails gesendet${xpSuffix(p)}.${problems.length ? `\n⚠️ ${problems.join("\n⚠️ ")}` : ""}`,
+      )
       .catch(() => undefined);
     await refreshHeader(ctx.api, db, date, true);
     await showNext(ctx, deps);
@@ -451,8 +483,14 @@ export async function handlePlanCallback(ctx: Context, deps: PlanBotDeps, by: st
       return true;
     }
     await setPlanStatus(db, item.id, "done", now);
-    await ctx.answerCallbackQuery({ text: r.kind === "sent" ? `Gesendet an ${r.to}` : "War schon gesendet" });
-    await closeCard(ctx, r.kind === "sent" ? `✅ Gesendet an ${r.to}` : "✅ War schon gesendet");
+    const p = await progress(ctx, deps);
+    await ctx.answerCallbackQuery({
+      text: r.kind === "sent" ? `Gesendet an ${r.to}${xpSuffix(p)}` : "War schon gesendet",
+    });
+    await closeCard(
+      ctx,
+      r.kind === "sent" ? `✅ Gesendet an ${r.to}${xpSuffix(p)}` : "✅ War schon gesendet",
+    );
   } else if (cb.kind === "done") {
     await setPlanStatus(db, item.id, "done", now);
     if (item.kind === "new") {
@@ -464,8 +502,9 @@ export async function handlePlanCallback(ctx: Context, deps: PlanBotDeps, by: st
         followUpDays: deps.followUpDays,
       });
     }
-    await ctx.answerCallbackQuery({ text: "Vermerkt" });
-    await closeCard(ctx, item.channel === "letter" ? "📮 Eingeworfen" : "✅ Gesendet");
+    const p = await progress(ctx, deps);
+    await ctx.answerCallbackQuery({ text: `Vermerkt${xpSuffix(p)}` });
+    await closeCard(ctx, `${item.channel === "letter" ? "📮 Eingeworfen" : "✅ Gesendet"}${xpSuffix(p)}`);
   } else if (cb.kind === "later") {
     await setPlanStatus(db, item.id, "later", now);
     await ctx.answerCallbackQuery({ text: "Kommt an einem anderen Tag wieder" });

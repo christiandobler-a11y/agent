@@ -1,0 +1,35 @@
+# Fortschritt als kleines Spiel (04.10.2026, Christians Idee). Alles wird aus dem Verlauf berechnet (interactions,
+# outreach_plan), nichts extra gezählt: jeder Lead zählt je Ereignis nur einmal.
+xp:
+  kontaktiert: 5 # Lead zum ersten Mal kontaktiert (Mail gesendet oder Brief eingeworfen)
+  nachgefasst: 1 # Nachfass-Mail gesendet
+  antwort: 15 # Lead hat geantwortet
+  interessiert: 25 # Lead ist interessiert (Termin)
+  gewonnen: 100 # Kunde gewonnen
+  perfekter_tag: 10 # Morgen-Paket komplett abgearbeitet
+
+# Level nach XP; bei 5 XP je Lead entspricht das grob 10, 20, 30, 50, 100 … kontaktierten Leads.
+level:
+  - { ab: 0, name: Startklar, emoji: "🌱" }
+  - { ab: 50, name: Erste Zehn, emoji: "📬" }
+  - { ab: 100, name: Postbote, emoji: "✉️" }
+  - { ab: 150, name: Kaltakquise-Kadett, emoji: "🎯" }
+  - { ab: 250, name: Durchstarter, emoji: "🔥" }
+  - { ab: 500, name: Hunderter-Club, emoji: "💯" }
+  - { ab: 750, name: Pipeline-Pilot, emoji: "🚀" }
+  - { ab: 1000, name: Akquise-Profi, emoji: "🏆" }
+  - { ab: 1500, name: Physio-Flüsterer, emoji: "👑" }
+  - { ab: 2500, name: Legende, emoji: "💎" }
+  - { ab: 5000, name: Avelio-Imperium, emoji: "🌍" }
+
+# Abzeichen (Bedingung im Code, src/game/xp.ts, gleiche Schlüssel).
+abzeichen:
+  erste_mail: { name: Erster Schuss, emoji: "📤", text: Der erste Lead ist angeschrieben. }
+  erste_antwort: { name: Eis gebrochen, emoji: "💬", text: Die erste Antwort ist da. }
+  erster_interessent: { name: Fuß in der Tür, emoji: "🤝", text: Der erste Interessent. }
+  erster_kunde: { name: Erster Kunde, emoji: "🥇", text: Der erste Auftrag ist gewonnen. }
+  drei_kunden: { name: Hattrick, emoji: "🎩", text: Drei Kunden gewonnen. }
+  zehn_kunden: { name: Agentur-Modus, emoji: "🏢", text: Zehn Kunden gewonnen. }
+  perfekter_tag: { name: Perfekter Tag, emoji: "✅", text: Ein Morgen-Paket komplett abgearbeitet. }
+  serie_5: { name: Am Ball, emoji: "⚡", text: Fünf Pakete in Folge komplett. }
+  serie_20: { name: Maschine, emoji: "🤖", text: Zwanzig Pakete in Folge komplett. }
