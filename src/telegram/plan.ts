@@ -24,7 +24,7 @@ import { createConfirmDraft, icsInvite, terminLabel } from "../outreach/confirm.
 import { queuePlanMails } from "../outreach/queue.js";
 import { sendDraft } from "../outreach/send.js";
 import { gameState } from "../game/xp.js";
-import { callbackData, escapeHtml } from "./format.js";
+import { callbackData, escapeHtml, websiteButton } from "./format.js";
 import { levelLine, reportProgress, xpSuffix } from "./game.js";
 
 /**
@@ -147,6 +147,8 @@ export function planEmailCard(
   ];
   const extra: InlineKeyboardButton[] = [];
   if (draft.meta.preview_url) extra.push({ text: "🎨 Entwurf ansehen", url: draft.meta.preview_url });
+  const site = websiteButton(item.website_url);
+  if (site) extra.push(site);
   extra.push({ text: "🗂 Lead", callback_data: callbackData("c", item.company_id) });
   keyboard.push(extra);
   return { text, keyboard };
@@ -175,6 +177,7 @@ export function planLetterCard(
         { text: "⏭️ Später", callback_data: planCallback({ kind: "later", id: item.id }) },
         { text: "🗑️ Nicht anschreiben", callback_data: planCallback({ kind: "drop", id: item.id }) },
       ],
+      ...[websiteButton(item.website_url)].filter((b) => b !== null).map((b) => [b]),
     ],
   };
 }

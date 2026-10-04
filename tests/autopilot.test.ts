@@ -21,7 +21,7 @@ import { getState, setState } from "../src/db/appState.js";
 import { upsertCompany, type Company } from "../src/db/companies.js";
 import { insertDraft, takenSlots } from "../src/db/drafts.js";
 import { createConfirmDraft, icsInvite, terminLabel } from "../src/outreach/confirm.js";
-import { mailEventMessage } from "../src/telegram/format.js";
+import { mailEventMessage, websiteButton } from "../src/telegram/format.js";
 import { countPlan, planItems, type PlanItem } from "../src/db/plan.js";
 import { insertWebsiteSnapshot } from "../src/db/websiteSnapshots.js";
 import type { LlmGateway } from "../src/llm/gateway.js";
@@ -237,6 +237,25 @@ describe("Morgen-Paket (rein)", () => {
     expect(replyExcerpt(incoming({}).text)).toBe("Hallo Christian,\ngern, Dienstag passt.");
     expect(replySubject("Re: Hallo")).toBe("Re: Hallo");
     expect(replySubject("Hallo")).toBe("Re: Hallo");
+  });
+
+  it("Knopf zur jetzigen Website: nur mit gültiger Adresse", () => {
+    expect(websiteButton("www.physio-inn.de")).toEqual({
+      text: "🌐 Jetzige Website",
+      url: "https://www.physio-inn.de/",
+    });
+    expect(websiteButton("http://physio.de/team")).toMatchObject({ url: "http://physio.de/team" });
+    expect(websiteButton(null)).toBeNull();
+    expect(websiteButton("kein link")).toBeNull();
+    expect(websiteButton("ftp://x.de")).toBeNull();
+    const msg = mailEventMessage({
+      kind: "bounce",
+      companyId: "c1",
+      companyName: "Physio",
+      address: "a@b.de",
+      website: "https://physio.de",
+    });
+    expect(msg.keyboard[0]![0]).toEqual({ text: "🌐 Jetzige Website", url: "https://physio.de/" });
   });
 
   it("Mittags-Zwischenstand", () => {

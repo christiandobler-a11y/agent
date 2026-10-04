@@ -276,7 +276,13 @@ export async function checkReplies(deps: ReplyDeps): Promise<MailEvent[]> {
           [hit.draftId, now.toISOString()],
         );
         const company = await noteFor(db, hit.companyId, `Unzustellbar: ${hit.to}`, now);
-        events.push({ kind: "bounce", companyId: hit.companyId, companyName: company.name, address: hit.to });
+        events.push({
+          kind: "bounce",
+          companyId: hit.companyId,
+          companyName: company.name,
+          address: hit.to,
+          website: company.website_url,
+        });
       }
     } else {
       const companyId = matchReply(mail, sent);
@@ -293,6 +299,7 @@ export async function checkReplies(deps: ReplyDeps): Promise<MailEvent[]> {
           kind: "auto_reply",
           companyId,
           companyName: company.name,
+          website: company.website_url,
           subject: mail.subject,
           excerpt,
         });
@@ -332,6 +339,7 @@ export async function checkReplies(deps: ReplyDeps): Promise<MailEvent[]> {
           kind: "reply",
           companyId,
           companyName: company.name,
+          website: company.website_url,
           from: mail.from,
           subject: mail.subject,
           excerpt,

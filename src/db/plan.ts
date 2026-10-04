@@ -22,6 +22,7 @@ export interface PlanItem {
 export interface PlanItemWithCompany extends PlanItem {
   company_name: string;
   current_score: number | null;
+  website_url: string | null;
 }
 
 export async function addPlanItem(
@@ -40,7 +41,7 @@ export async function addPlanItem(
 
 export async function planItems(db: DbClient, date: string): Promise<PlanItemWithCompany[]> {
   const { rows } = await db.query<PlanItemWithCompany>(
-    `select p.*, p.plan_date::text as plan_date, c.name as company_name, c.current_score
+    `select p.*, p.plan_date::text as plan_date, c.name as company_name, c.current_score, c.website_url
        from outreach_plan p join companies c on c.id = p.company_id
       where p.plan_date = $1 order by p.position`,
     [date],
@@ -50,7 +51,7 @@ export async function planItems(db: DbClient, date: string): Promise<PlanItemWit
 
 export async function planItem(db: DbClient, id: string): Promise<PlanItemWithCompany | null> {
   const { rows } = await db.query<PlanItemWithCompany>(
-    `select p.*, p.plan_date::text as plan_date, c.name as company_name, c.current_score
+    `select p.*, p.plan_date::text as plan_date, c.name as company_name, c.current_score, c.website_url
        from outreach_plan p join companies c on c.id = p.company_id where p.id = $1`,
     [id],
   );

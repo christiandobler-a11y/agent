@@ -46,8 +46,8 @@ export interface Notifier {
 
 export type DueReminder = Interaction & { company_name: string };
 
-/** Ereignisse aus Christians Posteingang (Antwort erkannt, Mail unzustellbar). */
-export type MailEvent =
+/** Ereignisse aus Christians Posteingang (Antwort erkannt, Mail unzustellbar). `website` = jetzige Website der Firma. */
+export type MailEvent = { website?: string | null } & (
   | {
       kind: "reply";
       companyId: string;
@@ -60,7 +60,8 @@ export type MailEvent =
     }
   | { kind: "bounce"; companyId: string; companyName: string; address: string }
   /** Abwesenheitsnotiz o. Ä.: nur zur Info, Nachfassen bleibt aktiv. */
-  | { kind: "auto_reply"; companyId: string; companyName: string; subject: string | null; excerpt: string };
+  | { kind: "auto_reply"; companyId: string; companyName: string; subject: string | null; excerpt: string }
+);
 
 const log = (msg: string, extra: Record<string, unknown>) =>
   console.log(JSON.stringify({ level: "info", msg, ...extra }));

@@ -97,6 +97,25 @@ export function designNotesMessage(
 
 const decimal = (n: number) => n.toFixed(1).replace(".", ",");
 
+/**
+ * Knopf zur jetzigen Website eines Betriebs (Christian, 04.10.2026: bei jeder Praxis gleich anklickbar). `null` bei
+ * fehlender oder ungültiger Adresse, denn Telegram lehnt die ganze Nachricht ab, wenn ein Knopf-Link nicht passt.
+ */
+export function websiteButton(
+  url: string | null | undefined,
+  text = "🌐 Jetzige Website",
+): InlineKeyboardButton | null {
+  const raw = url?.trim();
+  if (!raw) return null;
+  try {
+    const u = new URL(/^https?:\/\//i.test(raw) ? raw : `https://${raw}`);
+    if (!["http:", "https:"].includes(u.protocol) || !u.hostname.includes(".")) return null;
+    return { text, url: u.href };
+  } catch {
+    return null;
+  }
+}
+
 /** Karte zum Bewerten: bewusst ohne Score, damit das Bauchgefühl unbeeinflusst bleibt. */
 export function ratingCardMessage(
   card: RatingCard,
@@ -130,7 +149,14 @@ export function ratingCardMessage(
         { text: "C", callback_data: gradeCallback("C", c.id) },
         { text: "Weiß nicht", callback_data: gradeCallback("X", c.id) },
       ],
-      ...(c.website_url ? [[{ text: "💡 Als Vorbild merken", callback_data: inspoCallback(c.id) }]] : []),
+      ...(c.website_url
+        ? [
+            [
+              ...[websiteButton(c.website_url, "🌐 Website ansehen")].filter((b) => b !== null),
+              { text: "💡 Als Vorbild merken", callback_data: inspoCallback(c.id) },
+            ],
+          ]
+        : []),
     ],
   };
 }
@@ -310,7 +336,10 @@ export function leadCrmCard(
           callback_data: crmCallback({ kind: "offer", paket: "mehrseitig", companyId: c.id }),
         },
       ],
-      [{ text: "🎨 Prototyp bauen", callback_data: crmCallback({ kind: "prototype", companyId: c.id }) }],
+      [
+        ...[websiteButton(c.website_url)].filter((b) => b !== null),
+        { text: "🎨 Prototyp bauen", callback_data: crmCallback({ kind: "prototype", companyId: c.id }) },
+      ],
       [
         { text: "⏰ in 3 Tagen", callback_data: crmCallback({ kind: "remind", days: 3, companyId: c.id }) },
         { text: "⏰ in 7 Tagen", callback_data: crmCallback({ kind: "remind", days: 7, companyId: c.id }) },
@@ -419,6 +448,7 @@ export function emailDraftMessages(
             },
         { text: "🔄 Neu schreiben", callback_data: crmCallback({ kind: "email", companyId: company.id }) },
       ],
+      ...[websiteButton(company.website_url)].filter((b) => b !== null).map((b) => [b]),
     ],
   };
 }
@@ -479,7 +509,12 @@ export function prototypeMessage(
 
 /** Antwort erkannt bzw. Mail unzustellbar (aus dem Posteingang). */
 export function mailEventMessage(e: MailEvent): { text: string; keyboard: InlineKeyboardButton[][] } {
-  const open = [[{ text: "🗂 Lead öffnen", callback_data: callbackData("c", e.companyId) }]];
+  const open = [
+    [
+      ...[websiteButton(e.website)].filter((b) => b !== null),
+      { text: "🗂 Lead öffnen", callback_data: callbackData("c", e.companyId) },
+    ],
+  ];
   if (e.kind === "bounce") {
     return {
       text: `⚠️ <b>Unzustellbar:</b> ${escapeHtml(e.companyName)}\nDie Mail an <code>${escapeHtml(e.address)}</code> kam zurück. Vielleicht per Brief?`,

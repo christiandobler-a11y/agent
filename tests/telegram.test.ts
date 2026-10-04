@@ -493,7 +493,8 @@ describeDb("Telegram-Bot und Manager mit Datenbank", () => {
 
     await bot.handleUpdate(textUpdate(ALLOWED, "/kalibrieren"));
     expect(sent().at(-1)).toContain("Physio Vorbild");
-    const inspo = keyboard()[1]![0]!.callback_data;
+    expect(keyboard()[1]![0]).toMatchObject({ text: "🌐 Website ansehen" });
+    const inspo = keyboard()[1]![1]!.callback_data;
     expect(inspo).toBe(`iv:${physio.id}`);
     await bot.handleUpdate(callbackUpdate(ALLOWED, inspo));
     expect(sent().at(-1)).toContain("Was gefällt dir an der Seite?");
