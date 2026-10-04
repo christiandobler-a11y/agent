@@ -45,6 +45,18 @@ export interface TeaserData {
  * Farbwelten für den Stil "vital" (config/prototype.yaml → teaser.farbe). primary = Flächen und Schrift,
  * accent = Termin-Knopf, veil = Farbschleier über dem Foto.
  */
+interface Palette {
+  primary: string;
+  accent: string;
+  ink: string;
+  veil: string;
+  label: string;
+  /** Seitenhintergrund (sonst Weiß), dezente Flächen (Kacheln, Linien), Schrift auf Akzent-Knöpfen (sonst Weiß). */
+  bg?: string;
+  soft?: string;
+  onAccent?: string;
+}
+
 export const VITAL_PALETTES = {
   petrol: {
     primary: "#1f5f68",
@@ -88,6 +100,17 @@ export const VITAL_PALETTES = {
     veil: "rgba(30,32,36,.74)",
     label: "Anthrazit + Rot",
   },
+  // 04.10.2026 (Christians Farbwelt): tiefes Petrol, frisches Türkis, warmes Off-White, Anthrazit, helles Aqua.
+  aqua: {
+    primary: "#1d7184",
+    accent: "#41d6c3",
+    ink: "#23343a",
+    veil: "rgba(22,104,124,.70)",
+    label: "Petrol + Türkis auf Off-White",
+    bg: "#f7f5ef",
+    soft: "#e8f4f2",
+    onAccent: "#23343a",
+  },
   gelb: {
     primary: "#2b303b",
     accent: "#f5b800",
@@ -95,11 +118,11 @@ export const VITAL_PALETTES = {
     veil: "rgba(58,63,72,.62)",
     label: "Dunkelblau + Gelb (Elementa)",
   },
-} as const;
+} satisfies Record<string, Palette>;
 export type VitalPalette = keyof typeof VITAL_PALETTES;
 
-const paletteOf = (d: Pick<TeaserData, "palette">) =>
-  VITAL_PALETTES[(d.palette ?? "petrol") as VitalPalette] ?? VITAL_PALETTES.petrol;
+const paletteOf = (d: Pick<TeaserData, "palette">): Palette =>
+  (VITAL_PALETTES as Record<string, Palette>)[d.palette ?? "petrol"] ?? VITAL_PALETTES.petrol;
 
 /** Stockfotos (Unsplash-Lizenz, kommerziell frei, siehe assets/teaser/physio/QUELLEN.md); erstes = Favorit. */
 export const PHYSIO_PHOTOS = [
@@ -695,6 +718,8 @@ interface RestTheme {
   veil?: string;
   shapeAccent?: string;
   shapeDark?: string;
+  bg?: string;
+  soft?: string;
 }
 const VITAL_THEME: RestTheme = { primary: "#1f5f68", accent: "#e46a1c", ink: "#24515a", stub: "photo" };
 const ELEMENTA_THEME: RestTheme = { primary: "#1f2633", accent: "#c48a00", ink: "#1f2633", stub: "shapes" };
@@ -750,9 +775,9 @@ ${fonts}
 :root{--petrol:${theme.primary};--orange:${theme.accent};--ink:${theme.ink}}
 *{box-sizing:border-box;margin:0;padding:0}
 html,body{width:390px;height:844px;overflow:hidden}
-body{position:relative;background:#fff;font-family:Manrope,sans-serif;-webkit-font-smoothing:antialiased;color:var(--ink)}
+body{position:relative;background:${theme.bg ?? "#fff"};font-family:Manrope,sans-serif;-webkit-font-smoothing:antialiased;color:var(--ink)}
 .status{height:44px}
-header{height:56px;display:flex;align-items:center;justify-content:space-between;padding:0 18px;border-bottom:1px solid #eef2f2}
+header{height:56px;display:flex;align-items:center;justify-content:space-between;padding:0 18px;border-bottom:1px solid ${theme.soft ?? "#eef2f2"}}
 .brand{display:flex;align-items:center;gap:9px;min-width:0}
 .mark{flex:none;width:34px;height:34px;border-radius:50%;border:2px solid var(--petrol);display:grid;place-items:center;color:var(--orange);font-family:"Barlow Condensed",sans-serif;font-weight:600;font-size:15px}
 .brand b{font-family:"Barlow Condensed",sans-serif;font-weight:300;font-size:${title.length <= 18 ? 17 : 14}px;letter-spacing:.04em;text-transform:uppercase}
@@ -768,14 +793,14 @@ section{padding:6px 20px 0}
 .eyebrow{color:var(--orange);font-weight:800;font-size:11px;letter-spacing:.2em;text-transform:uppercase;text-align:center}
 h2{font-family:"Barlow Condensed",sans-serif;font-weight:600;font-size:30px;color:var(--petrol);text-align:center;margin-top:4px}
 .grid{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-top:16px}
-.tile{background:#f3f8f8;border-radius:16px;padding:14px 12px;min-height:118px;display:flex;flex-direction:column}
+.tile{background:${theme.soft ?? "#f3f8f8"};border-radius:16px;padding:14px 12px;min-height:118px;display:flex;flex-direction:column}
 .ic{width:40px;height:40px;border-radius:50%;background:#fff;color:var(--petrol);display:grid;place-items:center;box-shadow:0 4px 12px rgba(31,95,104,.10)}
 .tile b{margin-top:10px;font-family:"Barlow Condensed",sans-serif;font-weight:600;font-size:18px;line-height:1.05;color:var(--petrol)}
 .tile i{margin-top:auto;padding-top:6px;font-style:normal;font-weight:800;font-size:10px;color:var(--orange)}
 .hours{margin-top:16px;background:var(--petrol);color:#fff;border-radius:16px;padding:14px 16px}
 .hours small{display:block;font-weight:800;font-size:10px;letter-spacing:.18em;text-transform:uppercase;color:#f3b27f}
 .hours ul{list-style:none;margin-top:6px;font-weight:600;font-size:13px;line-height:1.6}
-.review{margin-top:16px;border:1px solid #e6eeee;border-radius:16px;padding:12px 14px}
+.review{margin-top:16px;background:#fff;border:1px solid ${theme.soft ?? "#e6eeee"};border-radius:16px;padding:12px 14px}
 .rhead{display:flex;align-items:center;gap:8px}
 .rhead svg{width:20px;height:20px}
 .rstars{display:flex;color:#f5b400}
@@ -787,8 +812,8 @@ h2{font-family:"Barlow Condensed",sans-serif;font-weight:600;font-size:30px;colo
 .review.score small{display:block;font-weight:600;font-size:12px;color:#6c8a90}
 .review p{margin-top:8px;font-weight:600;font-size:13px;line-height:1.45;color:var(--ink)}
 .review small{display:block;margin-top:5px;font-weight:600;font-size:11px;color:#6c8a90}
-.fade{position:absolute;left:0;right:0;bottom:0;height:120px;background:linear-gradient(rgba(255,255,255,0),#fff 80%)}
-.stats{display:flex;justify-content:space-around;padding:4px 14px 14px;border-bottom:1px solid #eef2f2;margin-bottom:12px}
+.fade{position:absolute;left:0;right:0;bottom:0;height:120px;background:linear-gradient(rgba(255,255,255,0),${theme.bg ?? "#fff"} 80%)}
+.stats{display:flex;justify-content:space-around;padding:4px 14px 14px;border-bottom:1px solid ${theme.soft ?? "#eef2f2"};margin-bottom:12px}
 .stats div{text-align:center}
 .stats b{display:block;font-family:"Barlow Condensed",sans-serif;font-weight:600;font-size:30px;line-height:1;color:var(--petrol)}
 .stats small{display:block;margin-top:3px;font-weight:600;font-size:10px;color:#6c8a90}
@@ -801,7 +826,7 @@ h2{font-family:"Barlow Condensed",sans-serif;font-weight:600;font-size:30px;colo
       ? `<img src="${assets.photo(photo.file)}" alt="">`
       : `<svg class="shapes" viewBox="0 0 390 120" preserveAspectRatio="none" aria-hidden="true"><rect width="390" height="120" fill="#a9aeb3"/><path d="M0 0H150L0 70Z" fill="${theme.shapeAccent ?? "#ffd24c"}"/><path d="M250 0H390V90Z" fill="${theme.shapeDark ?? "#2b303b"}"/><path d="M390 60V120H200Z" fill="${theme.shapeAccent ?? "#ffd24c"}"/></svg>`
   }<span>Termin vereinbaren</span>
-<svg class="wave" viewBox="0 0 390 46" preserveAspectRatio="none" aria-hidden="true"><path fill="#fff" d="M0 18 C 110 0, 190 46, 300 34 S 370 12, 390 20 L390 46 L0 46 Z"/></svg></div>
+<svg class="wave" viewBox="0 0 390 46" preserveAspectRatio="none" aria-hidden="true"><path fill="${theme.bg ?? "#fff"}" d="M0 18 C 110 0, 190 46, 300 34 S 370 12, 390 20 L390 46 L0 46 Z"/></svg></div>
 ${statsHtml}
 <section>
   <div class="eyebrow">Leistungen</div>
@@ -867,18 +892,18 @@ header{position:absolute;z-index:5;top:20px;left:70px;right:70px;height:78px;bac
 .brand small{display:block;font-weight:800;font-size:9px;letter-spacing:.14em;margin-top:2px}
 nav{display:flex;align-items:center;gap:22px;font-weight:800;font-size:14px;color:${pal.ink}}
 .btn{border-radius:8px;padding:12px 16px;font-weight:800;font-size:14px}
-.dark{background:${pal.primary};color:#fff}.yellow{background:${pal.accent};color:#fff}
+.dark{background:${pal.primary};color:#fff}.yellow{background:${pal.accent};color:${pal.onAccent ?? "#fff"}}
 .center{position:absolute;z-index:4;left:0;right:0;top:250px;text-align:center;color:#fff}
 h1{font-weight:800;font-size:${size}px;line-height:1.08;letter-spacing:-.01em;max-width:1050px;margin:0 auto}
 h2{font-weight:800;font-size:${Math.round(size * 0.62)}px;margin-top:6px}
 .row{display:flex;justify-content:center;gap:10px;margin-top:40px}
 .big{width:272px;height:52px;border-radius:8px;display:grid;place-items:center;font-weight:800;font-size:17px}
-.big.y{background:${pal.accent};color:#fff}.big.w{background:#fff;color:${pal.ink}}
+.big.y{background:${pal.accent};color:${pal.onAccent ?? "#fff"}}.big.w{background:#fff;color:${pal.ink}}
 .meta{margin-top:30px;font-weight:800;font-size:17px;line-height:1.7}
 .meta div{display:flex;align-items:center;justify-content:center;gap:8px}
 .star{position:absolute;z-index:6;right:150px;top:228px;width:124px;height:124px;transform:rotate(14deg)}
-.star b{position:absolute;left:0;right:0;top:36px;text-align:center;color:#fff;font-weight:800;font-size:38px}
-.star small{position:absolute;left:0;right:0;top:80px;text-align:center;color:#fff;font-weight:800;font-size:12px}
+.star b{position:absolute;left:0;right:0;top:36px;text-align:center;color:${pal.onAccent ?? "#fff"};font-weight:800;font-size:38px}
+.star small{position:absolute;left:0;right:0;top:80px;text-align:center;color:${pal.onAccent ?? "#fff"};font-weight:800;font-size:12px}
 .call{position:absolute;z-index:6;right:48px;bottom:48px;width:104px;height:104px;border-radius:50%;background:rgba(80,210,110,.45);display:grid;place-items:center}
 .call i{width:82px;height:82px;border-radius:50%;background:#2fd15a;display:grid;place-items:center}
 </style></head>
@@ -888,7 +913,7 @@ h2{font-weight:800;font-size:${Math.round(size * 0.62)}px;margin-top:6px}
 <svg class="shapes" viewBox="0 0 1440 900" preserveAspectRatio="none" aria-hidden="true">
   <path d="M0 0H430L0 185Z" fill="${pal.accent}"/>
   <path d="M730 0H1440V210Z" fill="${pal.primary}"/>
-  <path d="M0 595L715 900H0Z" fill="#cfd3d9"/>
+  <path d="M0 595L715 900H0Z" fill="${pal.bg ?? "#cfd3d9"}"/>
   <path d="M1440 720V900H1010Z" fill="${pal.accent}"/>
 </svg>
 <header>
@@ -936,16 +961,21 @@ export function renderTeaserMockup(
                   ...ELEMENTA_THEME,
                   primary: paletteOf(d).primary,
                   ink: paletteOf(d).ink,
-                  accent: paletteOf(d).accent,
+                  // Kleine Akzent-Schrift auf hellem Grund: bei hellem Akzent (Türkis) in der Hauptfarbe.
+                  accent: paletteOf(d).onAccent ? paletteOf(d).primary : paletteOf(d).accent,
                   shapeAccent: paletteOf(d).accent,
                   shapeDark: paletteOf(d).primary,
+                  ...(paletteOf(d).bg ? { bg: paletteOf(d).bg } : {}),
+                  ...(paletteOf(d).soft ? { soft: paletteOf(d).soft } : {}),
                 }
               : {
                   ...VITAL_THEME,
                   primary: paletteOf(d).primary,
-                  accent: paletteOf(d).accent,
+                  accent: paletteOf(d).onAccent ? paletteOf(d).primary : paletteOf(d).accent,
                   ink: paletteOf(d).ink,
                   veil: paletteOf(d).veil,
+                  ...(paletteOf(d).bg ? { bg: paletteOf(d).bg } : {}),
+                  ...(paletteOf(d).soft ? { soft: paletteOf(d).soft } : {}),
                 },
           );
   const lw = 1060; // Bildschirmbreite Laptop

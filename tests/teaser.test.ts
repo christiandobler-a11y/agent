@@ -152,6 +152,15 @@ describe("Vorschau-Bild Physio (rein)", () => {
     expect(mock).toContain("Wobei wir Ihnen helfen");
   });
 
+  it("Farbwelt aqua: Off-White, helle Flächen, dunkle Schrift auf Türkis", () => {
+    const hero = renderPhysioTeaser(data({ palette: "aqua" }), assets, "elementa");
+    expect(hero).toContain(".big.y{background:#41d6c3;color:#23343a}");
+    expect(hero).toContain('fill="#f7f5ef"');
+    const mock = renderTeaserMockup(data({ palette: "aqua" }), assets, "elementa");
+    expect(mock).toContain("background:#e8f4f2");
+    expect(mock).toContain("background:#f7f5ef");
+  });
+
   it("nur für die eingestellten Branchen", () => {
     const t = { branches: ["physiotherapie"] };
     expect(usesTeaser(t, { branch_key: "physiotherapie" } as never)).toBe(true);
