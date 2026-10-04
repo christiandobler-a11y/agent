@@ -155,7 +155,7 @@ export const HELP_TEXT = [
   "• Erinner mich Freitag an Hotel Ariadne",
   "",
   "Leads öffnen: /leads (Top 10 mit Buttons) · /lead Name (z. B. /lead Ariadne)",
-  "Schnellbefehle: /heute · /level · /status · /pipeline · /abdeckung · /kosten · /fehler · /budget (z. B. /budget +5)",
+  "Schnellbefehle: /heute · /probelauf · /level · /status · /pipeline · /abdeckung · /kosten · /fehler · /budget (z. B. /budget +5)",
   "Kalibrierung: /kalibrieren (Firmen mit A/B/C bewerten) · /auswertung",
 ].join("\n");
 
@@ -499,4 +499,28 @@ export function leadButtons(companies: Company[]): InlineKeyboardButton[][] {
   const rows: InlineKeyboardButton[][] = [];
   for (let i = 0; i < buttons.length; i += 2) rows.push(buttons.slice(i, i + 2));
   return rows;
+}
+
+/** Ergebnis des Probelaufs (Mail an Christian selbst). */
+export function probeText(r: {
+  company: { name: string };
+  leadAddress: string | null;
+  subject: string;
+  body: string;
+  sentTo: string | null;
+  costUsd: number;
+  warnings: string[];
+}): string {
+  return [
+    `🧪 <b>Probelauf</b> · ${escapeHtml(r.company.name)}`,
+    r.sentTo
+      ? `📬 Die Probe ging an <code>${escapeHtml(r.sentTo)}</code> (Betreff mit „[Probe]“). Schau sie dir in deiner Mail-App an.`
+      : "📭 Postfach nicht eingerichtet: die Mail steht nur hier (App-Passwort, DEPLOY.md Abschnitt 12).",
+    `Echter Empfänger wäre: <code>${escapeHtml(r.leadAddress ?? "keine Adresse gefunden")}</code>`,
+    `<b>Betreff:</b> ${escapeHtml(r.subject)}`,
+    "",
+    `<blockquote expandable>${escapeHtml(r.body)}</blockquote>`,
+    ...(r.warnings.length ? [`⚠️ ${r.warnings.map(escapeHtml).join(" · ")}`] : []),
+    `Nichts wurde an den Lead geschickt, kein Status, keine XP. Kosten ${r.costUsd.toFixed(3).replace(".", ",")} $`,
+  ].join("\n");
 }

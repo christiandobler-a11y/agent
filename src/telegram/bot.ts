@@ -27,6 +27,8 @@ import {
 import { levelText, reportProgress, xpSuffix } from "./game.js";
 import { gameState, loadGameConfig } from "../game/xp.js";
 import { buildPrototype, type PrototypeDeps } from "../prototype/run.js";
+import { chromiumTeaserShooter } from "../prototype/teaser.js";
+import { pickProbeLead, runProbe } from "../outreach/probe.js";
 import { chromiumLetterRenderer, type LetterRenderer } from "../outreach/letterPdf.js";
 import { raiseBudgetToday } from "../llm/budget.js";
 import { askManager, type ManagerDeps } from "../manager/agent.js";
@@ -40,6 +42,7 @@ import {
   callbackData,
   chunk,
   HELP_TEXT,
+  probeText,
   markdownToTelegramHtml,
   emailDraftMessages,
   letterMessages,
@@ -141,6 +144,7 @@ export function telegramFetch(fetchFn: typeof globalThis.fetch) {
 export const BOT_COMMANDS = [
   { command: "heute", description: "Morgen-Paket: heute vorbereitete Kontakte" },
   { command: "level", description: "Dein Level, XP und Abzeichen" },
+  { command: "probelauf", description: "Test-Mail an dich selbst (wie im Morgen-Paket)" },
   { command: "leads", description: "Beste Leads mit Buttons" },
   { command: "lead", description: "Lead-Karte öffnen, z. B. /lead Ariadne" },
   { command: "pipeline", description: "Vertrieb und offene Erinnerungen" },
@@ -309,6 +313,60 @@ export function createBot(options: BotOptions): AvelioBot {
   };
 
   // Karte eines Leads per Name, Domain oder Kurz-ID: /lead Ariadne
+  // Probelauf: Mail wie im Morgen-Paket, aber an Christians eigenes Postfach; kein Status, keine XP.
+  bot.command(["probelauf", "probe", "test"], async (ctx) => {
+    const outreach = outreachDeps();
+    const teaserConfig = options.prototype?.config.teaser;
+    if (!outreach || !teaserConfig) {
+      await ctx.reply("Der Probelauf braucht die Outreach- und Prototyp-Einstellungen.");
+      return;
+    }
+    const ref = ctx.match.trim();
+    let company: Company | null;
+    if (ref) {
+      const found = await findLead(pipeline.db, ref);
+      if (found.kind !== "found") {
+        await ctx.reply(
+          found.kind === "none" ? `Keinen Lead gefunden für „${ref}“.` : "Mehrere Treffer, bitte genauer.",
+        );
+        return;
+      }
+      company = found.company;
+    } else company = await pickProbeLead(pipeline.db, teaserConfig.branchen);
+    if (!company) {
+      await ctx.reply(
+        "Noch kein passender Lead (Physio, qualifiziert, mit Audit). Die Nachtsuche liefert welche.",
+      );
+      return;
+    }
+    await ctx.reply(`🧪 Probelauf mit ${company.name} … (dauert etwa eine halbe Minute)`);
+    try {
+      const r = await runProbe(
+        {
+          db: pipeline.db,
+          outreach,
+          mailbox,
+          teaser: {
+            dir: teaserConfig.dir,
+            branches: teaserConfig.branchen,
+            style: teaserConfig.stil,
+            shoot: chromiumTeaserShooter(process.env.CHROMIUM_PATH),
+          },
+        },
+        company,
+        by(ctx.chat.id),
+      );
+      if ("kind" in r) {
+        await ctx.reply("Für diesen Lead gibt es noch kein Audit.");
+        return;
+      }
+      if (r.teaser) await ctx.replyWithPhoto(new InputFile(r.teaser));
+      await ctx.reply(probeText(r), { parse_mode: "HTML", link_preview_options: { is_disabled: true } });
+    } catch (err) {
+      await ctx.reply(`Probelauf fehlgeschlagen: ${String(err).slice(0, 300)}`);
+    }
+  });
+
   bot.command(["lead", "kontakt"], async (ctx) => {
     const ref = ctx.match.trim();
     if (!ref) {

@@ -72,7 +72,9 @@ export async function sentToday(db: DbClient, now: Date): Promise<number> {
 const ACTIVE_OR_LATER = new Set(["CONTACTED", "REPLIED", "INTERESTED", "PROTOTYPE", "WON", "LOST"]);
 
 /** Vorschau-Bild als eingebettetes Bild unter seinem Satz; fehlt die Datei, geht die Mail als reiner Text raus. */
-function withTeaser(draft: DraftRow): Pick<OutgoingMail, "html" | "attachments"> {
+export function withTeaser(
+  draft: Pick<DraftRow, "body" | "meta">,
+): Pick<OutgoingMail, "html" | "attachments"> {
   const path = draft.meta.teaser;
   if (!path || !existsSync(path) || !draft.body) return {};
   const cid = "startseite-entwurf@avelio";

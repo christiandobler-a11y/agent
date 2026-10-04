@@ -9,6 +9,7 @@ import type { LlmGateway } from "../src/llm/gateway.js";
 import { loadOutreachConfig } from "../src/outreach/config.js";
 import { draftEmail } from "../src/outreach/draft.js";
 import { loadMailConfig, textToHtml, type Mailbox, type OutgoingMail } from "../src/outreach/mail.js";
+import { pickProbeLead, runProbe } from "../src/outreach/probe.js";
 import { sendDraft } from "../src/outreach/send.js";
 import {
   buildTeaser,
@@ -191,5 +192,85 @@ describeDb("Vorschau-Bild in Mail und Versand", () => {
       "test",
     );
     expect(sent[1]!.html).toBeUndefined();
+  });
+});
+
+describeDb("Probelauf", () => {
+  const db = useTestDb();
+  const NOW = new Date("2026-10-05T07:00:00Z");
+
+  it("schickt die Mail an Christian selbst, ändert nichts am Lead und hinterlässt keinen Entwurf", async () => {
+    const dir = mkdtempSync(join(tmpdir(), "avelio-probe-"));
+    const { company: c } = await upsertCompany(db(), {
+      name: "Physio Probe",
+      placeId: "probe-1",
+      city: "Murnau",
+    });
+    await db().query(
+      "update companies set branch_key = 'physiotherapie', status = 'QUALIFIED' where id = $1",
+      [c.id],
+    );
+    await db().query(
+      `insert into audits (company_id, prompt_version, model, findings, rubric, commercial, summary)
+       values ($1, 'v1', 'm', '[]', '{}', '{}', 's')`,
+      [c.id],
+    );
+    const picked = await pickProbeLead(db(), ["physiotherapie"]);
+    expect(picked?.id).toBe(c.id);
+    const sent: OutgoingMail[] = [];
+    const box: Mailbox = {
+      address: "christian@example.de",
+      send: (m) => {
+        sent.push(m);
+        return Promise.resolve({ messageId: "<p1@example.de>" });
+      },
+      fetchSince: () => Promise.resolve({ uidValidity: "1", maxUid: 0, mails: [] }),
+    };
+    const llm = {
+      structured: () =>
+        Promise.resolve({
+          output: { absatz: "mir ist Ihre Website aufgefallen." },
+          agentRunId: "r",
+          costUsd: 0.01,
+          model: "m",
+        }),
+    } as unknown as LlmGateway;
+    const r = await runProbe(
+      {
+        db: db(),
+        outreach: {
+          db: db(),
+          llm,
+          outreach: loadOutreachConfig(),
+          branches: {},
+          now: () => NOW,
+          contact: { whatsapp: null, phone: null },
+          teaserDir: dir,
+        },
+        mailbox: box,
+        teaser: {
+          dir,
+          branches: ["physiotherapie"],
+          shoot: async (_html, out) => {
+            await sharp({ create: { width: 80, height: 50, channels: 3, background: "#1f5f68" } })
+              .jpeg()
+              .toFile(out);
+          },
+        },
+      },
+      picked!,
+      "test",
+    );
+    if ("kind" in r) throw new Error("kein Audit");
+    expect(r.sentTo).toBe("christian@example.de");
+    expect(sent[0]!.to).toBe("christian@example.de");
+    expect(sent[0]!.subject).toMatch(/^\[Probe\] /);
+    expect(sent[0]!.html).toContain("cid:startseite-entwurf@avelio");
+    const { rows } = await db().query<{ n: number; status: string }>(
+      `select (select count(*)::int from interactions where company_id = $1) as n,
+              (select status from companies where id = $1) as status`,
+      [c.id],
+    );
+    expect(rows[0]).toEqual({ n: 0, status: "QUALIFIED" });
   });
 });
