@@ -1,4 +1,8 @@
 import { z } from "zod";
+import { recordApiUsage } from "../db/apiUsage.js";
+import { getState, setState } from "../db/appState.js";
+import type { Db } from "../db/client.js";
+import type { BudgetGuard } from "../llm/budget.js";
 
 /**
  * Google-Details für einen Prototyp (einmal je Lead): Bewertungen, Öffnungszeiten, Maps-Link. Reviews gehören zur
@@ -110,4 +114,36 @@ export async function fetchPlaceDetails(
   );
   if (!res.ok) throw new Error(`Places-Details: HTTP ${res.status} ${(await res.text()).slice(0, 200)}`);
   return parseDetails(await res.json());
+}
+
+/**
+ * Google-Details je Firma einmal holen und merken (app_state), für das Vorschau-Bild (echte Bewertung,
+ * Öffnungszeiten). Fehler oder kein Schlüssel: `null`, das Bild kommt dann ohne.
+ */
+export function cachedPlaceDetails(deps: {
+  db: Db;
+  budget: BudgetGuard;
+  apiKey: string | null | undefined;
+  fetchFn?: typeof fetch;
+}): (company: { id: string; place_id: string | null }) => Promise<PlaceDetails | null> {
+  return async (company) => {
+    const key = `place-details:${company.id}`;
+    const cached = await getState<PlaceDetails>(deps.db, key);
+    if (cached) return cached;
+    if (!deps.apiKey || !company.place_id) return null;
+    try {
+      await deps.budget.assertAvailable();
+      const details = await fetchPlaceDetails(deps.apiKey, company.place_id, deps.fetchFn);
+      await recordApiUsage(deps.db, {
+        service: "google_places",
+        operation: "place_details_teaser",
+        costUsd: PLACE_DETAILS_COST_USD,
+        companyId: company.id,
+      });
+      await setState(deps.db, key, details);
+      return details;
+    } catch {
+      return null;
+    }
+  };
 }

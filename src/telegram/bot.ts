@@ -2,6 +2,7 @@ import { Bot, InputFile, type Context } from "grammy";
 import type { UserFromGetMe } from "grammy/types";
 import { getState, setState } from "../db/appState.js";
 import { setRating } from "../db/calibration.js";
+import { cachedPlaceDetails } from "../prototype/placeDetails.js";
 import { addDesignNote, designNotes } from "../db/designNotes.js";
 import { outreachStats, statsText } from "../outreach/stats.js";
 import { findCompany, type Company } from "../db/companies.js";
@@ -401,6 +402,11 @@ export function createBot(options: BotOptions): AvelioBot {
               style: teaserConfig.stil,
               devices: teaserConfig.geraete,
               shoot: chromiumTeaserShooter(process.env.CHROMIUM_PATH),
+              details: cachedPlaceDetails({
+                db: pipeline.db,
+                budget: pipeline.budget,
+                apiKey: options.prototype?.googleApiKey,
+              }),
             },
           },
           company,

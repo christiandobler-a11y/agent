@@ -8,8 +8,9 @@ import { chromium } from "playwright";
 import sharp from "sharp";
 import type { DbClient } from "../db/client.js";
 import type { Company } from "../db/companies.js";
-import { latestPlacesSnapshot } from "../db/leads.js";
+import { latestAudit, latestPlacesSnapshot } from "../db/leads.js";
 import { seedOf } from "../outreach/slots.js";
+import type { PlaceDetails } from "./placeDetails.js";
 
 /**
  * Muster-Startseite fürs Erstkontakt-Bild (04.10.2026, Christian: eine Branche, ein einheitliches starkes Hero, nur Name
@@ -28,6 +29,12 @@ export interface TeaserData {
   reviewCount: number | null;
   /** Bestimmt das Foto (gleiche Firma = gleiches Bild). */
   seed: string;
+  /** Leistungen laut Website (Audit), für die Kacheln; fehlen sie, die üblichen Physio-Leistungen. */
+  services?: readonly string[];
+  /** Echte Google-Bewertung (fremder Inhalt: nur gekürzt und escaped angezeigt). */
+  quote?: { text: string; author: string } | null;
+  /** Öffnungszeiten von Google, z. B. "Mo–Fr: 08:00–19:00". */
+  hours?: readonly string[];
 }
 
 /** Stockfotos (Unsplash-Lizenz, kommerziell frei, siehe assets/teaser/physio/QUELLEN.md); erstes = Favorit. */
@@ -339,75 +346,6 @@ p{font-weight:300;font-size:28px;margin-top:22px;opacity:.95}
 </body></html>`;
 }
 
-/** Vital-Startseite in Handy-Breite (390 × 844) für das Geräte-Bild. */
-function renderVitalMobile(d: TeaserData, assets: TeaserAssets): string {
-  const { title } = teaserName(d.name, d.city);
-  const photo = pickPhoto(d.seed);
-  const city = d.city?.trim() || null;
-  const showRating = d.rating !== null && d.rating >= 4.3 && (d.reviewCount ?? 0) >= 5;
-  const fonts = (
-    [
-      ["Barlow Condensed", "Barlow Condensed 300", 300],
-      ["Barlow Condensed", "Barlow Condensed 600", 600],
-      ["Manrope", "Manrope 600", 600],
-      ["Manrope", "Manrope 800", 800],
-    ] as const
-  )
-    .map(
-      ([family, key, weight]) =>
-        `@font-face{font-family:"${family}";src:url("${assets.font(key)}") format("woff2");font-weight:${weight}}`,
-    )
-    .join("\n");
-  const size = title.length <= 14 ? 46 : title.length <= 24 ? 40 : 32;
-  return `<!doctype html>
-<html lang="de"><head><meta charset="utf-8"><title>${esc(title)}</title>
-<style>
-${fonts}
-:root{--petrol:#1f5f68;--orange:#e46a1c;--ink:#24515a}
-*{box-sizing:border-box;margin:0;padding:0}
-html,body{width:390px;height:844px;overflow:hidden}
-body{background:#fff;font-family:"Barlow Condensed",sans-serif;-webkit-font-smoothing:antialiased;color:var(--ink)}
-.status{height:44px}
-header{height:64px;display:flex;align-items:center;justify-content:space-between;padding:0 18px}
-.brand{display:flex;align-items:center;gap:10px;min-width:0}
-.mark{flex:none;width:40px;height:40px;border-radius:50%;border:2px solid var(--petrol);display:grid;place-items:center;color:var(--orange);font-weight:600;font-size:17px}
-.brand b{display:block;font-weight:300;font-size:${title.length <= 18 ? 19 : 15}px;letter-spacing:.04em;text-transform:uppercase;line-height:1.05}
-.brand small{display:block;color:var(--orange);font-family:Manrope,sans-serif;font-weight:800;font-size:8px;letter-spacing:.2em;margin-top:3px}
-.burger{flex:none;width:24px;height:16px;border-top:2px solid var(--ink);border-bottom:2px solid var(--ink);position:relative}
-.burger::after{content:"";position:absolute;left:0;right:0;top:5px;border-top:2px solid var(--ink)}
-.hero{position:relative;height:736px;overflow:hidden}
-.hero img{position:absolute;inset:0;width:100%;height:100%;object-fit:cover;object-position:${photo.position}}
-.hero::before{content:"";position:absolute;inset:0;z-index:1;background:rgba(27,86,95,.74)}
-.inner{position:relative;z-index:2;height:100%;display:flex;flex-direction:column;align-items:center;justify-content:center;text-align:center;color:#fff;padding:0 22px 130px}
-.eyebrow{font-weight:300;font-size:13px;letter-spacing:.26em;text-transform:uppercase}
-h1{font-weight:600;font-size:${size}px;line-height:1.02;margin-top:12px}
-p{font-weight:300;font-size:19px;margin-top:14px;opacity:.95}
-.cta{margin-top:26px;background:var(--orange);color:#fff;font-size:19px;font-weight:600;padding:13px 40px;border-radius:999px}
-.rating{margin-top:16px;display:flex;align-items:center;gap:8px;background:rgba(255,255,255,.14);border:1px solid rgba(255,255,255,.35);border-radius:999px;padding:8px 16px;font-family:Manrope,sans-serif;font-size:12px;font-weight:600}
-.rating .stars{display:flex;color:#ffc24a}
-.rating svg{width:12px;height:12px}
-.wave{position:absolute;z-index:3;left:0;right:0;bottom:-1px;width:100%;height:80px}
-</style></head>
-<body>
-<div class="status"></div>
-<header>
-  <div class="brand"><span class="mark">${esc(monogram(title))}</span><span><b>${esc(title)}</b><small>PHYSIOTHERAPIE</small></span></div>
-  <span class="burger"></span>
-</header>
-<section class="hero">
-  <img src="${assets.photo(photo.file)}" alt="">
-  <div class="inner">
-    <div class="eyebrow">Physiotherapie${city ? ` ${esc(city)}` : ""}</div>
-    <h1>${esc(title)}</h1>
-    <p>Wir machen Sie wieder fit für den Alltag.</p>
-    <span class="cta">Termin vereinbaren</span>
-    ${showRating ? `<span class="rating"><span class="stars">${STAR.repeat(5)}</span>${de(d.rating!)} · ${d.reviewCount} Bewertungen</span>` : ""}
-  </div>
-  <svg class="wave" viewBox="0 0 390 80" preserveAspectRatio="none" aria-hidden="true"><path fill="#fff" d="M0 30 C 110 0, 190 80, 300 60 S 370 25, 390 35 L390 80 L0 80 Z"/></svg>
-</section>
-</body></html>`;
-}
-
 const rundFonts = (assets: TeaserAssets) =>
   (
     [
@@ -631,6 +569,158 @@ p{font-weight:300;font-size:18px;margin-top:10px;opacity:.95}
 </body></html>`;
 }
 
+const DEFAULT_SERVICES = ["Krankengymnastik", "Manuelle Therapie", "Lymphdrainage", "Sportphysiotherapie"];
+
+/** Icon passend zur Leistung (sonst ein Plus). */
+function serviceIcon(name: string): string {
+  const n = name.toLowerCase();
+  const pick = (i: number) => STRIP[i]!.icon;
+  if (/gerät|kg|krankengym|training|reha/.test(n)) return pick(3);
+  if (/manuell|massage|faszi|osteo|chiro/.test(n)) return pick(1);
+  if (/lymph|wärme|fango|elektro|ultraschall/.test(n)) return pick(2);
+  if (/sport|lauf|kinesio|tape/.test(n)) return pick(4);
+  if (/kasse|privat|hausbesuch/.test(n)) return pick(0);
+  return "M12 5v14M5 12h14";
+}
+
+/** Leistungen für die Kacheln: kurze Namen von der Website, sonst die üblichen. */
+export function teaserServices(raw: readonly string[] | undefined, n = 4): string[] {
+  const clean = (raw ?? [])
+    .map((x) =>
+      x
+        .replace(/\s*[(:–-].*$/, "")
+        .replace(/\s+/g, " ")
+        .trim(),
+    )
+    .filter((x) => x.length >= 4 && x.length <= 26 && /^\p{L}/u.test(x))
+    .map((x) => x[0]!.toUpperCase() + x.slice(1));
+  const unique = [...new Set(clean)];
+  for (const d of DEFAULT_SERVICES) if (unique.length < n && !unique.includes(d)) unique.push(d);
+  return unique.slice(0, n);
+}
+
+/** Bewertung fürs Bild kürzen (an einer Satz- oder Wortgrenze). */
+export function teaserQuote(text: string, max = 150): string {
+  const t = text.replace(/\s+/g, " ").trim();
+  if (t.length <= max) return t;
+  const cut = t.slice(0, max);
+  const end = Math.max(cut.lastIndexOf(". "), cut.lastIndexOf("! "));
+  return end > 60 ? cut.slice(0, end + 1) : `${cut.slice(0, cut.lastIndexOf(" "))} …`;
+}
+
+/**
+ * "Der Rest" in Handy-Breite (04.10.2026, Christian: "noch nicht dieser Wow, lass mich sehen wie der Rest aussieht"):
+ * Ende des Heros, darunter ihre Leistungen und Öffnungszeiten, unten ausgeblendet. Macht neugierig auf die ganze Seite.
+ */
+function renderVitalRest(d: TeaserData, assets: TeaserAssets): string {
+  const { title } = teaserName(d.name, d.city);
+  const photo = pickPhoto(d.seed);
+  const services = teaserServices(d.services);
+  const hours = (d.hours ?? []).slice(0, 3);
+  const fonts = (
+    [
+      ["Barlow Condensed", "Barlow Condensed 300", 300],
+      ["Barlow Condensed", "Barlow Condensed 600", 600],
+      ["Manrope", "Manrope 600", 600],
+      ["Manrope", "Manrope 800", 800],
+    ] as const
+  )
+    .map(
+      ([family, key, weight]) =>
+        `@font-face{font-family:"${family}";src:url("${assets.font(key)}") format("woff2");font-weight:${weight}}`,
+    )
+    .join("\n");
+  const tiles = services
+    .map(
+      (x) =>
+        `<div class="tile"><span class="ic"><svg viewBox="0 0 24 24" width="22" height="22" aria-hidden="true"><path d="${serviceIcon(x)}" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"/></svg></span><b>${esc(x)}</b><i>Mehr erfahren →</i></div>`,
+    )
+    .join("");
+  // Kennzahlen-Leiste (Vorbild ReBuild): nur echte Werte der Praxis.
+  const good = d.rating !== null && d.rating >= 4.3 && (d.reviewCount ?? 0) >= 5;
+  const firstHours = /^([^:]+):\s*(.+)$/.exec(hours[0] ?? "");
+  const stats = [
+    ...(good
+      ? [
+          [de(d.rating!), "Google-Sterne"],
+          [String(d.reviewCount), "Bewertungen"],
+        ]
+      : []),
+    ...(firstHours ? [[firstHours[1]!.replace(/\s/g, ""), firstHours[2]!.replace(/\s*Uhr$/, "")]] : []),
+  ].slice(0, 3);
+  const statsHtml =
+    stats.length > 0
+      ? `<div class="stats">${stats.map(([big, small]) => `<div><b>${esc(big!)}</b><small>${esc(small!)}</small></div>`).join("")}</div>`
+      : "";
+  const info =
+    hours.length > 0
+      ? hours.map((h) => `<li>${esc(h)}</li>`).join("")
+      : `<li>Termine nach Vereinbarung</li>${d.phone ? `<li>Telefon: ${esc(d.phone)}</li>` : ""}`;
+  return `<!doctype html>
+<html lang="de"><head><meta charset="utf-8"><title>${esc(title)}</title>
+<style>
+${fonts}
+:root{--petrol:#1f5f68;--orange:#e46a1c;--ink:#24515a}
+*{box-sizing:border-box;margin:0;padding:0}
+html,body{width:390px;height:844px;overflow:hidden}
+body{position:relative;background:#fff;font-family:Manrope,sans-serif;-webkit-font-smoothing:antialiased;color:var(--ink)}
+.status{height:44px}
+header{height:56px;display:flex;align-items:center;justify-content:space-between;padding:0 18px;border-bottom:1px solid #eef2f2}
+.brand{display:flex;align-items:center;gap:9px;min-width:0}
+.mark{flex:none;width:34px;height:34px;border-radius:50%;border:2px solid var(--petrol);display:grid;place-items:center;color:var(--orange);font-family:"Barlow Condensed",sans-serif;font-weight:600;font-size:15px}
+.brand b{font-family:"Barlow Condensed",sans-serif;font-weight:300;font-size:${title.length <= 18 ? 17 : 14}px;letter-spacing:.04em;text-transform:uppercase}
+.burger{flex:none;width:22px;height:14px;border-top:2px solid var(--ink);border-bottom:2px solid var(--ink);position:relative}
+.burger::after{content:"";position:absolute;left:0;right:0;top:4px;border-top:2px solid var(--ink)}
+.hero{position:relative;height:120px;overflow:hidden}
+.hero img{position:absolute;inset:0;width:100%;height:100%;object-fit:cover;object-position:${photo.position}}
+.hero::before{content:"";position:absolute;inset:0;z-index:1;background:rgba(27,86,95,.74)}
+.hero span{position:absolute;z-index:2;left:0;right:0;top:26px;text-align:center;color:#fff;font-family:"Barlow Condensed",sans-serif;font-weight:600;font-size:24px}
+.wave{position:absolute;z-index:3;left:0;right:0;bottom:-1px;width:100%;height:46px}
+section{padding:6px 20px 0}
+.eyebrow{color:var(--orange);font-weight:800;font-size:11px;letter-spacing:.2em;text-transform:uppercase;text-align:center}
+h2{font-family:"Barlow Condensed",sans-serif;font-weight:600;font-size:30px;color:var(--petrol);text-align:center;margin-top:4px}
+.grid{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-top:16px}
+.tile{background:#f3f8f8;border-radius:16px;padding:14px 12px;min-height:118px;display:flex;flex-direction:column}
+.ic{width:40px;height:40px;border-radius:50%;background:#fff;color:var(--petrol);display:grid;place-items:center;box-shadow:0 4px 12px rgba(31,95,104,.10)}
+.tile b{margin-top:10px;font-family:"Barlow Condensed",sans-serif;font-weight:600;font-size:18px;line-height:1.05;color:var(--petrol)}
+.tile i{margin-top:auto;padding-top:6px;font-style:normal;font-weight:800;font-size:10px;color:var(--orange)}
+.hours{margin-top:16px;background:var(--petrol);color:#fff;border-radius:16px;padding:14px 16px}
+.hours small{display:block;font-weight:800;font-size:10px;letter-spacing:.18em;text-transform:uppercase;color:#f3b27f}
+.hours ul{list-style:none;margin-top:6px;font-weight:600;font-size:13px;line-height:1.6}
+.fade{position:absolute;left:0;right:0;bottom:0;height:120px;background:linear-gradient(rgba(255,255,255,0),#fff 80%)}
+.stats{display:flex;justify-content:space-around;padding:4px 14px 14px;border-bottom:1px solid #eef2f2;margin-bottom:12px}
+.stats div{text-align:center}
+.stats b{display:block;font-family:"Barlow Condensed",sans-serif;font-weight:600;font-size:30px;line-height:1;color:var(--petrol)}
+.stats small{display:block;margin-top:3px;font-weight:600;font-size:10px;color:#6c8a90}
+</style></head>
+<body>
+<div class="status"></div>
+<header><div class="brand"><span class="mark">${esc(monogram(title))}</span><b>${esc(title)}</b></div><span class="burger"></span></header>
+<div class="hero"><img src="${assets.photo(photo.file)}" alt=""><span>Termin vereinbaren</span>
+<svg class="wave" viewBox="0 0 390 46" preserveAspectRatio="none" aria-hidden="true"><path fill="#fff" d="M0 18 C 110 0, 190 46, 300 34 S 370 12, 390 20 L390 46 L0 46 Z"/></svg></div>
+${statsHtml}
+<section>
+  <div class="eyebrow">Leistungen</div>
+  <h2>Wobei wir Ihnen helfen</h2>
+  <div class="grid">${tiles}</div>
+  <div class="hours"><small>Öffnungszeiten</small><ul>${info}</ul></div>
+</section>
+<div class="fade"></div>
+</body></html>`;
+}
+
+/** Schwebende Karte mit einer echten Google-Bewertung (oder nur der Sterne-Zahl), fürs Geräte-Bild. */
+function quoteCard(d: TeaserData): string {
+  const good = d.rating !== null && d.rating >= 4.3 && (d.reviewCount ?? 0) >= 5;
+  if (!d.quote && !good) return "";
+  const stars = `<span class="qstars">${STAR.repeat(5)}</span>`;
+  const head = `<div class="qhead">${GOOGLE}<div>${stars}${good ? `<b>${de(d.rating!)} · ${d.reviewCount} Bewertungen</b>` : ""}</div></div>`;
+  const body = d.quote
+    ? `<p>„${esc(teaserQuote(d.quote.text))}“</p><small>${esc(d.quote.author)} auf Google</small>`
+    : "";
+  return `<div class="quote">${head}${body}</div>`;
+}
+
 /**
  * Geräte-Bild (04.10.2026, Christian): die Startseite auf einem Laptop, daneben dieselbe Seite auf einem Smartphone.
  * Wirkt wie ein fertiges Produkt und zeigt nebenbei, dass die Seite am Handy funktioniert. Beide Seiten stecken als
@@ -642,12 +732,14 @@ export function renderTeaserMockup(
   style: Exclude<TeaserStyle, "welt"> = "vital",
 ): string {
   const desktop = style === "vital" ? renderVital(d, assets) : renderRund(d, assets);
+  // vital: am Handy schon "der Rest" (Leistungen, Öffnungszeiten), dazu eine echte Bewertung als Karte.
   const mobile =
     style === "rund"
       ? renderRundMobile(d, assets)
       : style === "mix"
         ? renderMixMobile(d, assets)
-        : renderVitalMobile(d, assets);
+        : renderVitalRest(d, assets);
+  const card = style === "vital" ? quoteCard(d) : "";
   const lw = 1060; // Bildschirmbreite Laptop
   const ls = lw / 1440;
   const pw = 250; // Bildschirmbreite Handy
@@ -669,10 +761,19 @@ body{background:radial-gradient(120% 90% at 30% 20%,#f4f8f8 0%,#e3ecee 55%,#d5e1
 .phone .screen{width:${pw}px;height:${Math.round(844 * ps)}px;border-radius:34px;position:relative}
 .phone .screen iframe{width:390px;height:844px;transform:scale(${ps.toFixed(5)})}
 .island{position:absolute;z-index:2;left:50%;top:10px;width:78px;height:22px;margin-left:-39px;background:#000;border-radius:999px}
+@font-face{font-family:"Manrope";src:url("${assets.font("Manrope 600")}") format("woff2");font-weight:600}
+@font-face{font-family:"Manrope";src:url("${assets.font("Manrope 800")}") format("woff2");font-weight:800}
+.quote{position:absolute;z-index:5;left:56px;top:560px;width:430px;background:#fff;border-radius:18px;padding:20px 24px 18px;box-shadow:0 30px 60px rgba(22,48,53,.28);font-family:Manrope,sans-serif;color:#24515a}
+.qhead{display:flex;align-items:center;gap:12px}
+.qhead b{display:block;font-weight:800;font-size:15px;margin-top:2px}
+.qstars{display:flex;color:#f5b400}
+.quote p{margin-top:12px;font-weight:600;font-size:17px;line-height:1.45;color:#1f3f45}
+.quote small{display:block;margin-top:8px;font-weight:600;font-size:13px;color:#6c8a90}
 </style></head>
 <body>
 <div class="laptop"><div class="lid"><div class="screen"><iframe srcdoc="${esc(desktop)}"></iframe></div></div><div class="base"></div></div>
 <div class="phone"><div class="screen"><span class="island"></span><iframe srcdoc="${esc(mobile)}"></iframe></div></div>
+${card}
 </body></html>`;
 }
 
@@ -737,6 +838,8 @@ export interface TeaserDeps {
   style?: TeaserStyle;
   /** Startseite auf Laptop und Smartphone statt nur der Seite (alle Stile außer "welt"). */
   devices?: boolean;
+  /** Google-Details (Bewertungstext, Öffnungszeiten), siehe cachedPlaceDetails; fehlt es, ohne. */
+  details?: ((company: Company) => Promise<PlaceDetails | null>) | null;
 }
 
 export const usesTeaser = (t: Pick<TeaserDeps, "branches"> | null | undefined, company: Company) =>
@@ -745,6 +848,13 @@ export const usesTeaser = (t: Pick<TeaserDeps, "branches"> | null | undefined, c
 /** Bild für eine Firma bauen (Name, Ort, Telefon aus der Firma, Bewertung aus dem letzten Places-Abruf). */
 export async function teaserForCompany(db: DbClient, t: TeaserDeps, company: Company): Promise<string> {
   const places = await latestPlacesSnapshot(db, company.id);
+  // Echte Daten der Praxis (04.10.2026, "das ist ja meine Praxis"): Leistungen aus dem Audit, Bewertung und
+  // Öffnungszeiten von Google.
+  const audit = await latestAudit(db, company.id);
+  const services = ((audit?.commercial as { services?: string[] } | null)?.services ?? []).filter(
+    (x): x is string => typeof x === "string",
+  );
+  const details = t.details ? await t.details(company).catch(() => null) : null;
   return buildTeaser(
     t.dir,
     company.id,
@@ -755,6 +865,9 @@ export async function teaserForCompany(db: DbClient, t: TeaserDeps, company: Com
       phone: company.phone,
       rating: places?.rating ?? null,
       reviewCount: places?.review_count ?? null,
+      services,
+      quote: details?.quotes[0] ?? null,
+      hours: details?.hours ?? [],
     },
     t.shoot,
     t.style,

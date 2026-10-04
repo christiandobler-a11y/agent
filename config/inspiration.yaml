@@ -87,6 +87,30 @@ physiotherapie:
       - Google-Bewertungen sichtbar auf der Startseite
       - Hero-Text kurz halten (dort hatte Burkart zu viel Text)
     gespeichert: 2026-10-04
+  - url: https://physio-lorre.de/
+    name: Physiotherapie Vanessa Lorre (Köln-Ehrenfeld)
+    warum: Inspo, finde ich suuuuper.
+    merkmale:
+      - Hero-Foto mit kräftigem Farbschleier in der Markenfarbe (Hellgrün), Text zentriert, Logo mittig in der Navigation
+      - drei Häkchen-Vorteile direkt im Hero (freundliche Mitarbeiter, kurzfristige Termine, moderne Praxis), darunter ein klarer Termin-Button
+      - schräge Kanten statt gerader Abschnittsgrenzen (V-förmiger Hero-Abschluss, schräge Farbflächen)
+      - große Läufer-Grafik aus dem Logo, die über die Abschnittsgrenze ragt; schwebender runder Anruf-Knopf unten rechts
+      - Laufband oben mit Büro- und Praxis-Öffnungszeiten; Inhaberin stellt sich mit Text und Unterschrift vor
+      - Kontakt-Abschnitt mit Telefon groß, Öffnungszeiten und Google-Maps-Knopf über einem hellen Praxisfoto
+    gespeichert: 2026-10-04
+  - url: https://www.rebuild-physiotherapie.de/
+    name: ReBuild Physiotherapie (Köln)
+    warum: >-
+      Definitiv als Inspo speichern für künftige Websites, perfektes Verhältnis aus Effekten, lebendiger Seite und
+      guter Durchführung, sehr sehr geil.
+    merkmale:
+      - dunkles Design (Anthrazit) mit einer Akzentfarbe (Rot), riesige Schrift im Hero ("ReSet ReFocus ReBuild"), schräge Flächen im Hintergrund
+      - Google-Sterne mit Anzahl und ein Satz zur Praxis unten rechts im Hero, zwei Pillen-Knöpfe
+      - Kennzahlen-Leiste mit großen Zahlen und Häkchen (56 min Intensivtherapie, 2 Standorte, 1:1 Betreuung), Zahlen zählen beim Scrollen hoch
+      - Leistungen als dunkle Karten mit echtem Foto, Titel, zwei Sätzen und Knopf "Mehr erfahren"
+      - Vorteile mit 3D-Icons (Mikroskop, Stoppuhr, Laufband), "In 3 Schritten zum Erfolg" als Zeitleiste
+      - Nachrichten-Laufband oben (Neueröffnung), Effekte sparsam, aber spürbar (Einblenden beim Scrollen)
+    gespeichert: 2026-10-04
 
 alle:
   - url: https://www.mediana-zentrum.de/

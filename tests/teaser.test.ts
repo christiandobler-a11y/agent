@@ -18,6 +18,8 @@ import {
   physioAssetDir,
   renderPhysioTeaser,
   renderTeaserMockup,
+  teaserQuote,
+  teaserServices,
   teaserName,
   teaserPath,
   usesTeaser,
@@ -101,6 +103,38 @@ describe("Vorschau-Bild Physio (rein)", () => {
     expect(mix).toContain("class=&quot;oval&quot;");
     expect(mix).toContain("class=&quot;wave&quot;");
     expect(mix.match(/class=&quot;tile&quot;/g)).toHaveLength(8);
+  });
+
+  it("Vital-Geräte-Bild: am Handy ihre Leistungen, Öffnungszeiten und Kennzahlen, dazu eine echte Bewertung", () => {
+    const mock = renderTeaserMockup(
+      data({
+        services: ["Krankengymnastik am Gerät", "Kiefergelenksbehandlung (CMD)", "x", "Hausbesuche"],
+        quote: { text: "Super <b>Team</b>, sehr empfehlenswert und immer pünktlich.", author: "Anna M." },
+        hours: ["Mo–Fr: 07:30–19:00 Uhr"],
+      }),
+      assets,
+      "vital",
+    );
+    expect(mock).toContain("Wobei wir Ihnen helfen");
+    expect(mock).toContain("Kiefergelenksbehandlung"); // Klammerzusatz weg
+    expect(mock).toContain("Mo–Fr: 07:30–19:00 Uhr");
+    expect(mock).toContain("„Super &lt;b&gt;Team&lt;/b&gt;, sehr empfehlenswert");
+    expect(mock).toContain("Anna M. auf Google");
+    expect(mock).not.toContain("<script");
+    expect(teaserServices(undefined)).toEqual([
+      "Krankengymnastik",
+      "Manuelle Therapie",
+      "Lymphdrainage",
+      "Sportphysiotherapie",
+    ]);
+    expect(
+      teaserServices(["manuelle Therapie (MT)", "Wirbelsäulengymnastik nach Dorn und Breuß in Kombination"]),
+    ).toEqual(["Manuelle Therapie", "Krankengymnastik", "Lymphdrainage", "Sportphysiotherapie"]);
+    expect(teaserQuote("a".repeat(70) + ". " + "b ".repeat(80), 120)).toBe(`${"a".repeat(70)}.`);
+    // Ohne Bewertung und ohne Text: keine Karte
+    expect(renderTeaserMockup(data({ rating: null, reviewCount: null }), assets, "vital")).not.toContain(
+      'class="quote"',
+    );
   });
 
   it("nur für die eingestellten Branchen", () => {

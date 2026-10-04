@@ -9,6 +9,7 @@ import { createOffer, loadOfferConfig, offerCopyParts, offerSalutationFor } from
 import { chromiumLetterRenderer } from "./outreach/letterPdf.js";
 import { buildPrototype, loadPrototypeConfig, type PrototypeDeps } from "./prototype/run.js";
 import { chromiumTeaserShooter, teaserForCompany } from "./prototype/teaser.js";
+import { cachedPlaceDetails } from "./prototype/placeDetails.js";
 
 /** Befund-Seite als PDF: `avelio letter <Firma>` schreibt PDF und Vorschau nach data/letters/. */
 export async function letter(argv: string[]): Promise<number> {
@@ -134,6 +135,11 @@ export async function teaser(argv: string[]): Promise<number> {
         style: config.stil,
         devices: config.geraete,
         shoot: chromiumTeaserShooter(process.env.CHROMIUM_PATH),
+        details: cachedPlaceDetails({
+          db: app.ctx.db,
+          budget: app.ctx.budget,
+          apiKey: loadEnv().GOOGLE_API_KEY,
+        }),
       },
       found.company,
     );

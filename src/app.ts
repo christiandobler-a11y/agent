@@ -19,6 +19,7 @@ import { logNotifier, type Notifier } from "./queue/notifier.js";
 import { loadAutopilotConfig } from "./autopilot/plan.js";
 import { loadOutreachConfig } from "./outreach/config.js";
 import { chromiumLetterRenderer } from "./outreach/letterPdf.js";
+import { cachedPlaceDetails } from "./prototype/placeDetails.js";
 import { loadMailConfig, mailboxFromEnv, type MailConfig, type Mailbox } from "./outreach/mail.js";
 import { seedBoxesFromEnv } from "./outreach/seed.js";
 import { createMxCheck } from "./outreach/mx.js";
@@ -144,6 +145,7 @@ export async function createApp(options: { notifier?: Notifier; worker?: boolean
         style: prototypeConfig.teaser.stil,
         devices: prototypeConfig.teaser.geraete,
         shoot: chromiumTeaserShooter(process.env.CHROMIUM_PATH),
+        details: cachedPlaceDetails({ db, budget, apiKey: keys.GOOGLE_API_KEY }),
       },
       mx: createMxCheck(),
       lettersDir: "data/letters",
