@@ -5,11 +5,18 @@ import {
   createOffer,
   grossSplit,
   LexwareError,
+  lexwareArticles,
+  offerCopyParts,
   loadOfferConfig,
   offerSalutation,
   quotationBody,
 } from "../src/outreach/offer.js";
-import { crmCallback, parseCrmCallback } from "../src/telegram/format.js";
+import {
+  crmCallback,
+  lexwareSetupMessage,
+  offerCopyMessage,
+  parseCrmCallback,
+} from "../src/telegram/format.js";
 import { describeDb, useTestDb } from "./helpers/db.js";
 
 const c = loadOfferConfig();
@@ -88,6 +95,26 @@ describe("Angebot (rein)", () => {
     await expect(createLexwareQuotation(denied as unknown as typeof fetch, "key", {})).rejects.toThrow(
       /Schlüssel ungültig/,
     );
+  });
+
+  it("Ohne API: Artikel zur Einrichtung und Teile zum Kopieren, escaped", () => {
+    const articles = lexwareArticles(c);
+    expect(articles.map((a) => a.name)).toEqual([
+      "Neue Website (Onepager)",
+      "Neue Website (mehrseitig)",
+      "Hosting und Pflege (monatlich)",
+    ]);
+    expect(articles[0]!.description).toContain("• SEO-Grundoptimierung");
+    const parts = offerCopyParts(c, { ...input, company: { ...input.company, name: "Physio <A&B>" } });
+    expect(parts.address).toBe("Physio <A&B>\nHauptstr. 1\n82362 Weilheim");
+    expect(parts.introduction.startsWith("Sehr geehrte Frau Heider,\nvielen Dank")).toBe(true);
+    expect(parts.article).toBe("Neue Website (Onepager)");
+    expect(parts.remark).toContain("Fotos der Praxis");
+    expect(parts.remark).toContain("KI-Telefonassistent");
+    const msg = offerCopyMessage("Physio <A&B>", parts);
+    expect(msg).toContain("Physio &lt;A&amp;B&gt;");
+    expect(msg).not.toContain("<A&B>");
+    expect(lexwareSetupMessage(articles)).toContain("<pre>");
   });
 
   it("Knöpfe auf der Lead-Karte", () => {

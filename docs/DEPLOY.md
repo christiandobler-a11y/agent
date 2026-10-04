@@ -212,20 +212,19 @@ Danach `bash /opt/avelio/scripts/deploy.sh`. Ab dem nächsten Morgen um 7 Uhr ko
 geht es mit `/heute`. Grenzen: höchstens 40 neue Mails am Tag (`config/mail.yaml`), geplant sind 15, nach zwei Wochen
 30 (`config/autopilot.yaml`). Ohne App-Passwort funktioniert alles auch, nur mit „✅ Selbst gesendet“ statt „Senden“.
 
-## 13. Lexware verbinden (Angebote per Knopf)
+## 13. Angebote mit Lexware
 
-Avelio legt Angebote als **Entwurf** in Lexware an (Lead-Karte → „📄 Angebot Onepager“ bzw. „mehrseitig“). Du öffnest
-den Entwurf per Link, prüfst ihn und verschickst ihn aus Lexware. Avelio verschickt selbst nichts.
+Lexware Office hat erst ab Tarif XL eine Schnittstelle. Bis dahin (Tarif M):
 
-1. In Lexware: [app.lexware.de/addons/public-api](https://app.lexware.de/addons/public-api) → Schlüssel erstellen und
-   kopieren (nur einmal sichtbar).
-2. Auf dem Server in die `.env` (`nano /opt/avelio/.env`), nicht in den Chat:
+1. **Einmalig** in Telegram `/lexware` tippen: Avelio zeigt die Texte für drei Artikel (Onepager, mehrseitig,
+   Hosting). In Lexware unter Artikel je einen anlegen: Bezeichnung, Bruttopreis (19 %), Einheit „Pauschal“,
+   Beschreibung einfügen.
+2. **Je Angebot**: Lead-Karte → „📄 Angebot Onepager“ bzw. „mehrseitig“. Avelio schickt Anschrift, Einleitung,
+   Artikel und Bemerkung zum Kopieren. In Lexware: Angebot erstellen, Kunde anlegen, Artikel wählen, Texte einfügen.
 
-   ```
-   LEXWARE_API_KEY=der-schlüssel
-   ```
-
-3. `bash /opt/avelio/scripts/deploy.sh`
+Mit Tarif XL: Schlüssel unter [app.lexware.de/addons/public-api](https://app.lexware.de/addons/public-api) erstellen,
+`LEXWARE_API_KEY=…` in die `.env` und `bash /opt/avelio/scripts/deploy.sh`. Dann legt der Knopf den Entwurf direkt in
+Lexware an und schickt den Link.
 
 Preise und Leistungen stehen in `config/angebot.yaml` (Endpreise inkl. 19 % MwSt.).
 

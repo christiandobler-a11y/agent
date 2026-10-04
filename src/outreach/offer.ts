@@ -6,9 +6,10 @@ import { recipient } from "./draft.js";
 import { personInCompanyName } from "./names.js";
 
 /**
- * Angebot in Lexware (04.10.2026, mit Christian): Avelio legt das Angebot als Entwurf über die Lexware Public API an
- * (Paket, Leistungen, Hosting, Mitwirkung, Zahlung), Christian öffnet es per Link, prüft und verschickt es aus Lexware.
- * Preise sind Endpreise inkl. MwSt. Kein LLM: Inhalt aus config/angebot.yaml, Aufbau rein (`quotationBody`).
+ * Angebot in Lexware (04.10.2026, mit Christian). Lexware Office M hat keine Public API (erst XL): Christian legt einmal
+ * Artikel für die Pakete an (Texte aus `lexwareArticles`, Telegram /lexware), Avelio liefert je Lead die Teile zum
+ * Kopieren (`offerCopyParts`: Anschrift, Einleitung, Artikel, Bemerkung). Mit LEXWARE_API_KEY (XL) legt Avelio den
+ * Entwurf direkt an (`quotationBody`, `createOffer`). Preise sind Endpreise inkl. MwSt. Kein LLM.
  */
 
 const configSchema = z.object({
@@ -205,4 +206,66 @@ export async function createOffer(
     ],
   );
   return { id, url, gross };
+}
+
+/** Artikel für die einmalige Einrichtung in Lexware (Name, Preis brutto, Beschreibung). */
+export function lexwareArticles(c: OfferConfig): { name: string; price: string; description: string }[] {
+  return [
+    ...Object.values(c.pakete).map((p) => ({
+      name: p.titel,
+      price: euro(p.preis_brutto),
+      description: bullets(p.leistungen),
+    })),
+    {
+      name: `${c.hosting.titel} (monatlich)`,
+      price: euro(c.hosting.preis_monat_brutto),
+      description: `${bullets(c.hosting.leistungen)}\n${c.hosting.hinweis}`,
+    },
+  ];
+}
+
+/** Bemerkung fürs Angebot (Mitwirkung, Optionen, Lieferzeit, Zahlung). */
+export function offerRemark(c: OfferConfig): string {
+  return [
+    c.mitwirkung.length ? `Was ich von Ihnen brauche:\n${bullets(c.mitwirkung)}` : null,
+    c.optional.length
+      ? `Optional erweiterbar:\n${c.optional.map((o) => `• ${o.titel}: ${o.text} (${o.preis})`).join("\n")}`
+      : null,
+    `Lieferzeit: ${c.lieferzeit}.\nZahlung: ${c.zahlung}.`,
+    "Zur Beauftragung genügt eine kurze Antwort per Mail. Ich freue mich auf Ihre Rückmeldung.",
+  ]
+    .filter(Boolean)
+    .join("\n\n");
+}
+
+/** Teile zum Kopieren in Lexware für einen Lead, rein. */
+export function offerCopyParts(
+  c: OfferConfig,
+  q: Omit<QuotationInput, "now">,
+): { address: string; introduction: string; article: string; price: string; remark: string } {
+  const p = c.pakete[q.paket];
+  if (!p) throw new Error(`Unbekanntes Paket: ${q.paket}`);
+  return {
+    address: [
+      q.company.name,
+      q.company.street,
+      [q.company.postalCode, q.company.city].filter(Boolean).join(" "),
+    ]
+      .filter((x) => x && x.trim())
+      .join("\n"),
+    introduction: `${q.salutation}\nvielen Dank für das nette Gespräch. Wie besprochen erhalten Sie hier mein Angebot für die neue Website von ${q.company.name}.`,
+    article: p.titel,
+    price: euro(p.preis_brutto),
+    remark: offerRemark(c),
+  };
+}
+
+/** Anrede für das Angebot eines Leads (Impressum, sonst Inhaberin aus dem Firmennamen). */
+export async function offerSalutationFor(db: Db, company: Company): Promise<string> {
+  const person = await recipient(db, company.id);
+  const fromName = person.name ? null : personInCompanyName(company.name);
+  return offerSalutation({
+    name: person.name ?? fromName?.name ?? null,
+    salutation: person.salutation ?? fromName?.salutation ?? null,
+  });
 }

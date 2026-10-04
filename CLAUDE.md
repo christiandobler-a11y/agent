@@ -27,8 +27,9 @@ ausprobieren kann. Nach Schritt 6 ist ein Abstimmungstermin (Kalibrierung) vorge
   Stockfotos in `assets/teaser/physio/`, Stil `welt`/`vital` in `config/prototype.yaml → teaser`) nach
   `data/teasers/<id>.jpg`; das Morgen-Paket baut es für `teaser.branchen` statt eines Prototyps, die Mail bettet es als
   HTML-Bild unter `bild_satz` ein (`textToHtml`), die Befund-Seite nutzt es als „Nachher“
-- `npm run cli -- angebot <firma> [onepager|mehrseitig]` (Telegram: Lead-Karte → „📄 Angebot …“): Angebot als Entwurf in Lexware
-  (`src/outreach/offer.ts`, Public API mit `LEXWARE_API_KEY`, Brutto-Preise und Inhalt in `config/angebot.yaml`, Link im Verlauf)
+- `npm run cli -- angebot <firma> [onepager|mehrseitig]` (Telegram: Lead-Karte → „📄 Angebot …“): ohne Lexware-API
+  (Tarif M) Teile zum Kopieren in Lexware (Artikel einmalig über `/lexware`), mit `LEXWARE_API_KEY` (XL) Entwurf direkt
+  in Lexware (`src/outreach/offer.ts`, Brutto-Preise und Inhalt in `config/angebot.yaml`)
 - Termin bestätigen: Antwort-Meldung zeigt die angebotenen Termine als Knöpfe; `src/outreach/confirm.ts` schreibt die
   Bestätigung (mit .ics) im Verlauf, nach dem Senden Status „interessiert“ und Erinnerung (`config/outreach.yaml → bestaetigung`)
 - `npm run cli -- chat "…"`: Manager-Agent ohne Telegram befragen (gleicher Verlauf wie der Chat)

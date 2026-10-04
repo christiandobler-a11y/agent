@@ -5,7 +5,7 @@ import { loadEnv } from "./config/env.js";
 import { findLead } from "./manager/leads.js";
 import { loadOutreachConfig } from "./outreach/config.js";
 import { draftLetter } from "./outreach/letter.js";
-import { createOffer, loadOfferConfig } from "./outreach/offer.js";
+import { createOffer, loadOfferConfig, offerCopyParts, offerSalutationFor } from "./outreach/offer.js";
 import { chromiumLetterRenderer } from "./outreach/letterPdf.js";
 import { buildPrototype, loadPrototypeConfig, type PrototypeDeps } from "./prototype/run.js";
 import { chromiumTeaserShooter, teaserForCompany } from "./prototype/teaser.js";
@@ -165,8 +165,21 @@ export async function angebot(argv: string[]): Promise<number> {
       return 1;
     }
     if (!env.LEXWARE_API_KEY) {
-      console.error("LEXWARE_API_KEY fehlt (Schlüssel unter https://app.lexware.de/addons/public-api).");
-      return 1;
+      // Ohne Public API (Lexware Office bis M): Teile zum Kopieren.
+      const parts = offerCopyParts(loadOfferConfig(), {
+        paket,
+        company: {
+          name: found.company.name,
+          street: found.company.street,
+          postalCode: found.company.postal_code,
+          city: found.company.city,
+        },
+        salutation: await offerSalutationFor(app.ctx.db, found.company),
+      });
+      console.log(
+        `Kunde:\n${parts.address}\n\nEinleitung:\n${parts.introduction}\n\nArtikel: ${parts.article} (${parts.price})\n\nBemerkung:\n${parts.remark}`,
+      );
+      return 0;
     }
     const offer = await createOffer(
       { db: app.ctx.db, config: loadOfferConfig(), apiKey: env.LEXWARE_API_KEY, now: app.ctx.now },

@@ -553,3 +553,36 @@ export function probeText(r: {
     `Nichts wurde an den Lead geschickt, kein Status, keine XP. Kosten ${r.costUsd.toFixed(3).replace(".", ",")} $`,
   ].join("\n");
 }
+
+/** Angebot zum Kopieren in Lexware (ohne Public API): je Feld ein Block, in Telegram mit Kopier-Knopf. */
+export function offerCopyMessage(
+  companyName: string,
+  parts: { address: string; introduction: string; article: string; price: string; remark: string },
+): string {
+  const block = (label: string, text: string) => `<b>${label}</b>\n<pre>${escapeHtml(text)}</pre>`;
+  return [
+    `📄 <b>Angebot für ${escapeHtml(companyName)}</b> · in Lexware: Angebot erstellen, dann die Teile einfügen`,
+    "",
+    block("1. Kunde (neu anlegen)", parts.address),
+    block("2. Einleitung", parts.introduction),
+    `<b>3. Position:</b> Artikel „${escapeHtml(parts.article)}“ (${escapeHtml(parts.price)} inkl. MwSt.), dazu „Hosting und Pflege (monatlich)“ als Info oder eigene Position`,
+    "",
+    block("4. Bemerkung", parts.remark),
+    "Die Artikel legst du einmalig mit /lexware an.",
+  ].join("\n");
+}
+
+/** Einmalige Einrichtung der Artikel in Lexware. */
+export function lexwareSetupMessage(
+  articles: { name: string; price: string; description: string }[],
+): string {
+  return [
+    "🧾 <b>Lexware einrichten (einmalig)</b>",
+    "Unter Artikel → Neuer Artikel je einen anlegen: Bezeichnung, Bruttopreis (Steuersatz 19 %), Einheit „Pauschal“, Beschreibung einfügen.",
+    "",
+    ...articles.flatMap((a, i) => [
+      `<b>${i + 1}. ${escapeHtml(a.name)}</b> · ${escapeHtml(a.price)} brutto`,
+      `<pre>${escapeHtml(a.description)}</pre>`,
+    ]),
+  ].join("\n");
+}

@@ -29,7 +29,14 @@ import { gameState, loadGameConfig } from "../game/xp.js";
 import { buildPrototype, type PrototypeDeps } from "../prototype/run.js";
 import { chromiumTeaserShooter } from "../prototype/teaser.js";
 import { pickProbeLead, runProbe } from "../outreach/probe.js";
-import { createOffer, LexwareError, loadOfferConfig } from "../outreach/offer.js";
+import {
+  createOffer,
+  LexwareError,
+  lexwareArticles,
+  loadOfferConfig,
+  offerCopyParts,
+  offerSalutationFor,
+} from "../outreach/offer.js";
 import { chromiumLetterRenderer, type LetterRenderer } from "../outreach/letterPdf.js";
 import { raiseBudgetToday } from "../llm/budget.js";
 import { askManager, type ManagerDeps } from "../manager/agent.js";
@@ -43,6 +50,8 @@ import {
   callbackData,
   chunk,
   HELP_TEXT,
+  lexwareSetupMessage,
+  offerCopyMessage,
   probeText,
   markdownToTelegramHtml,
   emailDraftMessages,
@@ -401,6 +410,10 @@ export function createBot(options: BotOptions): AvelioBot {
     });
   });
 
+  bot.command("lexware", (ctx) =>
+    ctx.reply(lexwareSetupMessage(lexwareArticles(loadOfferConfig())), { parse_mode: "HTML" }),
+  );
+
   bot.command(["level", "xp"], async (ctx) => {
     const c = loadGameConfig();
     await ctx.reply(levelText(await gameState(pipeline.db, pipeline.now(), c), c), { parse_mode: "HTML" });
@@ -530,11 +543,30 @@ export function createBot(options: BotOptions): AvelioBot {
       }
       if (crm.kind === "offer") {
         const apiKey = process.env.LEXWARE_API_KEY?.trim();
+        // Ohne Public API (Lexware Office bis M): alles zum Kopieren.
         if (!apiKey) {
-          await ctx.answerCallbackQuery({
-            text: "Lexware ist noch nicht verbunden: LEXWARE_API_KEY in die .env (siehe docs/DEPLOY.md).",
-            show_alert: true,
+          await ctx.answerCallbackQuery();
+          const parts = offerCopyParts(loadOfferConfig(), {
+            paket: crm.paket,
+            company: {
+              name: company.name,
+              street: company.street,
+              postalCode: company.postal_code,
+              city: company.city,
+            },
+            salutation: await offerSalutationFor(pipeline.db, company),
           });
+          await ctx.reply(offerCopyMessage(company.name, parts), { parse_mode: "HTML" });
+          await pipeline.db.query(
+            `insert into interactions (company_id, type, channel, body, created_by, created_at)
+             values ($1, 'note', 'other', $2, $3, $4)`,
+            [
+              company.id,
+              `Angebot vorbereitet (Lexware): ${parts.article}, ${parts.price}`,
+              by(ctx.chat?.id),
+              now,
+            ],
+          );
           return;
         }
         await ctx.answerCallbackQuery({ text: "Lege das Angebot in Lexware an …" });
