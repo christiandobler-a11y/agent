@@ -5,16 +5,9 @@ import { berlinInstant, proposeSlots, seedOf, spokenTime } from "../src/outreach
 const cfg = loadOutreachConfig();
 // Freitag, 3.10.2026, 12:00 deutsche Zeit
 const NOW = new Date("2026-10-03T10:00:00Z");
-const berlin = (iso: string) =>
-  new Date(iso).toLocaleString("de-DE", {
-    timeZone: "Europe/Berlin",
-    weekday: "long",
-    hour: "2-digit",
-    minute: "2-digit",
-  });
 
 describe("Terminvorschläge", () => {
-  it("2 Tage mit je 2 Uhrzeiten, nie in der Arbeitszeit (außer höchstens einer Mittagspause)", () => {
+  it("2 Tage mit je 2 Uhrzeiten; Physio in der Mittagspause der Praxis (12 bis 13:30 Uhr)", () => {
     for (let seed = 0; seed < 50; seed++) {
       const p = proposeSlots({
         now: NOW,
@@ -28,7 +21,7 @@ describe("Terminvorschläge", () => {
       expect(p.slots).toHaveLength(4);
       expect(p.days[0]!.date < p.days[1]!.date).toBe(true);
       expect(p.days[0]!.weekday).not.toBe(p.days[1]!.weekday);
-      const workday = p.slots.filter((iso) => {
+      for (const iso of p.slots) {
         const d = new Date(iso);
         const wd = d.toLocaleDateString("en-US", { timeZone: "Europe/Berlin", weekday: "short" });
         const hm = d.toLocaleTimeString("de-DE", {
@@ -36,10 +29,9 @@ describe("Terminvorschläge", () => {
           hour: "2-digit",
           minute: "2-digit",
         });
-        return !["Sat", "Sun"].includes(wd) && hm >= "09:00" && hm < "17:30";
-      });
-      expect(workday.length).toBeLessThanOrEqual(1);
-      expect(workday.every((iso) => berlin(iso).endsWith("12:15"))).toBe(true);
+        expect(["Sat", "Sun"]).not.toContain(wd);
+        expect(hm >= "12:00" && hm <= "13:30").toBe(true);
+      }
       // frühestens in 2, spätestens in 9 Tagen
       for (const iso of p.slots) {
         const days = (Date.parse(iso) - NOW.getTime()) / 86_400_000;

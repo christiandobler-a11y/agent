@@ -33,7 +33,7 @@ import { seedOf } from "./slots.js";
  * Kontaktdaten setzt der Code. Avelio verschickt nichts: Christian druckt aus und schreibt den Umschlag selbst.
  */
 
-export const LETTER_PROMPT_VERSION = "v2";
+export const LETTER_PROMPT_VERSION = "v3";
 
 const pct = z.number();
 export const letterOutputSchema = z.object({
@@ -165,7 +165,13 @@ async function prototypeHero(
   }
 }
 
-export async function draftLetter(deps: LetterDeps, company: Company, by: string): Promise<LetterOutcome> {
+export async function draftLetter(
+  deps: LetterDeps,
+  company: Company,
+  by: string,
+  /** Brief als Nachfassen auf eine unbeantwortete Mail (Text erwähnt die Mail). */
+  opts: { followUp?: boolean } = {},
+): Promise<LetterOutcome> {
   const { db, outreach: o } = deps;
   const now = deps.now();
   const audit = await latestAudit(db, company.id);
@@ -213,6 +219,7 @@ export async function draftLetter(deps: LetterDeps, company: Company, by: string
   const branch = company.branch_key ? deps.branches[company.branch_key] : undefined;
   const data = {
     entwurf_vorhanden: after !== null,
+    ...(opts.followUp ? { nachfassen: true } : {}),
     betrieb: { name: company.name, ort: company.city, branche: branch?.label ?? company.category },
     anrede: form,
     befunde: findings.map((f, i) => ({

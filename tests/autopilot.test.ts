@@ -24,7 +24,12 @@ import { countPlan, planItems, type PlanItem } from "../src/db/plan.js";
 import { insertWebsiteSnapshot } from "../src/db/websiteSnapshots.js";
 import type { LlmGateway } from "../src/llm/gateway.js";
 import { loadOutreachConfig } from "../src/outreach/config.js";
-import { createFollowUpDraft, dueFollowUps, followUpBody } from "../src/outreach/followup.js";
+import {
+  createFollowUpDraft,
+  dueFollowUps,
+  dueLetterFollowUps,
+  followUpBody,
+} from "../src/outreach/followup.js";
 import {
   bounceOf,
   loadMailConfig,
@@ -104,12 +109,11 @@ describe("Morgen-Paket (rein)", () => {
     expect(dailyNewCount(c, saturday, null)).toBe(0);
   });
 
-  it("Kanal: Brief für starke Leads mit Anschrift, sonst Mail, ohne Mail notfalls Brief", () => {
-    expect(chooseChannel({ score: 85, hasAddress: true, mailOk: true }, 1, 80)).toBe("letter");
-    expect(chooseChannel({ score: 85, hasAddress: true, mailOk: true }, 0, 80)).toBe("email");
-    expect(chooseChannel({ score: 70, hasAddress: true, mailOk: true }, 3, 80)).toBe("email");
-    expect(chooseChannel({ score: 70, hasAddress: true, mailOk: false }, 3, 80)).toBe("letter");
-    expect(chooseChannel({ score: 70, hasAddress: false, mailOk: false }, 3, 80)).toBeNull();
+  it("Kanal: Erstkontakt per Mail, Brief nur ohne erreichbare Mail-Adresse", () => {
+    expect(chooseChannel({ hasAddress: true, mailOk: true }, 3)).toBe("email");
+    expect(chooseChannel({ hasAddress: true, mailOk: false }, 3)).toBe("letter");
+    expect(chooseChannel({ hasAddress: true, mailOk: false }, 0)).toBeNull();
+    expect(chooseChannel({ hasAddress: false, mailOk: false }, 3)).toBeNull();
   });
 
   it("Zeit und Datum in Deutschland", () => {
@@ -346,6 +350,30 @@ describeDb("Morgen-Paket mit Datenbank", () => {
     expect(await dueFollowUps(db(), NOW, 5)).toEqual([]);
   });
 
+  it("Brief als zweites Nachfassen nur für sehr gute Leads ohne Antwort", async () => {
+    await db().query("update companies set status = 'LOST'");
+    const followUpSent = async (c: Company, daysAgo: number) => {
+      await db().query("update companies set status = 'CONTACTED' where id = $1", [c.id]);
+      await insertDraft(db(), c.id, {
+        channel: "email",
+        body: "Nachfassen",
+        meta: { follow_up: true, sent_at: new Date(NOW.getTime() - daysAgo * 86_400_000).toISOString() },
+        by: "test",
+        now: NOW,
+      });
+    };
+    const top = await lead({ score: 86 });
+    const weak = await lead({ score: 70 });
+    const recent = await lead({ score: 90 });
+    const noAddress = await lead({ score: 88, street: null });
+    await followUpSent(top, 8);
+    await followUpSent(weak, 8);
+    await followUpSent(recent, 3);
+    await followUpSent(noAddress, 8);
+    expect((await dueLetterFollowUps(db(), NOW, 7, 80, 3)).map((c) => c.id)).toEqual([top.id]);
+    expect(await dueLetterFollowUps(db(), NOW, 7, 80, 0)).toEqual([]);
+  });
+
   it("Plan bauen und in Telegram durchklicken: Senden geht übers Postfach, Zähler und nächste Karte", async () => {
     // Leads aus den vorigen Tests dieser Datei nicht mitplanen.
     await db().query("update companies set status = 'LOST'");
@@ -355,14 +383,16 @@ describeDb("Morgen-Paket mit Datenbank", () => {
       .jpeg()
       .toFile(shot);
     const strong = await lead({ score: 88 });
+    const normal = await lead({ score: 72 });
+    // Ohne erreichbare Mail-Adresse, aber mit Anschrift: Brief.
+    const letterOnly = await lead({ score: 71, email: "post@gibtsnicht.de" });
     await insertWebsiteSnapshot(db(), {
-      companyId: strong.id,
+      companyId: letterOnly.id,
       url: "https://x.de",
       screenshotDesktop: shot,
       screenshotMobile: shot,
     });
-    const normal = await lead({ score: 72 });
-    const noMail = await lead({ score: 71, email: "info@gibtsnicht.de", street: null });
+    const noMail = await lead({ score: 70, email: "info@gibtsnicht.de", street: null });
     const old = await lead();
     await db().query("update companies set status = 'CONTACTED' where id = $1", [old.id]);
     await emailDraft(old, 6);
@@ -393,19 +423,20 @@ describeDb("Morgen-Paket mit Datenbank", () => {
     const result = await buildDailyPlan({
       db: db(),
       now: () => NOW,
-      config: { ...config({ start: 5 }), briefe: { pro_tag: 1, ab_score: 80 } },
+      config: { ...config({ start: 5 }), briefe: { pro_tag: 1, ab_score: 80, nachfassen_nach_tagen: 7 } },
       letter: letterDeps,
       prototype: null,
       mx: (a) => Promise.resolve(!a.endsWith("gibtsnicht.de")),
       lettersDir: join(tmp, "letters"),
     });
-    expect(result).toMatchObject({ followups: 1, letters: 1, emails: 1, stoppedByBudget: false });
+    expect(result).toMatchObject({ followups: 1, letters: 1, emails: 2, stoppedByBudget: false });
     expect(result.skipped.map((s) => s.name)).toEqual([noMail.name]);
     const items = await planItems(db(), "2026-10-05");
     expect(items.map((i) => [i.company_name, i.kind, i.channel])).toEqual([
       [old.name, "followup", "email"],
-      [strong.name, "new", "letter"],
+      [strong.name, "new", "email"],
       [normal.name, "new", "email"],
+      [letterOnly.name, "new", "letter"],
     ]);
 
     // Telegram
@@ -440,13 +471,13 @@ describeDb("Morgen-Paket mit Datenbank", () => {
     await bot.sendMorning("2026-10-05", ["Physiotherapie · Landkreis Weilheim-Schongau: 12 neue Betriebe"]);
     const sentMessages = calls.filter((c) => c.method === "sendMessage");
     const header = sentMessages[0]!.payload;
-    expect(String(header.text)).toContain("📧 Neue Mails: <b>0/1</b>");
+    expect(String(header.text)).toContain("📧 Neue Mails: <b>0/2</b>");
     expect(String(header.text)).toContain(
       "🌙 <b>Heute Nacht:</b>\nPhysiotherapie · Landkreis Weilheim-Schongau",
     );
     expect(sentMessages).toHaveLength(2);
     const card = sentMessages[1]!.payload;
-    expect(String(card.text)).toContain("🔁 Nachfassen <b>1/3</b>");
+    expect(String(card.text)).toContain("🔁 Nachfassen <b>1/4</b>");
     const buttons = (
       card.reply_markup as { inline_keyboard: { text: string; callback_data?: string }[][] }
     ).inline_keyboard.flat();
@@ -457,8 +488,9 @@ describeDb("Morgen-Paket mit Datenbank", () => {
     expect(calls.some((c) => c.method === "editMessageText" && String(c.payload.text).includes("0/1"))).toBe(
       true,
     );
-    // Als Nächstes die Befund-Seite (PDF fehlt im Test nicht: liegt im tmp-Ordner)
-    expect(calls.at(-1)!.method).toBe("sendDocument");
+    // Als Nächstes die Mail an den stärksten Lead
+    expect(calls.at(-1)!.method).toBe("sendMessage");
+    expect(String(calls.at(-1)!.payload.text)).toContain(strong.name);
     const after = await planItems(db(), "2026-10-05");
     expect(after[0]!.status).toBe("done");
   });
@@ -613,7 +645,7 @@ describeDb("Morgen-Paket mit Datenbank", () => {
     const result = await buildDailyPlan({
       db: db(),
       now: () => NOW,
-      config: { ...config({ start: 5 }), briefe: { pro_tag: 0, ab_score: 80 } },
+      config: { ...config({ start: 5 }), briefe: { pro_tag: 0, ab_score: 80, nachfassen_nach_tagen: 7 } },
       letter: {
         db: db(),
         llm,

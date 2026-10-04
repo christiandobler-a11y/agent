@@ -7,7 +7,7 @@ import type { Company } from "../db/companies.js";
 import { addPlanItem, planItems } from "../db/plan.js";
 import { BudgetExceededError } from "../llm/budget.js";
 import { draftEmail, recipient, type OutreachDeps } from "../outreach/draft.js";
-import { createFollowUpDraft, dueFollowUps } from "../outreach/followup.js";
+import { createFollowUpDraft, dueFollowUps, dueLetterFollowUps } from "../outreach/followup.js";
 import { draftLetter, type LetterDeps } from "../outreach/letter.js";
 import type { MxCheck } from "../outreach/mx.js";
 import { buildPrototype, type PrototypeDeps } from "../prototype/run.js";
@@ -28,7 +28,12 @@ export const autopilotConfigSchema = z.object({
     steigern_nach_tagen: z.number().int().min(0),
     nur_werktags: z.boolean(),
   }),
-  briefe: z.object({ pro_tag: z.number().int().min(0), ab_score: z.number().int() }),
+  briefe: z.object({
+    pro_tag: z.number().int().min(0),
+    ab_score: z.number().int(),
+    /** Brief als zweites Nachfassen: so viele Tage nach der Nachfass-Mail ohne Antwort (nur ab `ab_score`). */
+    nachfassen_nach_tagen: z.number().int().min(1).default(7),
+  }),
   prototyp_fuer_neue: z.boolean(),
   nachfassen: z.object({ nach_tagen: z.number().int().min(1), hoechstens: z.number().int().min(0) }),
   suche: z
@@ -100,14 +105,13 @@ export function dailyNewCount(config: AutopilotConfig, now: Date, firstSentAt: D
 
 /** Kanal je Lead: Brief für die stärksten (solange Platz) und für Leads ohne Mail; sonst Mail; sonst nichts. */
 export function chooseChannel(
-  lead: { score: number | null; hasAddress: boolean; mailOk: boolean },
+  lead: { hasAddress: boolean; mailOk: boolean },
   lettersLeft: number,
-  minLetterScore: number,
 ): "email" | "letter" | null {
-  const letterPossible = lead.hasAddress && lettersLeft > 0;
-  if (letterPossible && (lead.score ?? 0) >= minLetterScore) return "letter";
+  // 04.10.2026 (Christian): Erstkontakt immer per Mail; Brief nur ohne erreichbare Mail-Adresse (und später als
+  // Nachfassen für sehr gute Leads, siehe dueLetterFollowUps).
   if (lead.mailOk) return "email";
-  if (letterPossible) return "letter";
+  if (lead.hasAddress && lettersLeft > 0) return "letter";
   return null;
 }
 
@@ -117,6 +121,41 @@ async function firstSentAt(db: Db): Promise<Date | null> {
       where type = 'draft' and channel = 'email' and meta ? 'sent_at'`,
   );
   return rows[0]?.first ?? null;
+}
+
+/** Befund-Seite erstellen, als PDF/PNG ablegen und in den Plan nehmen; `false`, wenn es nicht ging. */
+async function planLetter(
+  deps: PlanDeps,
+  company: Company,
+  date: string,
+  by: string,
+  kind: "new" | "followup",
+  result: PlanBuildResult,
+): Promise<boolean> {
+  const letter = await draftLetter(deps.letter, company, by, { followUp: kind === "followup" });
+  if ("kind" in letter) {
+    result.skipped.push({ name: company.name, reason: letter.kind });
+    return false;
+  }
+  const dir = join(deps.lettersDir, date);
+  await mkdir(dir, { recursive: true });
+  const pdf = join(dir, letter.filename);
+  const png = pdf.replace(/\.pdf$/, ".png");
+  await writeFile(pdf, letter.pdf);
+  await writeFile(png, letter.png);
+  await deps.db.query(
+    `update interactions set meta = meta || jsonb_build_object('pdf', $2::text, 'png', $3::text) where id = $1`,
+    [letter.draftId, pdf, png],
+  );
+  await addPlanItem(deps.db, {
+    date,
+    companyId: company.id,
+    kind,
+    channel: "letter",
+    draftId: letter.draftId,
+  });
+  result.letters++;
+  return true;
 }
 
 /** Neue Kandidaten: vorgemerkt zuerst, dann qualifiziert nach Score; nie schon angeschrieben oder heute geplant. */
@@ -190,6 +229,19 @@ export async function buildDailyPlan(deps: PlanDeps, by = "autopilot"): Promise<
       }
     }
 
+    // 1b. Brief als zweites Nachfassen für sehr gute Leads ohne Antwort (Christian, 04.10.2026).
+    for (const company of await dueLetterFollowUps(
+      db,
+      now,
+      config.briefe.nachfassen_nach_tagen,
+      config.briefe.ab_score,
+      config.briefe.pro_tag,
+    )) {
+      await isolated(company, result, async () => {
+        await planLetter(deps, company, date, by, "followup", result);
+      });
+    }
+
     // 2. Neue Leads.
     const target = dailyNewCount(config, now, await firstSentAt(db));
     const already = (await planItems(db, date)).filter((i) => i.kind === "new").length;
@@ -200,13 +252,8 @@ export async function buildDailyPlan(deps: PlanDeps, by = "autopilot"): Promise<
         const person = await recipient(db, company.id);
         const mailOk = person.email ? await deps.mx(person.email) : false;
         const channel = chooseChannel(
-          {
-            score: company.current_score,
-            hasAddress: Boolean(company.street && company.postal_code),
-            mailOk,
-          },
+          { hasAddress: Boolean(company.street && company.postal_code), mailOk },
           lettersLeft,
-          config.briefe.ab_score,
         );
         if (!channel) {
           result.skipped.push({ name: company.name, reason: "keine gültige E-Mail und keine Anschrift" });
@@ -229,28 +276,7 @@ export async function buildDailyPlan(deps: PlanDeps, by = "autopilot"): Promise<
           }
         }
         if (channel === "letter") {
-          const letter = await draftLetter(deps.letter, company, by);
-          if ("kind" in letter) {
-            result.skipped.push({ name: company.name, reason: letter.kind });
-            return;
-          }
-          const dir = join(deps.lettersDir, date);
-          await mkdir(dir, { recursive: true });
-          const pdf = join(dir, letter.filename);
-          await writeFile(pdf, letter.pdf);
-          await writeFile(pdf.replace(/\.pdf$/, ".png"), letter.png);
-          await db.query(
-            `update interactions set meta = meta || jsonb_build_object('pdf', $2::text, 'png', $3::text) where id = $1`,
-            [letter.draftId, pdf, pdf.replace(/\.pdf$/, ".png")],
-          );
-          await addPlanItem(db, {
-            date,
-            companyId: company.id,
-            kind: "new",
-            channel: "letter",
-            draftId: letter.draftId,
-          });
-          result.letters++;
+          if (!(await planLetter(deps, company, date, by, "new", result))) return;
           lettersLeft--;
         } else {
           const mail = await draftEmail(outreachDeps, company, by);

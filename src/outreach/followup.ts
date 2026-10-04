@@ -114,3 +114,33 @@ export async function createFollowUpDraft(
   });
   return { draftId: draft.id, body, subject };
 }
+
+/**
+ * Zweites Nachfassen per Brief (04.10.2026, Christian: Briefe nur für sehr gute Leads): Nachfass-Mail vor `days` Tagen
+ * gesendet, noch keine Antwort, Score ab `minScore`, vollständige Anschrift, noch kein Brief.
+ */
+export async function dueLetterFollowUps(
+  db: DbClient,
+  now: Date,
+  days: number,
+  minScore: number,
+  limit: number,
+): Promise<Company[]> {
+  if (limit <= 0) return [];
+  const { rows } = await db.query<Company>(
+    `select c.* from companies c
+       join lateral (
+         select max((meta->>'sent_at')::timestamptz) as at from interactions
+          where company_id = c.id and type = 'draft' and channel = 'email'
+            and coalesce((meta->>'follow_up')::boolean, false) = true and meta ? 'sent_at'
+       ) f on f.at is not null
+      where c.status = 'CONTACTED' and coalesce(c.current_score, 0) >= $3
+        and c.street is not null and c.postal_code is not null
+        and f.at <= $1::timestamptz - make_interval(days => $2)
+        and not exists (select 1 from interactions l where l.company_id = c.id and l.type = 'draft' and l.channel = 'letter')
+      order by c.current_score desc nulls last
+      limit $4`,
+    [now, days, minScore, limit],
+  );
+  return rows;
+}

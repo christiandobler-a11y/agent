@@ -10,10 +10,13 @@ neue_kontakte:
   spaeter: 30 # danach, wenn nichts zurückkommt (Spamfilter gewöhnen sich an den Absender)
   steigern_nach_tagen: 14 # Tage seit der ersten gesendeten Mail
   nur_werktags: true # Mo bis Fr; am Wochenende nur Nachfassen
-# Befund-Seiten (Briefe): für die stärksten Leads und für Leads ohne erreichbare E-Mail-Adresse.
+# Befund-Seiten (Briefe), 04.10.2026 (Christian): Erstkontakt nur noch per Mail. Briefe gibt es für Leads ohne
+# erreichbare Mail-Adresse und als zweites Nachfassen für sehr gute Leads (ab_score), wenn auch die Nachfass-Mail
+# nach `nachfassen_nach_tagen` Tagen unbeantwortet blieb. Höchstens `pro_tag` je Tag.
 briefe:
   pro_tag: 3
   ab_score: 80
+  nachfassen_nach_tagen: 7
 # Prototyp für jeden neuen Lead mit Website (ca. 5 Cent je Stück); Vorher/Nachher in Brief und Mail. Branchen mit
 # Vorschau-Bild (config/prototype.yaml → teaser, derzeit Physio) bekommen stattdessen das Bild, ohne LLM.
 prototyp_fuer_neue: true
