@@ -35,6 +35,8 @@ export interface TeaserData {
   quote?: { text: string; author: string } | null;
   /** Öffnungszeiten von Google, z. B. "Mo–Fr: 08:00–19:00". */
   hours?: readonly string[];
+  /** Fester Stockfoto-Dateiname (config/prototype.yaml → teaser.foto); fehlt er, je Firma eins. */
+  photo?: string | null;
 }
 
 /** Stockfotos (Unsplash-Lizenz, kommerziell frei, siehe assets/teaser/physio/QUELLEN.md); erstes = Favorit. */
@@ -108,6 +110,11 @@ export const fileAssets: TeaserAssets = {
   font: (key) => pathToFileURL(require.resolve(FONT_FILES[key])).href,
   photo: (file) => pathToFileURL(join(physioAssetDir(), file)).href,
 };
+
+/** Festes Foto (config/prototype.yaml → teaser.foto), sonst je Firma eins aus der Auswahl. */
+export function photoFor(d: Pick<TeaserData, "seed" | "photo">): (typeof PHYSIO_PHOTOS)[number] {
+  return PHYSIO_PHOTOS.find((p) => p.file === d.photo) ?? pickPhoto(d.seed);
+}
 
 export function pickPhoto(seed: string): (typeof PHYSIO_PHOTOS)[number] {
   return PHYSIO_PHOTOS[seedOf(seed) % PHYSIO_PHOTOS.length]!;
@@ -275,7 +282,7 @@ ${topoLines()}
  */
 function renderVital(d: TeaserData, assets: TeaserAssets): string {
   const { title } = teaserName(d.name, d.city);
-  const photo = pickPhoto(d.seed);
+  const photo = photoFor(d);
   const city = d.city?.trim() || null;
   const showRating = d.rating !== null && d.rating >= 4.3 && (d.reviewCount ?? 0) >= 5;
   const fonts = (
@@ -375,7 +382,7 @@ const RUND_SERVICES = [STRIP[3]!, STRIP[1]!, STRIP[2]!, STRIP[4]!];
  */
 function renderRund(d: TeaserData, assets: TeaserAssets): string {
   const { title } = teaserName(d.name, d.city);
-  const photo = pickPhoto(d.seed);
+  const photo = photoFor(d);
   const city = d.city?.trim() || null;
   const showRating = d.rating !== null && d.rating >= 4.3 && (d.reviewCount ?? 0) >= 5;
   const size = title.length <= 16 ? 88 : title.length <= 26 ? 72 : 58;
@@ -442,7 +449,7 @@ p{font-size:21px;line-height:1.5;margin-top:20px;max-width:520px;color:#3d5f66}
 /** Runde Variante in Handy-Breite (390 × 844) für das Geräte-Bild. */
 function renderRundMobile(d: TeaserData, assets: TeaserAssets): string {
   const { title } = teaserName(d.name, d.city);
-  const photo = pickPhoto(d.seed);
+  const photo = photoFor(d);
   const city = d.city?.trim() || null;
   const showRating = d.rating !== null && d.rating >= 4.3 && (d.reviewCount ?? 0) >= 5;
   const size = title.length <= 14 ? 48 : title.length <= 24 ? 40 : 32;
@@ -510,7 +517,7 @@ p{font-size:15px;line-height:1.45;margin-top:10px;color:#3d5f66}
  */
 function renderMixMobile(d: TeaserData, assets: TeaserAssets): string {
   const { title } = teaserName(d.name, d.city);
-  const photo = pickPhoto(d.seed);
+  const photo = photoFor(d);
   const city = d.city?.trim() || null;
   const showRating = d.rating !== null && d.rating >= 4.3 && (d.reviewCount ?? 0) >= 5;
   const size = title.length <= 14 ? 44 : title.length <= 24 ? 38 : 30;
@@ -628,7 +635,7 @@ const ELEMENTA_THEME: RestTheme = { primary: "#1f2633", accent: "#c48a00", ink: 
 
 function renderVitalRest(d: TeaserData, assets: TeaserAssets, theme: RestTheme = VITAL_THEME): string {
   const { title } = teaserName(d.name, d.city);
-  const photo = pickPhoto(d.seed);
+  const photo = photoFor(d);
   const services = teaserServices(d.services);
   const hours = (d.hours ?? []).slice(0, 3);
   const fonts = (
@@ -735,7 +742,7 @@ ${statsHtml}
  */
 function renderElementa(d: TeaserData, assets: TeaserAssets): string {
   const { title } = teaserName(d.name, d.city);
-  const photo = pickPhoto(d.seed);
+  const photo = photoFor(d);
   const city = d.city?.trim() || null;
   const good = d.rating !== null && d.rating >= 4.3 && (d.reviewCount ?? 0) >= 5;
   const fonts = (
@@ -946,6 +953,8 @@ export interface TeaserDeps {
   style?: TeaserStyle;
   /** Startseite auf Laptop und Smartphone statt nur der Seite (alle Stile außer "welt"). */
   devices?: boolean;
+  /** Festes Foto für alle (Dateiname aus assets/teaser/physio/). */
+  photo?: string | null;
   /** Google-Details (Bewertungstext, Öffnungszeiten), siehe cachedPlaceDetails; fehlt es, ohne. */
   details?: ((company: Company) => Promise<PlaceDetails | null>) | null;
 }
@@ -976,6 +985,7 @@ export async function teaserForCompany(db: DbClient, t: TeaserDeps, company: Com
       services,
       quote: details?.quotes[0] ?? null,
       hours: details?.hours ?? [],
+      photo: t.photo ?? null,
     },
     t.shoot,
     t.style,

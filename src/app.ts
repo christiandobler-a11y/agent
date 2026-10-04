@@ -145,6 +145,7 @@ export async function createApp(options: { notifier?: Notifier; worker?: boolean
         style: prototypeConfig.teaser.stil,
         devices: prototypeConfig.teaser.geraete,
         shoot: chromiumTeaserShooter(process.env.CHROMIUM_PATH),
+        photo: prototypeConfig.teaser.foto,
         details: cachedPlaceDetails({ db, budget, apiKey: keys.GOOGLE_API_KEY }),
       },
       mx: createMxCheck(),

@@ -402,6 +402,7 @@ export function createBot(options: BotOptions): AvelioBot {
               style: teaserConfig.stil,
               devices: teaserConfig.geraete,
               shoot: chromiumTeaserShooter(process.env.CHROMIUM_PATH),
+              photo: teaserConfig.foto,
               details: cachedPlaceDetails({
                 db: pipeline.db,
                 budget: pipeline.budget,

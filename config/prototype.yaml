@@ -29,3 +29,8 @@ teaser:
   # mix = am Rechner rund, am Handy vital mit den vier Leistungen als runde Kacheln darunter
   stil: vital # 04.10.2026 Christian: rund und mix ausprobiert, "das vorherige hat mir am meisten gefallen"
   geraete: true # Startseite auf Laptop und Smartphone nebeneinander (alle Stile außer welt)
+  # Ein Foto für alle (04.10.2026, Christian: "der Kunde sieht eh nur diese Variante"). Hände bei der Massage, ohne
+  # erkennbaren Therapeuten, passt zu Inhaberin wie Inhaber. Andere: 1645005513713-9e2b92a687d3.jpg (Training ohne
+  # Gesichter), 1706353399656-210cca727a33.jpg (Therapeut mit Patientin), 1649751361457-01d3a696c7e6.jpg (Therapeut am
+  # Knie). null = je Praxis eins aus der Auswahl.
+  foto: 1519824145371-296894a0daa9.jpg

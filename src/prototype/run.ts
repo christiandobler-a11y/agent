@@ -43,8 +43,10 @@ const configSchema = z.object({
       branchen: z.array(z.string()),
       stil: z.enum(["welt", "vital", "rund", "mix", "elementa"]).default("welt"),
       geraete: z.boolean().default(false),
+      // Festes Stockfoto für alle (Dateiname in assets/teaser/physio/), sonst je Firma eins.
+      foto: z.string().nullable().default(null),
     })
-    .default({ dir: "data/teasers", branchen: [], stil: "welt", geraete: false }),
+    .default({ dir: "data/teasers", branchen: [], stil: "welt", geraete: false, foto: null }),
 });
 export type PrototypeConfig = z.infer<typeof configSchema>;
 export const loadPrototypeConfig = () => loadYamlConfig("prototype.yaml", configSchema);
