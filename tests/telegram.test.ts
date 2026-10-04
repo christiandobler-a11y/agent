@@ -431,7 +431,7 @@ describeDb("Telegram-Bot und Manager mit Datenbank", () => {
       return { text: String(msg.text), ids: kb[0]!.map((b) => b.callback_data) };
     };
 
-    await bot.handleUpdate(textUpdate(ALLOWED, "/kalibrieren"));
+    await bot.handleUpdate(textUpdate(ALLOWED, "/kalibrieren alle"));
     const first = lastCard();
     expect(first.text).toContain("Kalibrierung · 0 bewertet");
     expect(first.text).toContain("Restaurant, Gasthaus, Café · Kolbermoor");
@@ -457,6 +457,64 @@ describeDb("Telegram-Bot und Manager mit Datenbank", () => {
     await bot.handleUpdate(textUpdate(ALLOWED, "/auswertung"));
     expect(sent().at(-1)).toContain("Golden Set: 2 Firmen");
     expect(sent().at(-1)).toContain("noch nicht bestanden");
+    expect(toolStep).not.toHaveBeenCalled();
+  });
+
+  it("Kalibrierung: standardmäßig nur Physio, Vorbild merken mit Notiz, /vorbilder", async () => {
+    const scored = async (name: string, branch: string) => {
+      const { company } = await upsertCompany(db(), {
+        name,
+        placeId: `v-${name}`,
+        city: "Weilheim",
+        websiteUrl: `https://${name.toLowerCase().replace(/\W/g, "")}.de/`,
+      });
+      await db().query("update companies set branch_key = $2 where id = $1", [company.id, branch]);
+      const { rows } = await db().query<{ id: string }>(
+        `insert into lead_scores (company_id, scoring_version, total, breakdown) values ($1, 'v1', 70, '{}') returning id`,
+        [company.id],
+      );
+      await db().query("update companies set current_score_id = $2 where id = $1", [company.id, rows[0]!.id]);
+      return company;
+    };
+    const physio = await scored("Physio Vorbild", "physiotherapie");
+    await scored("Gasthaus Andere", "gastro");
+    const pctx = {
+      ...ctx(),
+      lead: { branches: loadBranches(), scoring: loadScoringConfig(), crawl: {}, recheck: {}, llm: {} },
+    } as unknown as PipelineContext;
+    const toolStep = vi.fn();
+    const { bot, sent, calls } = testBot(pctx, { toolStep } as unknown as LlmGateway);
+    const keyboard = () =>
+      (
+        calls.filter((c) => c.method === "sendMessage").at(-1)!.payload.reply_markup as {
+          inline_keyboard: { callback_data: string }[][];
+        }
+      ).inline_keyboard;
+
+    await bot.handleUpdate(textUpdate(ALLOWED, "/kalibrieren"));
+    expect(sent().at(-1)).toContain("Physio Vorbild");
+    const inspo = keyboard()[1]![0]!.callback_data;
+    expect(inspo).toBe(`iv:${physio.id}`);
+    await bot.handleUpdate(callbackUpdate(ALLOWED, inspo));
+    expect(sent().at(-1)).toContain("Was gefällt dir an der Seite?");
+    await bot.handleUpdate(textUpdate(ALLOWED, "Übergänge zwischen den Abschnitten & Team-Fotos"));
+    expect(sent().at(-1)).toContain("Gemerkt");
+    const { rows } = await db().query<{ branch_key: string; url: string; note: string }>(
+      "select branch_key, url, note from design_notes",
+    );
+    expect(rows).toEqual([
+      {
+        branch_key: "physiotherapie",
+        url: "https://physiovorbild.de/",
+        note: "Übergänge zwischen den Abschnitten & Team-Fotos",
+      },
+    ]);
+    // Danach geht Text wieder an den Manager, nicht noch einmal in die Notizen.
+    await bot.handleUpdate(callbackUpdate(ALLOWED, `gA:${physio.id}`));
+    expect(sent().at(-1)).toContain("Keine unbewertete Firma"); // Gastro ist nicht dran
+    await bot.handleUpdate(textUpdate(ALLOWED, "/vorbilder"));
+    expect(sent().at(-1)).toContain("Physio Vorbild");
+    expect(sent().at(-1)).toContain("Übergänge zwischen den Abschnitten &amp; Team-Fotos");
     expect(toolStep).not.toHaveBeenCalled();
   });
 

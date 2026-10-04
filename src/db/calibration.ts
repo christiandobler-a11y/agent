@@ -46,9 +46,9 @@ export async function ratingCounts(db: DbClient): Promise<Record<Grade, number>>
 
 /**
  * Nächste Firma zum Bewerten: hat einen Score, ist noch nicht bewertet. Für eine gute Mischung kommt zuerst die
- * Branche mit den wenigsten Bewertungen dran, innerhalb der Branche zufällig.
+ * Branche mit den wenigsten Bewertungen dran, innerhalb der Branche zufällig. `branches` grenzt ein (z. B. nur Physio).
  */
-export async function nextToRate(db: DbClient): Promise<Company | null> {
+export async function nextToRate(db: DbClient, branches?: readonly string[] | null): Promise<Company | null> {
   const { rows } = await db.query<Company>(
     `with per_branch as (
        select coalesce(c.branch_key, '') as branch, count(*) as n
@@ -58,8 +58,10 @@ export async function nextToRate(db: DbClient): Promise<Company | null> {
        left join per_branch p on p.branch = coalesce(c.branch_key, '')
       where c.current_score_id is not null
         and not exists (select 1 from calibration_ratings r where r.company_id = c.id)
+        and ($1::text[] is null or c.branch_key = any($1))
       order by coalesce(p.n, 0), random()
       limit 1`,
+    [branches && branches.length > 0 ? branches : null],
   );
   return rows[0] ?? null;
 }

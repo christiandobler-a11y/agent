@@ -33,8 +33,12 @@ ausprobieren kann. Nach Schritt 6 ist ein Abstimmungstermin (Kalibrierung) vorge
 - Termin bestätigen: Antwort-Meldung zeigt die angebotenen Termine als Knöpfe; `src/outreach/confirm.ts` schreibt die
   Bestätigung (mit .ics) im Verlauf, nach dem Senden Status „interessiert“ und Erinnerung (`config/outreach.yaml → bestaetigung`)
 - `npm run cli -- chat "…"`: Manager-Agent ohne Telegram befragen (gleicher Verlauf wie der Chat)
-- `npm run cli -- calibrate [export|--file|rate <firma> <A|B|C|X>]`: Golden Set (Telegram `/kalibrieren`,
-  `/auswertung`); `tests/golden/golden.json` ist Regressionstest für Gewichte und Prompts (`tests/golden.test.ts`)
+- `npm run cli -- calibrate [export|--file|rate <firma> <A|B|C|X>]`: Golden Set (Telegram `/kalibrieren`, standardmäßig
+  nur die Branchen aus `autopilot.yaml → suche.branchen`, `/kalibrieren alle`; `/auswertung`); `tests/golden/golden.json`
+  ist Regressionstest für Gewichte und Prompts (`tests/golden.test.ts`)
+- Vorbilder: Kalibrier-Karte → „💡 Als Vorbild merken“, nächste Nachricht = Christians Notiz (Tabelle `design_notes`);
+  fließt je Branche in `vorbilder` des Prototyps (`src/prototype/run.ts`), Liste mit `/vorbilder [branche|alle]`.
+  Gute Notizen bei Gelegenheit in `config/inspiration.yaml` bzw. die Vorlagen übernehmen
 - `npm run costs`: Ausgaben heute/Monat gegen das Budget, letzte 7 Tage je Rolle bzw. Dienst
 - `npm run db-status`: Migrationen, Tabellen, Zeilen, RLS/Data-API-Schutz der Datenbank aus `DATABASE_URL`
 - `npm run cli -- <befehl>`: einzelne Pipeline-Schritte ausführen (Debugging), z. B.

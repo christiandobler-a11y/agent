@@ -69,6 +69,32 @@ export function parseGradeCallback(data: string): { grade: Grade; companyId: str
   return m ? { grade: m[1] as Grade, companyId: m[2]! } : null;
 }
 
+/** Vorbild-Knopf auf der Kalibrier-Karte ("iv:<uuid>"). */
+export const inspoCallback = (companyId: string) => `iv:${companyId}`;
+
+export function parseInspoCallback(data: string): { companyId: string } | null {
+  const m = /^iv:([0-9a-f-]{36})$/.exec(data);
+  return m ? { companyId: m[1]! } : null;
+}
+
+/** Gemerkte Vorbild-Websites mit Christians Notiz. */
+export function designNotesMessage(
+  notes: readonly { name: string; url: string | null; note: string; created_at: Date }[],
+  branch: string | null,
+): string {
+  if (notes.length === 0)
+    return `Noch keine Vorbilder${branch ? ` für ${escapeHtml(branch)}` : ""}. Beim /kalibrieren auf „💡 Als Vorbild merken“ tippen.`;
+  const lines = [`<b>Vorbilder${branch ? ` · ${escapeHtml(branch)}` : ""} (${notes.length})</b>`];
+  for (const n of notes)
+    lines.push(
+      "",
+      `<b>${escapeHtml(n.name)}</b> · ${n.created_at.toISOString().slice(0, 10)}`,
+      ...(n.url ? [escapeHtml(n.url)] : []),
+      escapeHtml(n.note),
+    );
+  return lines.join("\n");
+}
+
 const decimal = (n: number) => n.toFixed(1).replace(".", ",");
 
 /** Karte zum Bewerten: bewusst ohne Score, damit das Bauchgefühl unbeeinflusst bleibt. */
@@ -93,6 +119,7 @@ export function ratingCardMessage(
     "",
     "Würdest du die Firma als Kunden ansprechen?",
     "A = ja, sofort · B = vielleicht · C = eher nicht",
+    ...(c.website_url ? ["Gefällt dir die Seite selbst? 💡 merken, dann lernt der Prototyp davon."] : []),
   ];
   return {
     text: lines.join("\n"),
@@ -103,6 +130,7 @@ export function ratingCardMessage(
         { text: "C", callback_data: gradeCallback("C", c.id) },
         { text: "Weiß nicht", callback_data: gradeCallback("X", c.id) },
       ],
+      ...(c.website_url ? [[{ text: "💡 Als Vorbild merken", callback_data: inspoCallback(c.id) }]] : []),
     ],
   };
 }

@@ -31,8 +31,11 @@ export interface RatingCard {
 }
 
 /** Nächste Firma für die Bewertung samt Google-Daten und Fortschritt, `null` wenn alle bewertet sind. */
-export async function nextRatingCard(db: Db): Promise<RatingCard | null> {
-  const company = await nextToRate(db);
+export async function nextRatingCard(
+  db: Db,
+  branches?: readonly string[] | null,
+): Promise<RatingCard | null> {
+  const company = await nextToRate(db, branches);
   if (!company) return null;
   return { company, places: await latestPlacesSnapshot(db, company.id), counts: await ratingCounts(db) };
 }

@@ -8,6 +8,7 @@ import { loadYamlConfig } from "../config/files.js";
 import { recordApiUsage } from "../db/apiUsage.js";
 import type { Db } from "../db/client.js";
 import type { Company } from "../db/companies.js";
+import { designNotes } from "../db/designNotes.js";
 import { latestAudit, latestOkSnapshotId, latestPlacesSnapshot } from "../db/leads.js";
 import type { BudgetGuard } from "../llm/budget.js";
 import { loadPrompt } from "../llm/config.js";
@@ -342,6 +343,8 @@ export async function buildPrototype(
     (company.branch_key && deps.duBranches.includes(company.branch_key) ? "du" : "sie");
   const branch = company.branch_key ? deps.branches[company.branch_key] : undefined;
   const inspiration = loadInspiration();
+  // Christians Vorbild-Notizen aus der Kalibrierung (/kalibrieren → 💡), neueste zuerst, je Branche.
+  const notes = company.branch_key ? await designNotes(db, company.branch_key, 8) : [];
   const shot = await screenRegion(snap.screenshot_desktop, deps.desktopScreenPx, "Bisherige Startseite");
   // Fotos einmal laden (auch für den Bau), Vorschaubilder fürs LLM; was nicht lädt, fällt aus der Liste.
   const fetchImage = memoFetcher(deps.fetchImage ?? httpImageFetcher());
@@ -360,7 +363,9 @@ export async function buildPrototype(
       // Betriebe ohne Laden (Handwerk, Dienstleister): Vorbild Unternehmensseite.
       ...(isCompanySite(company.branch_key, deps.config) ? (inspiration.unternehmen ?? []) : []),
       ...(inspiration.alle ?? []),
-    ].flatMap((v) => v.merkmale),
+    ]
+      .flatMap((v) => v.merkmale)
+      .concat(notes.map((n) => `Christian gefällt an ${n.name}: ${n.note}`)),
   };
   const result = await deps.llm.structured({
     role: "prototype",

@@ -20,6 +20,7 @@ describeDb("migrate", () => {
       "calibration_ratings",
       "companies",
       "contacts",
+      "design_notes",
       "interactions",
       "lead_scores",
       "messages",

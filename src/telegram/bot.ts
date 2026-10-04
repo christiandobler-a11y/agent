@@ -1,6 +1,8 @@
 import { Bot, InputFile, type Context } from "grammy";
 import type { UserFromGetMe } from "grammy/types";
+import { getState, setState } from "../db/appState.js";
 import { setRating } from "../db/calibration.js";
+import { addDesignNote, designNotes } from "../db/designNotes.js";
 import { findCompany, type Company } from "../db/companies.js";
 import {
   addReminder,
@@ -16,7 +18,7 @@ import type { OutreachConfig } from "../outreach/config.js";
 import { draftEmail, mailtoLink, type OutreachDeps } from "../outreach/draft.js";
 import { draftLetter, type LetterDeps } from "../outreach/letter.js";
 import { loadMailConfig, type MailConfig, type Mailbox } from "../outreach/mail.js";
-import { berlinDate } from "../autopilot/plan.js";
+import { berlinDate, loadAutopilotConfig } from "../autopilot/plan.js";
 import {
   handlePlanCallback,
   sendMorningPackage,
@@ -62,7 +64,10 @@ import {
   leadCrmCard,
   parseCallback,
   parseCrmCallback,
+  designNotesMessage,
+  escapeHtml,
   parseGradeCallback,
+  parseInspoCallback,
   pipelineMessage,
   ratingCardMessage,
 } from "./format.js";
@@ -162,7 +167,8 @@ export const BOT_COMMANDS = [
   { command: "abdeckung", description: "Wie vollständig sind die Regionen?" },
   { command: "status", description: "Stand der Suchen" },
   { command: "kosten", description: "Ausgaben und Budget" },
-  { command: "kalibrieren", description: "Firmen mit A/B/C bewerten" },
+  { command: "kalibrieren", description: "Websites bewerten (A/B/C), gute als Vorbild merken" },
+  { command: "vorbilder", description: "Gemerkte Vorbild-Websites" },
   { command: "hilfe", description: "Was ich kann" },
 ];
 
@@ -227,8 +233,11 @@ export function createBot(options: BotOptions): AvelioBot {
   });
 
   // Kalibrierung (ARCHITECTURE.md 7.4): eine Firma nach der anderen mit A/B/C bewerten, ohne den Score zu sehen.
+  // 04.10.2026: standardmäßig nur die Fokus-Branchen der Nachtsuche (derzeit Physio), "/kalibrieren alle" für alle.
+  const calibrationKey = (chatId: number | undefined) => `calibrate:branches:${chatId ?? "?"}`;
   const sendRatingCard = async (ctx: Context) => {
-    const card = await nextRatingCard(pipeline.db);
+    const branches = await getState<string[]>(pipeline.db, calibrationKey(ctx.chat?.id));
+    const card = await nextRatingCard(pipeline.db, branches);
     if (!card) {
       await ctx.reply(
         "Keine unbewertete Firma mit Score mehr. Neue Firmen kommen mit der nächsten Suche dazu. Auswertung: /auswertung",
@@ -245,7 +254,21 @@ export function createBot(options: BotOptions): AvelioBot {
     await replyLong(ctx, (await tool("coverage", region ? { region } : {}, ctx.chat.id)).text);
   });
 
-  bot.command(["kalibrieren", "bewerten"], sendRatingCard);
+  bot.command(["kalibrieren", "bewerten"], async (ctx) => {
+    const arg = ctx.match.trim().toLowerCase();
+    const branches =
+      arg === "alle" ? [] : arg && pipeline.lead.branches[arg] ? [arg] : loadAutopilotConfig().suche.branchen;
+    await setState(pipeline.db, calibrationKey(ctx.chat.id), branches);
+    await sendRatingCard(ctx);
+  });
+
+  // Vorbild-Notizen: Knopf auf der Kalibrier-Karte, die nächste Textnachricht ist die Notiz (30 Minuten gültig).
+  const inspoKey = (chatId: number | undefined) => `inspo:pending:${chatId ?? "?"}`;
+  bot.command(["vorbilder", "inspo"], async (ctx) => {
+    const arg = ctx.match.trim().toLowerCase();
+    const branch = arg === "alle" ? null : arg || "physiotherapie";
+    await replyLong(ctx, designNotesMessage(await designNotes(pipeline.db, branch), branch));
+  });
   bot.command(["auswertung", "kalibrierung"], async (ctx) => {
     const entries = await loadGoldenEntries({ ...pipeline.lead, db: pipeline.db, now: pipeline.now });
     if (entries.length === 0) {
@@ -659,6 +682,25 @@ export function createBot(options: BotOptions): AvelioBot {
       return;
     }
 
+    const inspo = parseInspoCallback(ctx.callbackQuery.data);
+    if (inspo) {
+      const company = await findCompany(pipeline.db, inspo.companyId);
+      if (!company) {
+        await ctx.answerCallbackQuery({ text: "Firma nicht gefunden" });
+        return;
+      }
+      await setState(pipeline.db, inspoKey(ctx.chat?.id), {
+        companyId: company.id,
+        at: pipeline.now().toISOString(),
+      });
+      await ctx.answerCallbackQuery();
+      await ctx.reply(
+        `💡 Vorbild: <b>${escapeHtml(company.name)}</b>\nWas gefällt dir an der Seite? Schreib es mir einfach als nächste Nachricht (z. B. „Übergänge zwischen den Abschnitten, Google-Bewertungen oben, Team-Fotos“).`,
+        { parse_mode: "HTML" },
+      );
+      return;
+    }
+
     const graded = parseGradeCallback(ctx.callbackQuery.data);
     if (graded) {
       const company = await findCompany(pipeline.db, graded.companyId);
@@ -727,6 +769,28 @@ export function createBot(options: BotOptions): AvelioBot {
   });
 
   bot.on("message:text", async (ctx) => {
+    const pending = await getState<{ companyId: string; at: string } | null>(
+      pipeline.db,
+      inspoKey(ctx.chat.id),
+    );
+    if (pending && pipeline.now().getTime() - Date.parse(pending.at) < 30 * 60_000) {
+      await setState(pipeline.db, inspoKey(ctx.chat.id), null);
+      const company = await findCompany(pipeline.db, pending.companyId);
+      if (company) {
+        await addDesignNote(pipeline.db, {
+          companyId: company.id,
+          branchKey: company.branch_key,
+          url: company.website_url,
+          name: company.name,
+          note: ctx.message.text,
+          by: by(ctx.chat.id),
+        });
+        await ctx.reply(
+          `Gemerkt ✅ Fließt in künftige Prototypen${company.branch_key ? ` (${pipeline.lead.branches[company.branch_key]?.label ?? company.branch_key})` : ""} ein. Bewerte die Seite oben noch mit A/B/C.`,
+        );
+        return;
+      }
+    }
     await ctx.replyWithChatAction("typing").catch(() => undefined);
     const reply = await askManager(options.manager, ctx.chat.id, ctx.message.text);
     await replyFormatted(ctx, reply.text);
