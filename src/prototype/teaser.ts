@@ -88,6 +88,13 @@ export const VITAL_PALETTES = {
     veil: "rgba(30,32,36,.74)",
     label: "Anthrazit + Rot",
   },
+  gelb: {
+    primary: "#2b303b",
+    accent: "#f5b800",
+    ink: "#1f2633",
+    veil: "rgba(58,63,72,.62)",
+    label: "Dunkelblau + Gelb (Elementa)",
+  },
 } as const;
 export type VitalPalette = keyof typeof VITAL_PALETTES;
 
