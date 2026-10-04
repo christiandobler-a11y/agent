@@ -19,6 +19,8 @@ export const outreachConfigSchema = z.object({
   positionierung: z.string(),
   absender_name: z.string().min(1),
   absender_zusatz: z.string().default(""),
+  // Letzte Zeile der Erstmail: wie man keine weiteren Nachrichten bekommt.
+  abmeldung: z.object({ sie: z.string(), du: z.string() }).nullable().default(null),
   du_branchen: z.array(z.string()).default([]),
   // Termin-Bestätigung per Knopf (src/outreach/confirm.ts); {termin} und {ablauf} setzt der Code.
   bestaetigung: z

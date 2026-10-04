@@ -267,7 +267,7 @@ describeDb("Vorschau-Bild in Mail und Versand", () => {
     // Ohne Namen: Praxisteam mit Bitte um Weiterleitung
     expect(mail.body.startsWith("Liebes Praxisteam,")).toBe(true);
     expect(mail.body).toMatch(
-      /\nP\.S\. Falls sich bei Ihnen jemand anderes um die Website kümmert, leiten Sie das gern weiter\.$/,
+      /\nP\.S\. Falls sich bei Ihnen jemand anderes um die Website kümmert, leiten Sie das gern weiter\.\n\nSie möchten keine weiteren Nachrichten von mir\? Eine kurze Antwort genügt, dann melde ich mich nicht mehr\.$/,
     );
     expect(sent[0]!.text).toBe(mail.body);
 

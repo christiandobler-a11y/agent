@@ -402,6 +402,9 @@ export async function draftEmail(
     ...(previewUrl ? [cta] : []),
     `${greeting}\n${signature}`,
     ...(team ? [`P.S. ${inForm(team.weiterleiten, team.weiterleiten_du)}`] : []),
+    // Abmelde-Satz (04.10.2026): üblich bei Erstkontakt, senkt Spam-Klicks, und mehr Text neben dem Bild hilft bei
+    // SpamAssassin (HTML_IMAGE_ONLY).
+    ...(o.abmeldung ? [inForm(o.abmeldung.sie, o.abmeldung.du)] : []),
   ].join("\n\n");
 
   const warnings = [...clean.warnings];

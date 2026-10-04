@@ -294,7 +294,7 @@ describeDb("E-Mail-Entwurf (Datenbank)", () => {
     expect(d.body).toMatch(/unverbindlich\. (Hätten Sie|Passt Ihnen) \w+/);
     expect(d.body).not.toContain("wa.me");
     expect(d.body).toMatch(
-      /Christian Dobler\nWebsites für lokale Betriebe · Avelio, Peißenberg\n0151 12345678$/,
+      /Christian Dobler\nWebsites für lokale Betriebe · Avelio, Peißenberg\n0151 12345678\n\nSie möchten keine weiteren Nachrichten von mir\? Eine kurze Antwort genügt, dann melde ich mich nicht mehr\.$/,
     );
     expect(d.slots).toHaveLength(2);
     expect(d.warnings).toEqual([]);

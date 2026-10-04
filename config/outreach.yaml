@@ -8,6 +8,10 @@ positionierung: >-
 
 absender_name: Christian Dobler
 absender_zusatz: Websites für lokale Betriebe · Avelio, Peißenberg
+# Letzte Zeile der Erstmail (04.10.2026, mail-tester: mehr Text neben dem Bild; bei Kaltakquise ohnehin üblich).
+abmeldung:
+  sie: Sie möchten keine weiteren Nachrichten von mir? Eine kurze Antwort genügt, dann melde ich mich nicht mehr.
+  du: Du möchtest keine weiteren Nachrichten von mir? Eine kurze Antwort genügt, dann melde ich mich nicht mehr.
 # Du für diese Branchen, sonst Sie.
 du_branchen: [fahrrad, gastro, friseur, kosmetik]
 
