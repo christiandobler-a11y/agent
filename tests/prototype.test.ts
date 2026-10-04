@@ -388,6 +388,7 @@ describeDb("Prototyp mit Datenbank", () => {
           branchen: [],
           stil: "welt" as const,
           geraete: false,
+          farbe: "petrol",
           foto: null,
         },
       },

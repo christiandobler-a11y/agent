@@ -136,6 +136,7 @@ export async function teaser(argv: string[]): Promise<number> {
         devices: config.geraete,
         shoot: chromiumTeaserShooter(process.env.CHROMIUM_PATH),
         photo: config.foto,
+        palette: config.farbe,
         details: cachedPlaceDetails({
           db: app.ctx.db,
           budget: app.ctx.budget,

@@ -37,7 +37,62 @@ export interface TeaserData {
   hours?: readonly string[];
   /** Fester Stockfoto-Dateiname (config/prototype.yaml → teaser.foto); fehlt er, je Firma eins. */
   photo?: string | null;
+  /** Farbwelt des Stils "vital" (VITAL_PALETTES), Standard petrol. */
+  palette?: string | null;
 }
+
+/**
+ * Farbwelten für den Stil "vital" (config/prototype.yaml → teaser.farbe). primary = Flächen und Schrift,
+ * accent = Termin-Knopf, veil = Farbschleier über dem Foto.
+ */
+export const VITAL_PALETTES = {
+  petrol: {
+    primary: "#1f5f68",
+    accent: "#e46a1c",
+    ink: "#24515a",
+    veil: "rgba(27,86,95,.74)",
+    label: "Petrol + Orange",
+  },
+  salbei: {
+    primary: "#4f6b5a",
+    accent: "#c8794f",
+    ink: "#3b5245",
+    veil: "rgba(70,96,80,.72)",
+    label: "Salbei + Terrakotta",
+  },
+  navy: {
+    primary: "#1e2f4f",
+    accent: "#f2b632",
+    ink: "#1e2f4f",
+    veil: "rgba(24,38,66,.72)",
+    label: "Navy + Gelb",
+  },
+  wald: {
+    primary: "#245b3b",
+    accent: "#9bc53d",
+    ink: "#21452f",
+    veil: "rgba(31,82,52,.72)",
+    label: "Waldgrün + Limette",
+  },
+  ozean: {
+    primary: "#155e75",
+    accent: "#2ec4b6",
+    ink: "#164e63",
+    veil: "rgba(18,84,105,.72)",
+    label: "Ozeanblau + Türkis",
+  },
+  anthrazit: {
+    primary: "#26292e",
+    accent: "#d7263d",
+    ink: "#26292e",
+    veil: "rgba(30,32,36,.74)",
+    label: "Anthrazit + Rot",
+  },
+} as const;
+export type VitalPalette = keyof typeof VITAL_PALETTES;
+
+const paletteOf = (d: Pick<TeaserData, "palette">) =>
+  VITAL_PALETTES[(d.palette ?? "petrol") as VitalPalette] ?? VITAL_PALETTES.petrol;
 
 /** Stockfotos (Unsplash-Lizenz, kommerziell frei, siehe assets/teaser/physio/QUELLEN.md); erstes = Favorit. */
 export const PHYSIO_PHOTOS = [
@@ -281,6 +336,7 @@ ${topoLines()}
  * ganze Breite mit Petrol-Schleier, zentrierte schmale Schrift, orange Pille, geschwungener Abschluss unten.
  */
 function renderVital(d: TeaserData, assets: TeaserAssets): string {
+  const pal = paletteOf(d);
   const { title } = teaserName(d.name, d.city);
   const photo = photoFor(d);
   const city = d.city?.trim() || null;
@@ -313,7 +369,7 @@ function renderVital(d: TeaserData, assets: TeaserAssets): string {
 <html lang="de"><head><meta charset="utf-8"><title>${esc(title)}</title>
 <style>
 ${fonts}
-:root{--petrol:#1f5f68;--orange:#e46a1c;--ink:#24515a}
+:root{--petrol:${pal.primary};--orange:${pal.accent};--ink:${pal.ink}}
 *{box-sizing:border-box;margin:0;padding:0}
 html,body{width:1440px;height:900px;overflow:hidden}
 body{background:#fff;font-family:"Barlow Condensed",sans-serif;-webkit-font-smoothing:antialiased;color:var(--ink)}
@@ -327,7 +383,7 @@ header{height:100px;display:flex;align-items:center;justify-content:space-betwee
 nav{display:flex;gap:30px;font-size:21px;font-weight:300;color:var(--ink)}
 .hero{position:relative;height:760px;overflow:hidden}
 .hero img{position:absolute;inset:0;width:100%;height:100%;object-fit:cover;object-position:${photo.position}}
-.hero::before{content:"";position:absolute;inset:0;z-index:1;background:rgba(27,86,95,.74)}
+.hero::before{content:"";position:absolute;inset:0;z-index:1;background:${pal.veil}}
 .inner{position:relative;z-index:2;height:100%;display:flex;flex-direction:column;align-items:center;justify-content:center;text-align:center;color:#fff;padding-bottom:150px}
 .eyebrow{font-weight:300;font-size:22px;letter-spacing:.32em;text-transform:uppercase;padding-left:.32em}
 h1{font-weight:600;font-size:${size}px;line-height:1.02;margin-top:18px;max-width:1100px}
@@ -629,6 +685,7 @@ interface RestTheme {
   ink: string;
   /** Kopf-Streifen: Foto mit Farbschleier (vital) oder Farbflächen (elementa). */
   stub: "photo" | "shapes";
+  veil?: string;
 }
 const VITAL_THEME: RestTheme = { primary: "#1f5f68", accent: "#e46a1c", ink: "#24515a", stub: "photo" };
 const ELEMENTA_THEME: RestTheme = { primary: "#1f2633", accent: "#c48a00", ink: "#1f2633", stub: "shapes" };
@@ -694,7 +751,7 @@ header{height:56px;display:flex;align-items:center;justify-content:space-between
 .burger::after{content:"";position:absolute;left:0;right:0;top:4px;border-top:2px solid var(--ink)}
 .hero{position:relative;height:120px;overflow:hidden}
 .hero img{position:absolute;inset:0;width:100%;height:100%;object-fit:cover;object-position:${photo.position}}
-.hero::before{content:"";position:absolute;inset:0;z-index:1;background:${theme.stub === "photo" ? "rgba(27,86,95,.74)" : "transparent"}}
+.hero::before{content:"";position:absolute;inset:0;z-index:1;background:${theme.stub === "photo" ? (theme.veil ?? "rgba(27,86,95,.74)") : "transparent"}}
 .hero .shapes{position:absolute;inset:0;width:100%;height:100%}
 .hero span{position:absolute;z-index:2;left:0;right:0;top:26px;text-align:center;color:#fff;font-family:"Barlow Condensed",sans-serif;font-weight:600;font-size:24px}
 .wave{position:absolute;z-index:3;left:0;right:0;bottom:-1px;width:100%;height:46px}
@@ -853,7 +910,19 @@ export function renderTeaserMockup(
       ? renderRundMobile(d, assets)
       : style === "mix"
         ? renderMixMobile(d, assets)
-        : renderVitalRest(d, assets, style === "elementa" ? ELEMENTA_THEME : VITAL_THEME);
+        : renderVitalRest(
+            d,
+            assets,
+            style === "elementa"
+              ? ELEMENTA_THEME
+              : {
+                  ...VITAL_THEME,
+                  primary: paletteOf(d).primary,
+                  accent: paletteOf(d).accent,
+                  ink: paletteOf(d).ink,
+                  veil: paletteOf(d).veil,
+                },
+          );
   const card = style === "vital" || style === "elementa" ? quoteCard(d) : "";
   const lw = 1060; // Bildschirmbreite Laptop
   const ls = lw / 1440;
@@ -955,6 +1024,8 @@ export interface TeaserDeps {
   devices?: boolean;
   /** Festes Foto für alle (Dateiname aus assets/teaser/physio/). */
   photo?: string | null;
+  /** Farbwelt für "vital" (VITAL_PALETTES). */
+  palette?: string | null;
   /** Google-Details (Bewertungstext, Öffnungszeiten), siehe cachedPlaceDetails; fehlt es, ohne. */
   details?: ((company: Company) => Promise<PlaceDetails | null>) | null;
 }
@@ -986,6 +1057,7 @@ export async function teaserForCompany(db: DbClient, t: TeaserDeps, company: Com
       quote: details?.quotes[0] ?? null,
       hours: details?.hours ?? [],
       photo: t.photo ?? null,
+      palette: t.palette ?? null,
     },
     t.shoot,
     t.style,

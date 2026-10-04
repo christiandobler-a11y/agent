@@ -45,8 +45,17 @@ const configSchema = z.object({
       geraete: z.boolean().default(false),
       // Festes Stockfoto für alle (Dateiname in assets/teaser/physio/), sonst je Firma eins.
       foto: z.string().nullable().default(null),
+      // Farbwelt des Stils "vital": petrol, salbei, navy, wald, ozean, anthrazit (src/prototype/teaser.ts).
+      farbe: z.string().default("petrol"),
     })
-    .default({ dir: "data/teasers", branchen: [], stil: "welt", geraete: false, foto: null }),
+    .default({
+      dir: "data/teasers",
+      branchen: [],
+      stil: "welt",
+      geraete: false,
+      foto: null,
+      farbe: "petrol",
+    }),
 });
 export type PrototypeConfig = z.infer<typeof configSchema>;
 export const loadPrototypeConfig = () => loadYamlConfig("prototype.yaml", configSchema);

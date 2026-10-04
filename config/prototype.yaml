@@ -34,3 +34,5 @@ teaser:
   # Gesichter), 1706353399656-210cca727a33.jpg (Therapeut mit Patientin), 1649751361457-01d3a696c7e6.jpg (Therapeut am
   # Knie). null = je Praxis eins aus der Auswahl.
   foto: 1519824145371-296894a0daa9.jpg
+  # Farbwelt für vital: petrol (Petrol + Orange), salbei, navy, wald, ozean, anthrazit
+  farbe: petrol
