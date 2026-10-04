@@ -3,6 +3,7 @@ import { dailyNewCount, loadAutopilotConfig } from "../src/autopilot/plan.js";
 import { upsertCompany } from "../src/db/companies.js";
 import { loadMailConfig, type Mailbox, type OutgoingMail } from "../src/outreach/mail.js";
 import {
+  imapReason,
   recentSeedProblem,
   seedBoxesFromEnv,
   seedReport,
@@ -34,6 +35,19 @@ describe("Kontrollmail und Zahlen (rein)", () => {
       loadMailConfig(),
     );
     expect(boxes.map((b) => [b.label, b.address])).toEqual([["Gmail", "test@gmail.com"]]);
+  });
+
+  it("IMAP-Fehler verständlich", () => {
+    expect(
+      imapReason({
+        message: "Command failed",
+        authenticationFailed: true,
+        responseText: "Invalid credentials",
+      }),
+    ).toBe("Login abgelehnt (Invalid credentials): App-Passwort und IMAP-Freigabe prüfen");
+    expect(imapReason({ message: "Command failed", responseText: "IMAP access disabled" })).toBe(
+      "IMAP access disabled",
+    );
   });
 
   it("Spam bremst: eine Stufe zurück, auf der ersten Stufe halbiert", () => {

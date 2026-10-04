@@ -23,6 +23,14 @@ export interface SeedBox {
 
 const SPAM_NAME = /^(spam|junk|junk-e-mail|spamverdacht|\[gmail\]\/spam|bulk mail)$/i;
 
+/** Grund aus einem IMAP-Fehler (imapflow meldet nur "Command failed", der Server sagt mehr). */
+export function imapReason(err: unknown): string {
+  const e = err as { message?: string; responseText?: string; authenticationFailed?: boolean; code?: string };
+  if (e.authenticationFailed)
+    return `Login abgelehnt${e.responseText ? ` (${e.responseText})` : ""}: App-Passwort und IMAP-Freigabe prüfen`;
+  return e.responseText || e.code || e.message || String(err);
+}
+
 export function createSeedBox(s: {
   label: string;
   address: string;
@@ -40,7 +48,14 @@ export function createSeedBox(s: {
         auth: { user: s.address, pass: s.password },
         logger: false,
       });
-      await client.connect();
+      // Fehler sauber beenden (sonst hält die offene Verbindung den Prozess am Leben) und verständlich melden.
+      client.on("error", () => undefined);
+      try {
+        await client.connect();
+      } catch (err) {
+        client.close();
+        throw new Error(imapReason(err), { cause: err });
+      }
       try {
         const boxes = await client.list();
         const spam =
@@ -59,8 +74,10 @@ export function createSeedBox(s: {
         if (await found("INBOX")) return "inbox";
         if (spam && (await found(spam))) return "spam";
         return null;
+      } catch (err) {
+        throw new Error(imapReason(err), { cause: err });
       } finally {
-        await client.logout().catch(() => undefined);
+        await client.logout().catch(() => client.close());
       }
     },
   };

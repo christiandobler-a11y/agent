@@ -290,7 +290,8 @@ async function seedCheck(): Promise<number> {
       console.log(`✘ ${box.label} (${box.address}): ${err instanceof Error ? err.message : String(err)}`);
     }
   }
-  return failed > 0 ? 1 : 0;
+  // Offene IMAP-Verbindungen dürfen die Konsole nicht festhalten.
+  process.exit(failed > 0 ? 1 : 0);
 }
 
 const commands: Record<string, (args: string[]) => Promise<number>> = {
