@@ -137,6 +137,18 @@ describe("Vorschau-Bild Physio (rein)", () => {
     );
   });
 
+  it("Stil elementa: Farbflächen, Stern-Badge nur bei guter Note, Name escaped, auch als Geräte-Bild", () => {
+    const html = renderPhysioTeaser(data({ name: "Physio <b>Test</b>" }), assets, "elementa");
+    expect(html).toContain("Physio &lt;b&gt;Test&lt;/b&gt;");
+    expect(html).toContain('class="star"');
+    expect(html).toContain("Jetzt Termin vereinbaren");
+    expect(html).not.toContain("<script");
+    expect(renderPhysioTeaser(data({ rating: 4 }), assets, "elementa")).not.toContain('class="star"');
+    const mock = renderTeaserMockup(data(), assets, "elementa");
+    expect(mock.match(/<iframe srcdoc="/g)).toHaveLength(2);
+    expect(mock).toContain("Wobei wir Ihnen helfen");
+  });
+
   it("nur für die eingestellten Branchen", () => {
     const t = { branches: ["physiotherapie"] };
     expect(usesTeaser(t, { branch_key: "physiotherapie" } as never)).toBe(true);

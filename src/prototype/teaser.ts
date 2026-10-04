@@ -120,6 +120,9 @@ const GOOGLE =
 const PIN =
   '<svg viewBox="0 0 24 24" width="22" height="22" aria-hidden="true"><path fill="none" stroke="currentColor" stroke-width="1.8" d="M12 21s-7-6.2-7-11.5A7 7 0 0 1 19 9.5C19 14.8 12 21 12 21z"/><circle cx="12" cy="9.5" r="2.5" fill="none" stroke="currentColor" stroke-width="1.8"/></svg>';
 
+const PHONE_ICON =
+  '<svg viewBox="0 0 24 24" width="20" height="20" aria-hidden="true"><path fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" d="M5 4h4l2 5-2.5 1.5a11 11 0 0 0 5 5L15 13l5 2v4a2 2 0 0 1-2 2A16 16 0 0 1 3 6a2 2 0 0 1 2-2"/></svg>';
+
 /** Leiste unten im Stil einer Partner-Leiste: Kassen und typische Qualifikationen als schlichte Schriftzüge. */
 const STRIP: { icon: string; top: string; main: string }[] = [
   { icon: "M12 3l8 3v6c0 4.5-3.4 8.3-8 9-4.6-.7-8-4.5-8-9V6z", top: "Alle Kassen", main: "& Privat" },
@@ -169,7 +172,7 @@ export function monogram(title: string): string {
  * Physio-Seiten (z. B. therapie-welt.de, 04.10.2026 mit Christian): schwebende Kopfleiste, Höhenlinien, Aussage mit
  * markiertem Praxisnamen, Google-Bewertung, Foto-Collage, Leiste mit Kassen und Qualifikationen.
  */
-export type TeaserStyle = "welt" | "vital" | "rund" | "mix";
+export type TeaserStyle = "welt" | "vital" | "rund" | "mix" | "elementa";
 
 export function renderPhysioTeaser(
   d: TeaserData,
@@ -178,6 +181,7 @@ export function renderPhysioTeaser(
 ): string {
   if (style === "vital") return renderVital(d, assets);
   if (style === "rund" || style === "mix") return renderRund(d, assets);
+  if (style === "elementa") return renderElementa(d, assets);
   const { title } = teaserName(d.name, d.city);
   const start = seedOf(d.seed) % PHYSIO_PHOTOS.length;
   const photo = (k: number) => PHYSIO_PHOTOS[(start + k) % PHYSIO_PHOTOS.length]!;
@@ -612,7 +616,17 @@ export function teaserQuote(text: string, max = 150): string {
  * "Der Rest" in Handy-Breite (04.10.2026, Christian: "noch nicht dieser Wow, lass mich sehen wie der Rest aussieht"):
  * Ende des Heros, darunter ihre Leistungen und Öffnungszeiten, unten ausgeblendet. Macht neugierig auf die ganze Seite.
  */
-function renderVitalRest(d: TeaserData, assets: TeaserAssets): string {
+interface RestTheme {
+  primary: string;
+  accent: string;
+  ink: string;
+  /** Kopf-Streifen: Foto mit Farbschleier (vital) oder Farbflächen (elementa). */
+  stub: "photo" | "shapes";
+}
+const VITAL_THEME: RestTheme = { primary: "#1f5f68", accent: "#e46a1c", ink: "#24515a", stub: "photo" };
+const ELEMENTA_THEME: RestTheme = { primary: "#1f2633", accent: "#c48a00", ink: "#1f2633", stub: "shapes" };
+
+function renderVitalRest(d: TeaserData, assets: TeaserAssets, theme: RestTheme = VITAL_THEME): string {
   const { title } = teaserName(d.name, d.city);
   const photo = pickPhoto(d.seed);
   const services = teaserServices(d.services);
@@ -660,7 +674,7 @@ function renderVitalRest(d: TeaserData, assets: TeaserAssets): string {
 <html lang="de"><head><meta charset="utf-8"><title>${esc(title)}</title>
 <style>
 ${fonts}
-:root{--petrol:#1f5f68;--orange:#e46a1c;--ink:#24515a}
+:root{--petrol:${theme.primary};--orange:${theme.accent};--ink:${theme.ink}}
 *{box-sizing:border-box;margin:0;padding:0}
 html,body{width:390px;height:844px;overflow:hidden}
 body{position:relative;background:#fff;font-family:Manrope,sans-serif;-webkit-font-smoothing:antialiased;color:var(--ink)}
@@ -673,7 +687,8 @@ header{height:56px;display:flex;align-items:center;justify-content:space-between
 .burger::after{content:"";position:absolute;left:0;right:0;top:4px;border-top:2px solid var(--ink)}
 .hero{position:relative;height:120px;overflow:hidden}
 .hero img{position:absolute;inset:0;width:100%;height:100%;object-fit:cover;object-position:${photo.position}}
-.hero::before{content:"";position:absolute;inset:0;z-index:1;background:rgba(27,86,95,.74)}
+.hero::before{content:"";position:absolute;inset:0;z-index:1;background:${theme.stub === "photo" ? "rgba(27,86,95,.74)" : "transparent"}}
+.hero .shapes{position:absolute;inset:0;width:100%;height:100%}
 .hero span{position:absolute;z-index:2;left:0;right:0;top:26px;text-align:center;color:#fff;font-family:"Barlow Condensed",sans-serif;font-weight:600;font-size:24px}
 .wave{position:absolute;z-index:3;left:0;right:0;bottom:-1px;width:100%;height:46px}
 section{padding:6px 20px 0}
@@ -696,7 +711,11 @@ h2{font-family:"Barlow Condensed",sans-serif;font-weight:600;font-size:30px;colo
 <body>
 <div class="status"></div>
 <header><div class="brand"><span class="mark">${esc(monogram(title))}</span><b>${esc(title)}</b></div><span class="burger"></span></header>
-<div class="hero"><img src="${assets.photo(photo.file)}" alt=""><span>Termin vereinbaren</span>
+<div class="hero">${
+    theme.stub === "photo"
+      ? `<img src="${assets.photo(photo.file)}" alt="">`
+      : `<svg class="shapes" viewBox="0 0 390 120" preserveAspectRatio="none" aria-hidden="true"><rect width="390" height="120" fill="#a9aeb3"/><path d="M0 0H150L0 70Z" fill="#ffd24c"/><path d="M250 0H390V90Z" fill="#2b303b"/><path d="M390 60V120H200Z" fill="#ffd24c"/></svg>`
+  }<span>Termin vereinbaren</span>
 <svg class="wave" viewBox="0 0 390 46" preserveAspectRatio="none" aria-hidden="true"><path fill="#fff" d="M0 18 C 110 0, 190 46, 300 34 S 370 12, 390 20 L390 46 L0 46 Z"/></svg></div>
 ${statsHtml}
 <section>
@@ -706,6 +725,90 @@ ${statsHtml}
   <div class="hours"><small>Öffnungszeiten</small><ul>${info}</ul></div>
 </section>
 <div class="fade"></div>
+</body></html>`;
+}
+
+/**
+ * Stil "elementa" (04.10.2026, Christians Favorit elementa-therapie.de): geometrische Farbflächen in Gelb, Dunkelblau
+ * und Grau, schwebende weiße Kopfleiste, große fette Überschrift, Stern-Badge mit der Google-Note, gelber und weißer
+ * Knopf, Adresse und Telefon, grüner Anruf-Knopf. Das Praxisfoto liegt gedämpft dahinter.
+ */
+function renderElementa(d: TeaserData, assets: TeaserAssets): string {
+  const { title } = teaserName(d.name, d.city);
+  const photo = pickPhoto(d.seed);
+  const city = d.city?.trim() || null;
+  const good = d.rating !== null && d.rating >= 4.3 && (d.reviewCount ?? 0) >= 5;
+  const fonts = (
+    [
+      ["Manrope", "Manrope 400", 400],
+      ["Manrope", "Manrope 600", 600],
+      ["Manrope", "Manrope 800", 800],
+    ] as const
+  )
+    .map(
+      ([family, key, weight]) =>
+        `@font-face{font-family:"${family}";src:url("${assets.font(key)}") format("woff2");font-weight:${weight}}`,
+    )
+    .join("\n");
+  const size = title.length <= 22 ? 76 : title.length <= 34 ? 62 : 50;
+  const address = [d.street, city]
+    .filter(Boolean)
+    .map((x) => esc(x!))
+    .join(", ");
+  return `<!doctype html>
+<html lang="de"><head><meta charset="utf-8"><title>${esc(title)}</title>
+<style>
+${fonts}
+*{box-sizing:border-box;margin:0;padding:0}
+html,body{width:1440px;height:900px;overflow:hidden}
+body{position:relative;font-family:Manrope,sans-serif;-webkit-font-smoothing:antialiased;color:#1f2633;background:#a9aeb3}
+.photo{position:absolute;inset:0;width:100%;height:100%;object-fit:cover;object-position:${photo.position};filter:grayscale(.35)}
+.veil{position:absolute;inset:0;background:rgba(58,63,72,.62)}
+.shapes{position:absolute;inset:0;width:100%;height:100%}
+header{position:absolute;z-index:5;top:20px;left:70px;right:70px;height:78px;background:#fff;border-radius:18px;display:flex;align-items:center;justify-content:space-between;padding:0 16px 0 18px;box-shadow:0 10px 30px rgba(0,0,0,.08)}
+.brand{display:flex;align-items:center;gap:12px}
+.ring{width:56px;height:56px;border-radius:50%;border:2px solid #1f2633;display:grid;place-items:center}
+.ring i{width:22px;height:22px;border-radius:50%;border:4px solid #1f2633}
+.brand b{display:block;font-weight:600;font-size:${title.length <= 24 ? 24 : 19}px;letter-spacing:-.01em;max-width:420px;line-height:1.1}
+.brand small{display:block;font-weight:800;font-size:9px;letter-spacing:.14em;margin-top:2px}
+nav{display:flex;align-items:center;gap:22px;font-weight:800;font-size:14px}
+.btn{border-radius:8px;padding:12px 16px;font-weight:800;font-size:14px}
+.dark{background:#1f2633;color:#fff}.yellow{background:#ffd24c;color:#fff}
+.center{position:absolute;z-index:4;left:0;right:0;top:250px;text-align:center;color:#fff}
+h1{font-weight:800;font-size:${size}px;line-height:1.08;letter-spacing:-.01em;max-width:1050px;margin:0 auto}
+h2{font-weight:800;font-size:${Math.round(size * 0.62)}px;margin-top:6px}
+.row{display:flex;justify-content:center;gap:10px;margin-top:40px}
+.big{width:272px;height:52px;border-radius:8px;display:grid;place-items:center;font-weight:800;font-size:17px}
+.big.y{background:#ffd24c;color:#fff}.big.w{background:#fff;color:#1f2633}
+.meta{margin-top:30px;font-weight:800;font-size:17px;line-height:1.7}
+.meta div{display:flex;align-items:center;justify-content:center;gap:8px}
+.star{position:absolute;z-index:6;right:150px;top:228px;width:124px;height:124px;transform:rotate(14deg)}
+.star b{position:absolute;left:0;right:0;top:36px;text-align:center;color:#fff;font-weight:800;font-size:38px}
+.star small{position:absolute;left:0;right:0;top:80px;text-align:center;color:#fff;font-weight:800;font-size:12px}
+.call{position:absolute;z-index:6;right:48px;bottom:48px;width:104px;height:104px;border-radius:50%;background:rgba(80,210,110,.45);display:grid;place-items:center}
+.call i{width:82px;height:82px;border-radius:50%;background:#2fd15a;display:grid;place-items:center}
+</style></head>
+<body>
+<img class="photo" src="${assets.photo(photo.file)}" alt="">
+<div class="veil"></div>
+<svg class="shapes" viewBox="0 0 1440 900" preserveAspectRatio="none" aria-hidden="true">
+  <path d="M0 0H430L0 185Z" fill="#ffd24c"/>
+  <path d="M730 0H1440V210Z" fill="#2b303b"/>
+  <path d="M0 595L715 900H0Z" fill="#cfd3d9"/>
+  <path d="M1440 720V900H1010Z" fill="#ffd24c"/>
+</svg>
+<header>
+  <div class="brand"><span class="ring"><i></i></span><span><b>${esc(title)}</b><small>PHYSIOTHERAPIE</small></span></div>
+  <nav><span>Leistungen</span><span>Praxis</span><span>Team</span><span>Kontakt</span><span class="btn dark">Rezept einreichen</span><span class="btn yellow">Termin vereinbaren</span></nav>
+</header>
+${good ? `<div class="star"><svg viewBox="0 0 100 100" width="124" height="124" aria-hidden="true"><path fill="#ffd24c" d="M50 4l13 30 32 3-24 21 7 32-28-17-28 17 7-32L5 37l32-3z"/></svg><b>${de(d.rating!)}</b><small>Bei Google</small></div>` : ""}
+<div class="center">
+  <h1>${esc(title)}</h1>
+  ${/physio/i.test(title) && !city ? "" : `<h2>${/physio/i.test(title) ? "" : "Physiotherapie "}${city ? `in ${esc(city)}` : ""}</h2>`}
+  <div class="row"><span class="big y">Jetzt Termin vereinbaren</span><span class="big w">Öffnungszeiten</span></div>
+  <div class="meta">${address ? `<div>${PIN} ${address}</div>` : ""}${d.phone ? `<div>${PHONE_ICON} ${esc(d.phone)}</div>` : ""}</div>
+</div>
+<div class="call"><i><svg viewBox="0 0 24 24" width="36" height="36" aria-hidden="true"><path fill="none" stroke="#fff" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" d="M5 4h4l2 5-2.5 1.5a11 11 0 0 0 5 5L15 13l5 2v4a2 2 0 0 1-2 2A16 16 0 0 1 3 6a2 2 0 0 1 2-2"/></svg></i></div>
 </body></html>`;
 }
 
@@ -731,15 +834,20 @@ export function renderTeaserMockup(
   assets: TeaserAssets = fileAssets,
   style: Exclude<TeaserStyle, "welt"> = "vital",
 ): string {
-  const desktop = style === "vital" ? renderVital(d, assets) : renderRund(d, assets);
+  const desktop =
+    style === "vital"
+      ? renderVital(d, assets)
+      : style === "elementa"
+        ? renderElementa(d, assets)
+        : renderRund(d, assets);
   // vital: am Handy schon "der Rest" (Leistungen, Öffnungszeiten), dazu eine echte Bewertung als Karte.
   const mobile =
     style === "rund"
       ? renderRundMobile(d, assets)
       : style === "mix"
         ? renderMixMobile(d, assets)
-        : renderVitalRest(d, assets);
-  const card = style === "vital" ? quoteCard(d) : "";
+        : renderVitalRest(d, assets, style === "elementa" ? ELEMENTA_THEME : VITAL_THEME);
+  const card = style === "vital" || style === "elementa" ? quoteCard(d) : "";
   const lw = 1060; // Bildschirmbreite Laptop
   const ls = lw / 1440;
   const pw = 250; // Bildschirmbreite Handy

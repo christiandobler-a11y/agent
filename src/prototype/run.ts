@@ -41,7 +41,7 @@ const configSchema = z.object({
     .object({
       dir: z.string(),
       branchen: z.array(z.string()),
-      stil: z.enum(["welt", "vital", "rund", "mix"]).default("welt"),
+      stil: z.enum(["welt", "vital", "rund", "mix", "elementa"]).default("welt"),
       geraete: z.boolean().default(false),
     })
     .default({ dir: "data/teasers", branchen: [], stil: "welt", geraete: false }),

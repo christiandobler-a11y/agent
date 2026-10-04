@@ -111,6 +111,20 @@ physiotherapie:
       - Vorteile mit 3D-Icons (Mikroskop, Stoppuhr, Laufband), "In 3 Schritten zum Erfolg" als Zeitleiste
       - Nachrichten-Laufband oben (Neueröffnung), Effekte sparsam, aber spürbar (Einblenden beim Scrollen)
     gespeichert: 2026-10-04
+  - url: https://www.elementa-therapie.de/standorte/physiotherapie-koeln-ehrenfeld
+    name: Elementa Therapie (Köln-Ehrenfeld)
+    warum: >-
+      Poooah, die ist auch krank. Würde ich genau so selbst haben wollen, wenn ich Unternehmer wäre. Am meisten liegt
+      mir tatsächlich diese hier (Christians Favorit, 04.10.2026).
+    merkmale:
+      - geometrische Farbflächen als schräge Dreiecke in Gelb, Dunkelblau und Grau rund um das Hero, wirkt modern und eigenständig
+      - schwebende weiße Kopfleiste mit runden Ecken, rechts zwei Knöpfe (dunkel "Jetzt bewerben", gelb "Termin vereinbaren")
+      - große, fette Überschrift "Praxisname Physiotherapie in Ort", zentriert; Stern-Badge "4.9 bei Google" schräg daneben
+      - zwei große Knöpfe (gelb "Jetzt Termin vereinbaren", weiß "Öffnungszeiten"), darunter Sprachen, Adresse und Telefon
+      - grüner runder Anruf-Knopf mit pulsierendem Ring unten rechts, immer sichtbar
+      - Standort-Seite mit Karte, Kontakt und vollständiger Öffnungszeiten-Tabelle, Karten für Bahn, Bus und Parken
+      - Online-Terminbuchung eingebettet, Bewertungen von Google und Jameda als Karten
+    gespeichert: 2026-10-04
 
 alle:
   - url: https://www.mediana-zentrum.de/
