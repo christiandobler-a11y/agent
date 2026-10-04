@@ -4,6 +4,8 @@ import { createDb, describeDbError } from "./db/client.js";
 import { migrate } from "./db/migrate.js";
 import { dbStatus } from "./db/status.js";
 import { costReport } from "./db/costs.js";
+import { loadMailConfig } from "./outreach/mail.js";
+import { seedBoxesFromEnv } from "./outreach/seed.js";
 import { createBudgetGuard } from "./llm/budget.js";
 import { loadModelsConfig } from "./llm/config.js";
 import { createAnthropicMessages, createLlmGateway } from "./llm/gateway.js";
@@ -269,7 +271,30 @@ async function crawl(args: string[]): Promise<number> {
   }
 }
 
+/** Kontroll-Postfächer prüfen: Login per IMAP, Spam-Ordner gefunden? Verschickt nichts, gibt keine Passwörter aus. */
+async function seedCheck(): Promise<number> {
+  const boxes = seedBoxesFromEnv(loadEnv(), loadMailConfig());
+  if (boxes.length === 0) {
+    console.log(
+      "Keine Kontroll-Postfächer eingerichtet (SEED_1_ADDRESS/SEED_1_PASSWORD in der .env, docs/DEPLOY.md 14).",
+    );
+    return 1;
+  }
+  let failed = 0;
+  for (const box of boxes) {
+    try {
+      await box.locate("<avelio-test@avelio.digital>");
+      console.log(`✔ ${box.label} (${box.address}): Login ok`);
+    } catch (err) {
+      failed++;
+      console.log(`✘ ${box.label} (${box.address}): ${err instanceof Error ? err.message : String(err)}`);
+    }
+  }
+  return failed > 0 ? 1 : 0;
+}
+
 const commands: Record<string, (args: string[]) => Promise<number>> = {
+  "seed-check": seedCheck,
   search,
   coverage,
   worker,

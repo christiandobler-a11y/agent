@@ -245,7 +245,8 @@ kommt in Telegram; liegt sie im Spam, verschickt das Morgen-Paket die nächsten 
    SEED_2_ADDRESS=deine.kontrolle@gmx.de
    SEED_2_PASSWORD=…
    ```
-4. `bash /opt/avelio/scripts/deploy.sh`
+4. `bash /opt/avelio/scripts/deploy.sh`, dann prüfen (verschickt nichts):
+   `cd /opt/avelio && docker compose -f docker-compose.prod.yml exec app node dist/cli.js seed-check`
 
 Wichtig: In den Kontroll-Postfächern Mails von Avelio **nicht** als „kein Spam“ markieren oder antworten, sonst lernt
 der Filter dort und der Test sagt nichts mehr über echte Empfänger. Nur nachsehen.
