@@ -7,7 +7,7 @@ positionierung: >-
   Direkt nach dem Befund kommt ein Kompliment mit Fakt, damit "zeitgemäß" nicht nach "veraltet" klingt.
 
 absender_name: Christian Dobler
-absender_zusatz: Avelio, Peißenberg
+absender_zusatz: Websites für Physiotherapie-Praxen · Avelio, Peißenberg
 # Du für diese Branchen, sonst Sie.
 du_branchen: [fahrrad, gastro, friseur, kosmetik]
 
@@ -39,8 +39,9 @@ bestaetigung:
 team_anrede:
   physiotherapie:
     anrede: "Liebes Praxisteam,"
-    weiterleiten: Falls sich bei Ihnen jemand anderes um die Website kümmert, leiten Sie die Mail gern an die Praxisleitung weiter.
-    weiterleiten_du: Falls sich bei euch jemand anderes um die Website kümmert, leitet die Mail gern an die Praxisleitung weiter.
+    # steht als P.S. unter der Signatur
+    weiterleiten: Falls sich bei Ihnen jemand anderes um die Website kümmert, leiten Sie das gern weiter.
+    weiterleiten_du: Falls sich bei euch jemand anderes um die Website kümmert, leitet das gern weiter.
 
 # Gewählter Einstieg (Variante 2, 03.10.2026). Die anderen nur zur Abwechslung, damit nicht jede Mail gleich klingt.
 einstieg: Ich heiße Christian und mache Online-Auftritte zeitgemäß. Für die meisten Kunden ist die Website ja das Erste, was sie von einem sehen.
@@ -71,11 +72,11 @@ kanaele:
 # Gegen Spamfilter (03.10.2026, Christians Wunsch): jede Mail etwas anders, wenig Masse, sauberer Absender.
 spamschutz:
   abwechseln: [einstieg, betreff, aufhaenger, gruss] # je Mail eine andere Kombination; nie zwei gleiche Mails am selben Tag
+  # 04.10.2026: mit Praxisname, das wird deutlich häufiger geöffnet als ein allgemeiner Betreff.
   betreffe:
-    - Ihr erster Eindruck online
-    - Kurze Frage zu Ihrer Website
-    - "{firma}: ein Gedanke zur Website"
-    - Ein Gedanke zu Ihrem Online-Auftritt
+    - "Ein Entwurf für {firma}"
+    - "{firma}: eine Idee für Ihre Startseite"
+    - "Ihre Startseite, neu gedacht ({firma})"
   aufhaenger_varianten:
     - Ich hab Ihnen dazu etwas vorbereitet und würde es gern kurz mit Ihnen durchgehen, 5 bis 10 Minuten reichen. Wann passt es Ihnen diese Woche am besten?
     - Dazu hab ich schon was vorbereitet. Hätten Sie diese Woche 10 Minuten, damit ich es Ihnen kurz zeigen kann?
@@ -104,36 +105,25 @@ kontaktweg:
   entwurf_satz: "Ich hab mir auch schon mal erlaubt zu skizzieren, wie Ihre Startseite aussehen könnte: {link}"
   entwurf_satz_du: "Ich hab auch schon mal skizziert, wie eure Startseite aussehen könnte: {link}"
   # Mit Vorschau-Bild (04.10.2026, Physio): das Bild steht in der Mail direkt unter diesem Satz.
-  bild_satz: "Ich hab mir auch schon mal erlaubt zu skizzieren, wie Ihre Startseite aussehen könnte:"
-  bild_satz_du: "Ich hab auch schon mal skizziert, wie eure Startseite aussehen könnte:"
+  bild_satz: "Ich hab mir deshalb erlaubt zu skizzieren, wie Ihre Startseite aussehen könnte:"
+  bild_satz_du: "Ich hab deshalb mal skizziert, wie eure Startseite aussehen könnte:"
   email_cta_ohne_whatsapp: Am einfachsten antworten Sie kurz auf diese Mail.
   email_cta_ohne_whatsapp_du: Am einfachsten antwortest du kurz auf diese Mail.
   # Überleitung zum Terminvorschlag ("ich hab was vorbereitet"), wird abgewechselt.
+  # 04.10.2026: kurz, "unverbindlich" steckt drin, danach direkt die Terminfrage.
   vorbereitet:
-    - Ich hab Ihnen dazu etwas vorbereitet und würde es gern kurz mit Ihnen durchgehen, 5 bis 10 Minuten reichen.
-    - Dazu hab ich schon was vorbereitet, das ich Ihnen gern kurz zeigen würde. Dauert 5 bis 10 Minuten.
-    - Ich hab mir dazu schon Gedanken gemacht und etwas vorbereitet, das würde ich Ihnen gern in 5 bis 10 Minuten zeigen.
+    - Ich hab dazu schon etwas vorbereitet und zeige es Ihnen gern in 10 Minuten am Telefon, unverbindlich.
+    - Dazu hab ich schon etwas vorbereitet, das zeige ich Ihnen gern in 10 Minuten am Telefon, ganz unverbindlich.
   # Mit Entwurf-Link davor: kein zweites "vorbereitet".
   vorbereitet_mit_entwurf:
-    - Den Rest würde ich Ihnen gern kurz zeigen, 5 bis 10 Minuten reichen.
-    - Mehr dazu zeige ich Ihnen gern in 5 bis 10 Minuten.
+    - Den Rest zeige ich Ihnen gern in 10 Minuten am Telefon, unverbindlich.
+    - Mehr dazu zeige ich Ihnen gern in 10 Minuten am Telefon, ganz unverbindlich.
   vorbereitet_mit_entwurf_du:
-    - Den Rest zeig ich dir gern kurz, 5 bis 10 Minuten reichen.
-    - Mehr dazu zeig ich dir gern in 5 bis 10 Minuten.
-  # Nach dem Terminvorschlag (04.10.2026, Christian): unverbindlich, kostet nichts, nichts zu verlieren. Bewusst ohne
-  # "kostenlos"/"gratis" (Spamfilter). Wird abgewechselt.
-  unverbindlich:
-    - Das Ganze ist unverbindlich und kostet Sie nichts. Wenn es Sie nicht überzeugt, ist das völlig in Ordnung.
-    - Für Sie ist das unverbindlich und ohne Kosten, und wenn es Sie nicht überzeugt, haben Sie nichts verloren.
-    - Das Gespräch ist unverbindlich und kostet nichts. Passt es für Sie nicht, ist das auch kein Problem.
-  unverbindlich_du:
-    - Das Ganze ist unverbindlich und kostet dich nichts. Wenn es dich nicht überzeugt, ist das völlig in Ordnung.
-    - Für dich ist das unverbindlich und ohne Kosten, und wenn es dich nicht überzeugt, hast du nichts verloren.
-    - Das Gespräch ist unverbindlich und kostet nichts. Passt es für dich nicht, ist das auch kein Problem.
+    - Den Rest zeig ich dir gern in 10 Minuten am Telefon, unverbindlich.
+    - Mehr dazu zeig ich dir gern in 10 Minuten am Telefon, ganz unverbindlich.
   vorbereitet_du:
-    - Ich hab dir dazu was vorbereitet und würd das gern kurz mit dir durchgehen, 5 bis 10 Minuten reichen.
-    - Dazu hab ich schon was vorbereitet, das ich dir gern kurz zeigen würde. Dauert 5 bis 10 Minuten.
-    - Ich hab mir dazu schon Gedanken gemacht und was vorbereitet, das würd ich dir gern in 5 bis 10 Minuten zeigen.
+    - Ich hab dazu schon was vorbereitet und zeig es dir gern in 10 Minuten am Telefon, unverbindlich.
+    - Dazu hab ich schon was vorbereitet, das zeig ich dir gern in 10 Minuten am Telefon, ganz unverbindlich.
 
 # Terminvorschläge statt offenem Kalender (03.10.2026): Knappheit erzeugen, nicht "Mo bis Fr alles frei".
 # Jede Nachricht schlägt 2 konkrete Tage mit je 2 Uhrzeiten vor, z. B. "Dienstag um 12 oder 18 Uhr, sonst Donnerstag
@@ -152,16 +142,16 @@ termine:
     physiotherapie: ["12:15", "12:30", "13:00", "13:15"]
     gastro: ["07:45", "08:00", "17:45", "18:00"]
   tage_je_nachricht: 2
-  uhrzeiten_je_tag: 2
+  uhrzeiten_je_tag: 1 # 04.10.2026: zwei konkrete Termine statt vier, eine klare Frage
   fruehestens_in_tagen: 2 # Vorlauf, damit die Antwort noch rechtzeitig kommt
   spaetestens_in_tagen: 9
   max_leads_je_termin: 5 # Antwortquote ~5–10 %, Doppelzusagen also selten; bei 2 wären die Termine nach ~7 Mails weg
   formulierungen_du:
-    - Hättest du {tag1} um {zeit1a} oder {zeit1b} Uhr kurz Zeit? Sonst ginge noch {tag2} um {zeit2a} oder {zeit2b} Uhr.
-    - Passt dir {tag1} um {zeit1a} oder {zeit1b} Uhr? Alternativ hätte ich {tag2} um {zeit2a} oder {zeit2b} Uhr noch was frei.
+    - Passt dir {tag1} um {zeit1a} Uhr oder {tag2} um {zeit2a} Uhr?
+    - Hättest du {tag1} um {zeit1a} Uhr kurz Zeit? Sonst ginge auch {tag2} um {zeit2a} Uhr.
   formulierungen:
-    - Hätten Sie {tag1} um {zeit1a} oder {zeit1b} Uhr kurz Zeit? Sonst ginge noch {tag2} um {zeit2a} oder {zeit2b} Uhr.
-    - Passt Ihnen {tag1} um {zeit1a} oder {zeit1b} Uhr? Alternativ hätte ich {tag2} um {zeit2a} oder {zeit2b} Uhr noch was frei.
+    - Passt Ihnen {tag1} um {zeit1a} Uhr oder {tag2} um {zeit2a} Uhr?
+    - Hätten Sie {tag1} um {zeit1a} Uhr kurz Zeit? Sonst ginge auch {tag2} um {zeit2a} Uhr.
 
 # Befund-Seite für Briefe (03.10.2026): ein Blatt A4, Umschlag schreibt Christian von Hand (wirkt persönlicher als
 # ein Sichtfenster). Den Text unter dem Bild schreibt das LLM (prompts/letter.v1.md), den Rest setzt der Code.

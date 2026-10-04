@@ -132,6 +132,7 @@ export async function teaser(argv: string[]): Promise<number> {
         ...config,
         branches: config.branchen,
         style: config.stil,
+        devices: config.geraete,
         shoot: chromiumTeaserShooter(process.env.CHROMIUM_PATH),
       },
       found.company,

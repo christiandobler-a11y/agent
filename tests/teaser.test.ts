@@ -17,6 +17,7 @@ import {
   PHYSIO_PHOTOS,
   physioAssetDir,
   renderPhysioTeaser,
+  renderTeaserMockup,
   teaserName,
   teaserPath,
   usesTeaser,
@@ -74,6 +75,14 @@ describe("Vorschau-Bild Physio (rein)", () => {
     // Gleiche Firma, gleiches Foto; das Foto stammt aus der Auswahl.
     expect(renderPhysioTeaser(data(), assets)).toBe(renderPhysioTeaser(data(), assets));
     expect(PHYSIO_PHOTOS.some((p) => html.includes(`photo/${p.file}`))).toBe(true);
+  });
+
+  it("Geräte-Bild: Laptop und Smartphone mit derselben Seite, Name escaped, kein Skript", () => {
+    const html = renderTeaserMockup(data({ name: "Physio <b>Test</b>" }), assets);
+    expect(html.match(/<iframe srcdoc="/g)).toHaveLength(2);
+    expect(html).toContain("Physio &amp;lt;b&amp;gt;Test&amp;lt;/b&amp;gt;");
+    expect(html).toContain("width:390px;height:844px");
+    expect(html).not.toContain("<script");
   });
 
   it("nur für die eingestellten Branchen", () => {
@@ -190,7 +199,9 @@ describeDb("Vorschau-Bild in Mail und Versand", () => {
     expect((await sharp(att[0]!.content).metadata()).width).toBeLessThanOrEqual(1200);
     // Ohne Namen: Praxisteam mit Bitte um Weiterleitung
     expect(mail.body.startsWith("Liebes Praxisteam,")).toBe(true);
-    expect(mail.body).toContain("an die Praxisleitung weiter");
+    expect(mail.body).toMatch(
+      /\nP\.S\. Falls sich bei Ihnen jemand anderes um die Website kümmert, leiten Sie das gern weiter\.$/,
+    );
     expect(sent[0]!.text).toBe(mail.body);
 
     // Ohne Bild bleibt es eine reine Text-Mail.

@@ -41,8 +41,9 @@ const configSchema = z.object({
       dir: z.string(),
       branchen: z.array(z.string()),
       stil: z.enum(["welt", "vital"]).default("welt"),
+      geraete: z.boolean().default(false),
     })
-    .default({ dir: "data/teasers", branchen: [], stil: "welt" }),
+    .default({ dir: "data/teasers", branchen: [], stil: "welt", geraete: false }),
 });
 export type PrototypeConfig = z.infer<typeof configSchema>;
 export const loadPrototypeConfig = () => loadYamlConfig("prototype.yaml", configSchema);

@@ -338,6 +338,111 @@ p{font-weight:300;font-size:28px;margin-top:22px;opacity:.95}
 </body></html>`;
 }
 
+/** Vital-Startseite in Handy-Breite (390 × 844) für das Geräte-Bild. */
+function renderVitalMobile(d: TeaserData, assets: TeaserAssets): string {
+  const { title } = teaserName(d.name, d.city);
+  const photo = pickPhoto(d.seed);
+  const city = d.city?.trim() || null;
+  const showRating = d.rating !== null && d.rating >= 4.3 && (d.reviewCount ?? 0) >= 5;
+  const fonts = (
+    [
+      ["Barlow Condensed", "Barlow Condensed 300", 300],
+      ["Barlow Condensed", "Barlow Condensed 600", 600],
+      ["Manrope", "Manrope 600", 600],
+      ["Manrope", "Manrope 800", 800],
+    ] as const
+  )
+    .map(
+      ([family, key, weight]) =>
+        `@font-face{font-family:"${family}";src:url("${assets.font(key)}") format("woff2");font-weight:${weight}}`,
+    )
+    .join("\n");
+  const size = title.length <= 14 ? 46 : title.length <= 24 ? 40 : 32;
+  return `<!doctype html>
+<html lang="de"><head><meta charset="utf-8"><title>${esc(title)}</title>
+<style>
+${fonts}
+:root{--petrol:#1f5f68;--orange:#e46a1c;--ink:#24515a}
+*{box-sizing:border-box;margin:0;padding:0}
+html,body{width:390px;height:844px;overflow:hidden}
+body{background:#fff;font-family:"Barlow Condensed",sans-serif;-webkit-font-smoothing:antialiased;color:var(--ink)}
+.status{height:44px}
+header{height:64px;display:flex;align-items:center;justify-content:space-between;padding:0 18px}
+.brand{display:flex;align-items:center;gap:10px;min-width:0}
+.mark{flex:none;width:40px;height:40px;border-radius:50%;border:2px solid var(--petrol);display:grid;place-items:center;color:var(--orange);font-weight:600;font-size:17px}
+.brand b{display:block;font-weight:300;font-size:${title.length <= 18 ? 19 : 15}px;letter-spacing:.04em;text-transform:uppercase;line-height:1.05}
+.brand small{display:block;color:var(--orange);font-family:Manrope,sans-serif;font-weight:800;font-size:8px;letter-spacing:.2em;margin-top:3px}
+.burger{flex:none;width:24px;height:16px;border-top:2px solid var(--ink);border-bottom:2px solid var(--ink);position:relative}
+.burger::after{content:"";position:absolute;left:0;right:0;top:5px;border-top:2px solid var(--ink)}
+.hero{position:relative;height:736px;overflow:hidden}
+.hero img{position:absolute;inset:0;width:100%;height:100%;object-fit:cover;object-position:${photo.position}}
+.hero::before{content:"";position:absolute;inset:0;z-index:1;background:rgba(27,86,95,.74)}
+.inner{position:relative;z-index:2;height:100%;display:flex;flex-direction:column;align-items:center;justify-content:center;text-align:center;color:#fff;padding:0 22px 130px}
+.eyebrow{font-weight:300;font-size:13px;letter-spacing:.26em;text-transform:uppercase}
+h1{font-weight:600;font-size:${size}px;line-height:1.02;margin-top:12px}
+p{font-weight:300;font-size:19px;margin-top:14px;opacity:.95}
+.cta{margin-top:26px;background:var(--orange);color:#fff;font-size:19px;font-weight:600;padding:13px 40px;border-radius:999px}
+.rating{margin-top:16px;display:flex;align-items:center;gap:8px;background:rgba(255,255,255,.14);border:1px solid rgba(255,255,255,.35);border-radius:999px;padding:8px 16px;font-family:Manrope,sans-serif;font-size:12px;font-weight:600}
+.rating .stars{display:flex;color:#ffc24a}
+.rating svg{width:12px;height:12px}
+.wave{position:absolute;z-index:3;left:0;right:0;bottom:-1px;width:100%;height:80px}
+</style></head>
+<body>
+<div class="status"></div>
+<header>
+  <div class="brand"><span class="mark">${esc(monogram(title))}</span><span><b>${esc(title)}</b><small>PHYSIOTHERAPIE</small></span></div>
+  <span class="burger"></span>
+</header>
+<section class="hero">
+  <img src="${assets.photo(photo.file)}" alt="">
+  <div class="inner">
+    <div class="eyebrow">Physiotherapie${city ? ` ${esc(city)}` : ""}</div>
+    <h1>${esc(title)}</h1>
+    <p>Wir machen Sie wieder fit für den Alltag.</p>
+    <span class="cta">Termin vereinbaren</span>
+    ${showRating ? `<span class="rating"><span class="stars">${STAR.repeat(5)}</span>${de(d.rating!)} · ${d.reviewCount} Bewertungen</span>` : ""}
+  </div>
+  <svg class="wave" viewBox="0 0 390 80" preserveAspectRatio="none" aria-hidden="true"><path fill="#fff" d="M0 30 C 110 0, 190 80, 300 60 S 370 25, 390 35 L390 80 L0 80 Z"/></svg>
+</section>
+</body></html>`;
+}
+
+/**
+ * Geräte-Bild (04.10.2026, Christian): die Startseite auf einem Laptop, daneben dieselbe Seite auf einem Smartphone.
+ * Wirkt wie ein fertiges Produkt und zeigt nebenbei, dass die Seite am Handy funktioniert. Beide Seiten stecken als
+ * iframe (srcdoc) in der Szene, ein Screenshot reicht. Bildgröße 1440 × 900 wie die Seite selbst.
+ */
+export function renderTeaserMockup(d: TeaserData, assets: TeaserAssets = fileAssets): string {
+  const desktop = renderVital(d, assets);
+  const mobile = renderVitalMobile(d, assets);
+  const lw = 1060; // Bildschirmbreite Laptop
+  const ls = lw / 1440;
+  const pw = 250; // Bildschirmbreite Handy
+  const ps = pw / 390;
+  return `<!doctype html>
+<html lang="de"><head><meta charset="utf-8"><title>Entwurf</title>
+<style>
+*{box-sizing:border-box;margin:0;padding:0}
+html,body{width:1440px;height:900px;overflow:hidden}
+body{background:radial-gradient(120% 90% at 30% 20%,#f4f8f8 0%,#e3ecee 55%,#d5e1e3 100%)}
+.laptop{position:absolute;left:110px;top:70px;width:${lw + 32}px}
+.lid{background:#16191c;border-radius:22px 22px 6px 6px;padding:16px 16px 22px;box-shadow:0 40px 80px rgba(22,48,53,.28)}
+.lid::before{content:"";display:block;width:6px;height:6px;border-radius:50%;background:#3a3f44;margin:-9px auto 3px}
+.screen{width:${lw}px;height:${Math.round(900 * ls)}px;overflow:hidden;border-radius:4px;background:#fff}
+.screen iframe{width:1440px;height:900px;border:0;transform:scale(${ls.toFixed(5)});transform-origin:0 0}
+.base{width:${lw + 140}px;height:22px;margin-left:-54px;background:linear-gradient(#e9ecef,#c3c8cd);border-radius:0 0 18px 18px;box-shadow:0 18px 30px rgba(22,48,53,.22);position:relative}
+.base::before{content:"";position:absolute;left:50%;top:0;width:140px;height:8px;margin-left:-70px;background:#b4bac0;border-radius:0 0 10px 10px}
+.phone{position:absolute;left:1065px;top:300px;width:${pw + 24}px;padding:12px;background:#111316;border-radius:46px;box-shadow:0 40px 70px rgba(22,48,53,.35),inset 0 0 0 2px #2b2f34}
+.phone .screen{width:${pw}px;height:${Math.round(844 * ps)}px;border-radius:34px;position:relative}
+.phone .screen iframe{width:390px;height:844px;transform:scale(${ps.toFixed(5)})}
+.island{position:absolute;z-index:2;left:50%;top:10px;width:78px;height:22px;margin-left:-39px;background:#000;border-radius:999px}
+</style></head>
+<body>
+<div class="laptop"><div class="lid"><div class="screen"><iframe srcdoc="${esc(desktop)}"></iframe></div></div><div class="base"></div></div>
+<div class="phone"><div class="screen"><span class="island"></span><iframe srcdoc="${esc(mobile)}"></iframe></div></div>
+</body></html>`;
+}
+
 export type TeaserShooter = (html: string, outFile: string) => Promise<void>;
 
 /** HTML mit Chromium als JPEG (1600 px breit) speichern. */
@@ -350,7 +455,7 @@ export function chromiumTeaserShooter(executablePath?: string): TeaserShooter {
       await writeFile(file, html);
       const page = await browser.newPage({ viewport: { width: 1440, height: 900 }, deviceScaleFactor: 1.5 });
       await page.goto(pathToFileURL(file).href, { waitUntil: "load" });
-      await page.evaluate("document.fonts.ready.then(() => true)");
+      for (const frame of page.frames()) await frame.evaluate("document.fonts.ready.then(() => true)");
       const png = await page.screenshot({ type: "png" });
       await sharp(png).resize({ width: 1600 }).jpeg({ quality: 84, mozjpeg: true }).toFile(outFile);
     } finally {
@@ -376,10 +481,16 @@ export async function buildTeaser(
   data: Omit<TeaserData, "seed">,
   shoot: TeaserShooter,
   style: TeaserStyle = "welt",
+  devices = false,
 ): Promise<string> {
   await mkdir(dir, { recursive: true });
   const out = teaserPath(dir, companyId);
-  await shoot(renderPhysioTeaser({ ...data, seed: companyId }, fileAssets, style), out);
+  const d = { ...data, seed: companyId };
+  // Laptop + Smartphone gibt es für den Stil "vital".
+  await shoot(
+    devices && style === "vital" ? renderTeaserMockup(d) : renderPhysioTeaser(d, fileAssets, style),
+    out,
+  );
   return out;
 }
 
@@ -389,6 +500,8 @@ export interface TeaserDeps {
   branches: readonly string[];
   shoot: TeaserShooter;
   style?: TeaserStyle;
+  /** Startseite auf Laptop und Smartphone statt nur der Seite (nur Stil "vital"). */
+  devices?: boolean;
 }
 
 export const usesTeaser = (t: Pick<TeaserDeps, "branches"> | null | undefined, company: Company) =>
@@ -410,5 +523,6 @@ export async function teaserForCompany(db: DbClient, t: TeaserDeps, company: Com
     },
     t.shoot,
     t.style,
+    t.devices ?? false,
   );
 }

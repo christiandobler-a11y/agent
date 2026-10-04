@@ -200,10 +200,10 @@ describeDb("E-Mail-Entwurf (Datenbank)", () => {
     contact: { whatsapp, phone: "0151 12345678" },
   });
 
-  it("Sie-Form: Code setzt Betreff, Termine, WhatsApp, Gruß und Signatur; Befund und Kompliment gehen ans Modell", async () => {
+  it("Sie-Form: kurz, Code setzt Betreff mit Praxisname, zwei Termine, Gruß und Signatur; kein WhatsApp-Link", async () => {
     const c = await lead("Physio Kagerer", "physiotherapie", "Elisabeth Kagerer");
     const { llm, structured } = fakeLlm(
-      "Ich heiße Christian und mache Online-Auftritte zeitgemäß. Auf dem Handy ist Ihre Nummer nicht antippbar – schade. Dabei haben Sie 4,8 Sterne.",
+      "Mir ist Ihre Praxis bei Google aufgefallen, 4,8 Sterne sind richtig stark. Auf der Website kommt das noch nicht rüber – schade.",
     );
     const d = await draftEmail(deps(llm), c, "test");
     if ("kind" in d) throw new Error("kein Entwurf");
@@ -212,17 +212,20 @@ describeDb("E-Mail-Entwurf (Datenbank)", () => {
       anrede: "sie",
       befunde: [{ titel: "Telefonnummer nicht antippbar", schwere: "high" }],
       kompliment_fakt: "4,8 Sterne bei 170 Google-Bewertungen",
-      einstiegssatz: outreach.einstieg,
     });
+    expect(input).not.toHaveProperty("einstiegssatz");
     expect(structured.mock.calls[0]![0].role).toBe("contact");
     expect(d.to).toMatch(/^info@/);
     expect(outreach.spamschutz.betreffe.map((b) => b.replace("{firma}", c.name))).toContain(d.subject);
-    expect(d.body).toMatch(/^Hallo Elisabeth Kagerer,\n\nich heiße Christian/);
+    expect(d.subject).toContain("Physio Kagerer");
+    expect(d.body).toMatch(/^Hallo Elisabeth Kagerer,\n\nmir ist Ihre Praxis/);
     expect(d.body).not.toMatch(/[–—]/);
-    expect(d.body).toMatch(/(Hätten Sie|Passt Ihnen) \w+/);
-    expect(d.body).toContain("https://wa.me/4915112345678?text=");
-    expect(d.body).toMatch(/Christian Dobler\nAvelio, Peißenberg\n0151 12345678$/);
-    expect(d.slots).toHaveLength(4);
+    expect(d.body).toMatch(/unverbindlich\. (Hätten Sie|Passt Ihnen) \w+/);
+    expect(d.body).not.toContain("wa.me");
+    expect(d.body).toMatch(
+      /Christian Dobler\nWebsites für Physiotherapie-Praxen · Avelio, Peißenberg\n0151 12345678$/,
+    );
+    expect(d.slots).toHaveLength(2);
     expect(d.warnings).toEqual([]);
     const { rows } = await db().query<{ type: string; meta: { slots: string[]; subject: string } }>(
       "select type, meta from interactions where company_id = $1",
@@ -232,7 +235,7 @@ describeDb("E-Mail-Entwurf (Datenbank)", () => {
     expect(rows[0]!.meta.slots).toEqual(d.slots);
   });
 
-  it("Du-Branche ohne Ansprechpartner → Ihr-Form; fehlende WhatsApp-Nummer wird gemeldet", async () => {
+  it("Du-Branche ohne Ansprechpartner → Ihr-Form, kein WhatsApp nötig", async () => {
     const c = await lead("Radl Team", "fahrrad", null);
     const { llm, structured } = fakeLlm(
       "Ich bin Christian und bring Websites auf den Stand von heute. Bei euch fehlt X. Dabei habt ihr 4,8 Sterne.",
@@ -242,9 +245,8 @@ describeDb("E-Mail-Entwurf (Datenbank)", () => {
     const sent = JSON.parse(structured.mock.calls[0]![0].input as string) as Record<string, unknown>;
     expect(sent, JSON.stringify(sent)).toMatchObject({ anrede: "ihr" });
     expect(d.body).toMatch(/(Hättet ihr|Passt euch)/);
-    expect(d.body).toContain("Am einfachsten antwortet ihr kurz auf diese Mail.");
     expect(d.body).not.toMatch(/\b(dir|du)\b/);
-    expect(d.warnings).toContain("WhatsApp-Nummer fehlt (OUTREACH_WHATSAPP in der .env)");
+    expect(d.warnings).toEqual([]);
   });
 
   it("ein Termin geht nie an mehr Leads als erlaubt (hier: höchstens 2)", async () => {

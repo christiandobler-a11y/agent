@@ -383,7 +383,7 @@ describeDb("Prototyp mit Datenbank", () => {
         ...loadPrototypeConfig(),
         previews_dir: join(tmp, "previews"),
         shots_dir: join(tmp, "shots"),
-        teaser: { dir: join(tmp, "teasers"), branchen: [], stil: "welt" as const },
+        teaser: { dir: join(tmp, "teasers"), branchen: [], stil: "welt" as const, geraete: false },
       },
       duBranches: ["fahrrad"],
       now: () => NOW,

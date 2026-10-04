@@ -109,10 +109,11 @@ export function proposeSlots(input: {
   days.sort((a, b) => a.date.localeCompare(b.date));
 
   let lunchUsed = false;
-  const chosen = days.map((day) => {
+  const chosen = days.map((day, i) => {
     const lunchTimes = new Set(c.ausnahmen_mittagspause[day.weekday] ?? []);
     const pool = day.times.filter((t) => !(lunchUsed && lunchTimes.has(t)));
-    const offset = (input.seed >>> 3) % pool.length;
+    // Je Tag eine andere Uhrzeit, damit nicht zweimal "um 13 Uhr" dasteht.
+    const offset = ((input.seed >>> 3) + i) % pool.length;
     const picked = [...pool.slice(offset), ...pool.slice(0, offset)].slice(0, c.uhrzeiten_je_tag).sort();
     if (picked.some((t) => lunchTimes.has(t))) lunchUsed = true;
     return { ...day, times: picked };

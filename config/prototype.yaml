@@ -26,3 +26,4 @@ teaser:
   # welt = helle Seite mit Foto-Collage und Google-Bewertung (angelehnt an therapie-welt.de),
   # vital = großes Foto mit Petrol-Schleier und Bogen (angelehnt an revitalis-physio.de)
   stil: vital # 04.10.2026 Christian: "finde vital viel besser"
+  geraete: true # Startseite auf Laptop und Smartphone nebeneinander (nur vital)

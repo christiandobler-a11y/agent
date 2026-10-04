@@ -7,7 +7,7 @@ const cfg = loadOutreachConfig();
 const NOW = new Date("2026-10-03T10:00:00Z");
 
 describe("Terminvorschläge", () => {
-  it("2 Tage mit je 2 Uhrzeiten; Physio in der Mittagspause der Praxis (12 bis 13:30 Uhr)", () => {
+  it("2 Tage mit je einer Uhrzeit; Physio in der Mittagspause der Praxis (12 bis 13:30 Uhr)", () => {
     for (let seed = 0; seed < 50; seed++) {
       const p = proposeSlots({
         now: NOW,
@@ -18,7 +18,7 @@ describe("Terminvorschläge", () => {
         seed,
       })!;
       expect(p.days).toHaveLength(2);
-      expect(p.slots).toHaveLength(4);
+      expect(p.slots).toHaveLength(2);
       expect(p.days[0]!.date < p.days[1]!.date).toBe(true);
       expect(p.days[0]!.weekday).not.toBe(p.days[1]!.weekday);
       for (const iso of p.slots) {
@@ -129,7 +129,7 @@ describe("Terminvorschläge", () => {
         seed,
       })!;
       expect(p.sentence).toMatch(/Uhr/);
-      expect(p.slots).toHaveLength(4);
+      expect(p.slots).toHaveLength(2);
     }
   });
 

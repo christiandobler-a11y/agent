@@ -140,6 +140,7 @@ export async function createApp(options: { notifier?: Notifier; worker?: boolean
         dir: prototypeConfig.teaser.dir,
         branches: prototypeConfig.teaser.branchen,
         style: prototypeConfig.teaser.stil,
+        devices: prototypeConfig.teaser.geraete,
         shoot: chromiumTeaserShooter(process.env.CHROMIUM_PATH),
       },
       mx: createMxCheck(),

@@ -10,7 +10,7 @@ import type { Branches } from "../pipeline/research/branches.js";
 import type { OutreachConfig } from "./config.js";
 import { proposeSlots, seedOf } from "./slots.js";
 import { duToIhr, lowerFirst, subjectFor, type Form } from "./form.js";
-import { teaserExists, teaserPath } from "../prototype/teaser.js";
+import { teaserExists, teaserName, teaserPath } from "../prototype/teaser.js";
 import { personFromCompanyName, personInCompanyName } from "./names.js";
 
 /**
@@ -20,7 +20,7 @@ import { personFromCompanyName, personInCompanyName } from "./names.js";
  * nichts; Christian sendet selbst.
  */
 
-export const CONTACT_PROMPT_VERSION = "v4";
+export const CONTACT_PROMPT_VERSION = "v5";
 
 export const contactOutputSchema = z.object({
   absatz: z.string().min(40).max(1000),
@@ -229,13 +229,10 @@ export async function draftEmail(
   // Mittelteil des letzten Entwurfs (Absatz nach der Grußzeile), damit "Neu schreiben" anders formuliert.
   const previous = prior[0]?.body?.split("\n\n")[1] ?? null;
 
-  const intros = [o.einstieg, ...o.einstiege_abwechslung];
-  const intro = intros[variant % intros.length]!;
   const branch = company.branch_key ? deps.branches[company.branch_key] : undefined;
   const input = {
     betrieb: { name: company.name, ort: company.city, branche: branch?.label ?? company.category },
     anrede: form,
-    einstiegssatz: intro,
     befunde:
       findings.length > 0
         ? findings.map((f) => ({ titel: f.title, detail: f.detail, beleg: f.evidence, schwere: f.severity }))
@@ -331,32 +328,32 @@ export async function draftEmail(
           whatsappLink(deps.contact.whatsapp, form === "sie" ? k.whatsapp_text_sie : k.whatsapp_text),
         )
       : inForm(k.email_cta_ohne_whatsapp, k.email_cta_ohne_whatsapp_du);
+  // Name wie im Vorschau-Bild ("Pickelmann Mike" statt "Praxis für Physiotherapie Pickelmann").
   const subject = subjectFor(
-    pick(o.spamschutz.betreffe, seed, 11, variant).replace("{firma}", shortCompanyName(company.name)),
+    pick(o.spamschutz.betreffe, seed, 11, variant).replace(
+      "{firma}",
+      teaserName(company.name, company.city).title,
+    ),
     form,
   );
   const greeting = pick(o.spamschutz.gruesse, seed, 13, variant);
   const signature = [o.absender_name, o.absender_zusatz, deps.contact.phone].filter(Boolean).join("\n");
 
+  // 04.10.2026 (mit Christian): kurz, Bild früh, genau eine Bitte (Termin), Weiterleiten als P.S.; mit Entwurfs-Link
+  // bleibt der Antwort-Hinweis, ohne Link keine weitere Aufforderung (auch kein WhatsApp-Link in der Erstmail).
   const body = [
     salutationLine(form, { name, salutation }, company.name, team?.anrede),
     lowerFirst(clean.text),
     ...(draftSentence ? [draftSentence] : []),
-    [
-      prepared,
-      slotSentence,
-      inForm(pick(k.unverbindlich, seed, 17, variant), pick(k.unverbindlich_du, seed, 17, variant)),
-    ]
-      .filter(Boolean)
-      .join(" "),
-    [team ? inForm(team.weiterleiten, team.weiterleiten_du) : null, cta].filter(Boolean).join(" "),
+    [prepared, slotSentence].filter(Boolean).join(" "),
+    ...(previewUrl ? [cta] : []),
     `${greeting}\n${signature}`,
+    ...(team ? [`P.S. ${inForm(team.weiterleiten, team.weiterleiten_du)}`] : []),
   ].join("\n\n");
 
   const warnings = [...clean.warnings];
   if (!email) warnings.push("Keine E-Mail-Adresse im Impressum gefunden");
   if (!slots) warnings.push("Keine freien Termine in den nächsten Tagen (config/outreach.yaml → termine)");
-  if (!deps.contact.whatsapp) warnings.push("WhatsApp-Nummer fehlt (OUTREACH_WHATSAPP in der .env)");
 
   const draft = await insertDraft(db, company.id, {
     channel: "email",

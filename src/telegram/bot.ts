@@ -361,6 +361,7 @@ export function createBot(options: BotOptions): AvelioBot {
             dir: teaserConfig.dir,
             branches: teaserConfig.branchen,
             style: teaserConfig.stil,
+            devices: teaserConfig.geraete,
             shoot: chromiumTeaserShooter(process.env.CHROMIUM_PATH),
           },
         },
