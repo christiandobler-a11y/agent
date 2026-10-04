@@ -237,7 +237,7 @@ describeDb("Befund-Seite mit Datenbank", () => {
     expect(buttons.map((b) => b.text)).toEqual(["📮 Verschickt, kontaktiert", "🔄 Neu erstellen"]);
 
     const html = render.mock.calls[0]![0];
-    expect(html).toContain("Hallo Herr Ernst,");
+    expect(html).toContain("Grüß Sie, Herr Ernst,");
     expect(html).toContain("Ihre Seite ist mir aufgefallen"); // groß, steht für sich
     expect(html).toContain("<svg"); // QR-Code und Markierung
     const input = (structured.mock.calls as unknown as [{ role: string; input: unknown[] }][])[0]![0];

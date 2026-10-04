@@ -262,6 +262,7 @@ export async function draftLetter(
     person,
     company.name,
     o.team_anrede[company.branch_key ?? ""]?.anrede,
+    o.anrede,
   );
   const whatsapp = deps.contact.whatsapp;
   const qr = whatsapp

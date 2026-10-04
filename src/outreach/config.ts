@@ -37,17 +37,25 @@ export const outreachConfigSchema = z.object({
       text_du:
         "super, dann machen wir {termin}. {ablauf} Eine Kalender-Einladung hängt an, ich freu mich drauf.",
       ablauf_telefon:
-        "Ich rufe Sie dann kurz an und zeige Ihnen den Entwurf dabei am Bildschirm, den Link dazu schicke ich Ihnen ein paar Minuten vorher.",
+        "Den Link zum Video-Call (läuft einfach im Browser, nichts installieren) schicke ich Ihnen ein paar Minuten vorher, dann zeige ich Ihnen den Entwurf direkt am Bildschirm.",
       ablauf_telefon_du:
-        "Ich ruf dich dann kurz an und zeig dir den Entwurf dabei am Bildschirm, den Link dazu schick ich dir ein paar Minuten vorher.",
-      ablauf_link: "Hier schon mal der Link für das kurze Gespräch, das läuft einfach im Browser: {link}",
-      ablauf_link_du: "Hier schon mal der Link für das kurze Gespräch, das läuft einfach im Browser: {link}",
+        "Den Link zum Video-Call (läuft einfach im Browser, nichts installieren) schick ich dir ein paar Minuten vorher, dann zeig ich dir den Entwurf direkt am Bildschirm.",
+      ablauf_link:
+        "Hier schon mal der Link zum Video-Call, der läuft einfach im Browser, nichts installieren: {link}",
+      ablauf_link_du:
+        "Hier schon mal der Link zum Video-Call, der läuft einfach im Browser, nichts installieren: {link}",
       erinnerung_minuten: 30,
       dauer_minuten: 15,
     }),
   // Warum eine gute Website für die Branche zählt (geht als Kontext an das LLM, Rolle contact).
   branche_kontext: z.record(z.string(), z.string()).default({}),
-  // Ohne Ansprechpartner: Anrede ans Team und Bitte um Weiterleitung, je Branche (sonst "Hallo Team {Firma}").
+  // Grußzeile: {anrede} {nachname} nur mit feststehendem Frau/Herr, {vorname} bei du, sonst ans Team.
+  anrede: z.object({ sie: z.string(), du: z.string(), ohne_name: z.string() }).default({
+    sie: "Grüß Sie, {anrede} {nachname},",
+    du: "Servus {vorname},",
+    ohne_name: "Hallo Team {firma},",
+  }),
+  // Ohne Ansprechpartner: Anrede ans Team und Bitte um Weiterleitung, je Branche (sonst anrede.ohne_name).
   team_anrede: z
     .record(
       z.string(),

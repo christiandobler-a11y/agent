@@ -3,7 +3,7 @@ import { FEMININE_ROLE } from "../pipeline/crawl/impressum.js";
 /**
  * Ansprechpartner aus dem Firmennamen (04.10.2026, Christian: "Hallo Team Christina Heider Physiotherapeutin" ist zu
  * generisch). Viele Praxen heißen wie ihre Inhaberin; erkannt wird ein gängiger Vorname direkt neben einem Nachnamen.
- * Das Geschlecht wird nie geraten: die Anrede nutzt den vollen Namen ohne Frau/Herr.
+ * Das Geschlecht wird nie geraten: ohne Frau/Herr geht die Sie-Mail ans Team (salutationLine).
  */
 
 const FIRST_NAMES = new Set(

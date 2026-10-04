@@ -9,6 +9,8 @@ import {
   draftEmail,
   mailtoLink,
   pickFindings,
+  overallImpression,
+  personalContact,
   salutationLine,
   shortCompanyName,
   sanitizeDraftText,
@@ -52,29 +54,68 @@ describe("Entwurf (rein)", () => {
     expect(pickFindings([])).toEqual([]);
   });
 
-  it("Grußzeile aus dem Impressum, ohne Namen an das Team", () => {
+  it("Grußzeile: Frau/Herr nur wenn es feststeht, sonst an das Team", () => {
     expect(salutationLine("sie", { name: "Monika Späth", salutation: "Frau" }, "x")).toBe(
-      "Hallo Frau Späth,",
+      "Grüß Sie, Frau Späth,",
     );
-    expect(salutationLine("sie", { name: "Kai Ernst", salutation: null }, "x")).toBe("Hallo Kai Ernst,");
-    expect(salutationLine("du", { name: "Josef Kerscher", salutation: "Herr" }, "x")).toBe("Hallo Josef,");
-    // Inhaberin im Firmennamen (ohne Geschlecht zu raten), Vorname auch hinten; sonst Team bzw. Team-Anrede der Branche.
-    // Weibliche Berufsbezeichnung im Namen ist eine Angabe, kein Raten → "Frau"; sonst voller Name.
+    expect(salutationLine("sie", { name: "Kai Ernst", salutation: "Herr" }, "x")).toBe(
+      "Grüß Sie, Herr Ernst,",
+    );
+    // Nie Vor- und Nachname, nie Geschlecht raten: ohne Frau/Herr ans Team.
+    expect(salutationLine("sie", { name: "Kai Ernst", salutation: null }, "Physio Ernst")).toBe(
+      "Hallo Team Physio Ernst,",
+    );
+    expect(salutationLine("du", { name: "Josef Kerscher", salutation: "Herr" }, "x")).toBe("Servus Josef,");
+    expect(salutationLine("du", { name: "Josef Kerscher", salutation: null }, "x")).toBe("Servus Josef,");
+    expect(salutationLine("ihr", { name: null, salutation: null }, "Radl Team")).toBe(
+      "Hallo Team Radl Team,",
+    );
+    // Weibliche Berufsbezeichnung im Firmennamen ist eine Angabe, kein Raten → "Frau".
     expect(
       salutationLine("sie", { name: null, salutation: null }, "Christina Heider Physiotherapeutin"),
-    ).toBe("Hallo Frau Heider,");
-    expect(salutationLine("sie", { name: null, salutation: null }, "Physiotherapie Christina Heider")).toBe(
-      "Hallo Christina Heider,",
-    );
-    expect(salutationLine("sie", { name: null, salutation: null }, "Max Huber Physiotherapeut")).toBe(
-      "Hallo Max Huber,",
-    );
-    expect(salutationLine("sie", { name: null, salutation: null }, "Physiotherapie Pickelmann Mike")).toBe(
-      "Hallo Mike Pickelmann,",
+    ).toBe("Grüß Sie, Frau Heider,");
+    expect(
+      salutationLine(
+        "sie",
+        { name: null, salutation: null },
+        "Physiotherapie Christina Heider",
+        "Liebes Praxisteam,",
+      ),
+    ).toBe("Liebes Praxisteam,");
+    expect(
+      salutationLine(
+        "sie",
+        { name: null, salutation: null },
+        "Max Huber Physiotherapeut",
+        "Liebes Praxisteam,",
+      ),
+    ).toBe("Liebes Praxisteam,");
+    expect(
+      personalContact("sie", { name: null, salutation: null }, "Christina Heider Physiotherapeutin"),
+    ).toEqual({
+      name: "Christina Heider",
+      salutation: "Frau",
+    });
+    expect(
+      personalContact("sie", { name: null, salutation: null }, "Physiotherapie Pickelmann Mike"),
+    ).toBeNull();
+    expect(personalContact("du", { name: null, salutation: null }, "Physiotherapie Pickelmann Mike")).toEqual(
+      {
+        name: "Mike Pickelmann",
+        salutation: null,
+      },
     );
     expect(
       salutationLine("sie", { name: null, salutation: null }, "Physio Vital", "Liebes Praxisteam,"),
     ).toBe("Liebes Praxisteam,");
+    // Eigene Texte aus der Konfiguration
+    expect(
+      salutationLine("sie", { name: "Kai Ernst", salutation: "Herr" }, "x", null, {
+        sie: "Guten Tag {anrede} {nachname},",
+        du: "Hallo {vorname},",
+        ohne_name: "Hallo zusammen,",
+      }),
+    ).toBe("Guten Tag Herr Ernst,");
     expect(personFromCompanyName("Franz Physio Murnau")).toBeNull();
     expect(personFromCompanyName("Salzmann am Salzstadel")).toBeNull();
     expect(personFromCompanyName("PHYSIOteam Rosenheim")).toBeNull();
@@ -85,6 +126,23 @@ describe("Entwurf (rein)", () => {
     expect(shortCompanyName("RADsyndikat GmbH")).toBe("RADsyndikat");
     expect(shortCompanyName('Gasthof - Hotel "Alt- Fürstätt"')).toBe("Gasthof Hotel Alt- Fürstätt");
     expect(shortCompanyName("Hotel Ariadne")).toBe("Hotel Ariadne");
+  });
+
+  it("Gesamteindruck: schwache Rubrik-Punkte mit Beleg, schwächste zuerst", () => {
+    const rubric = {
+      design_age: { score: 2, evidence: "Layout von 2012" },
+      mobile_ux: { score: 1, evidence: "Text am Handy winzig" },
+      cta_clarity: { score: 4, evidence: "ok" },
+    };
+    expect(overallImpression({ summary: "Wirkt alt.", rubric })).toEqual({
+      zusammenfassung: "Wirkt alt.",
+      schwaechen: [
+        { punkt: "Mobile Nutzbarkeit", note: 1, beleg: "Text am Handy winzig" },
+        { punkt: "Design-Aktualität", note: 2, beleg: "Layout von 2012" },
+      ],
+    });
+    expect(overallImpression(null)).toBeNull();
+    expect(overallImpression({ summary: null, rubric: {} })).toBeNull();
   });
 
   it("Kompliment nur bei wirklich guter Bewertung", () => {
@@ -218,12 +276,14 @@ describeDb("E-Mail-Entwurf (Datenbank)", () => {
     expect(d.to).toMatch(/^info@/);
     expect(outreach.spamschutz.betreffe.map((b) => b.replace("{firma}", c.name))).toContain(d.subject);
     expect(d.subject).toContain("Physio Kagerer");
-    expect(d.body).toMatch(/^Hallo Elisabeth Kagerer,\n\nmir ist Ihre Praxis/);
+    // Name im Impressum, aber kein Frau/Herr → Team-Anrede der Branche mit P.S.
+    expect(d.body).toMatch(/^Liebes Praxisteam,\n\nmir ist Ihre Praxis/);
+    expect(d.body).toContain("P.S. Falls sich bei Ihnen jemand anderes");
     expect(d.body).not.toMatch(/[–—]/);
     expect(d.body).toMatch(/unverbindlich\. (Hätten Sie|Passt Ihnen) \w+/);
     expect(d.body).not.toContain("wa.me");
     expect(d.body).toMatch(
-      /Christian Dobler\nWebsites für Physiotherapie-Praxen · Avelio, Peißenberg\n0151 12345678$/,
+      /Christian Dobler\nWebsites für lokale Betriebe · Avelio, Peißenberg\n0151 12345678\n\nP\.S\. /,
     );
     expect(d.slots).toHaveLength(2);
     expect(d.warnings).toEqual([]);

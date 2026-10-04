@@ -131,7 +131,7 @@ export async function createConfirmDraft(
     : inForm(b.ablauf_telefon, b.ablauf_telefon_du);
   const seed = seedOf(company.id);
   const body = [
-    salutationLine(form, person, company.name, o.team_anrede[company.branch_key ?? ""]?.anrede),
+    salutationLine(form, person, company.name, o.team_anrede[company.branch_key ?? ""]?.anrede, o.anrede),
     inForm(b.text, b.text_du).replace("{termin}", terminLabel(termin)).replace("{ablauf}", ablauf),
     `${pick(o.spamschutz.gruesse, seed, 13, 1)}\n${[o.absender_name, o.absender_zusatz, deps.contact.phone].filter(Boolean).join("\n")}`,
   ].join("\n\n");

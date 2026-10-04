@@ -5,7 +5,7 @@ import { insertDraft, takenSlots } from "../db/drafts.js";
 import { latestAudit, latestOkSnapshotId, latestPlacesSnapshot, type LatestPlaces } from "../db/leads.js";
 import { loadPrompt } from "../llm/config.js";
 import type { LlmGateway } from "../llm/gateway.js";
-import type { Finding } from "../pipeline/audit/schema.js";
+import { RUBRIC_CRITERIA, RUBRIC_LABELS, type Finding } from "../pipeline/audit/schema.js";
 import type { Branches } from "../pipeline/research/branches.js";
 import type { OutreachConfig } from "./config.js";
 import { proposeSlots, seedOf } from "./slots.js";
@@ -20,7 +20,7 @@ import { personFromCompanyName, personInCompanyName } from "./names.js";
  * nichts; Christian sendet selbst.
  */
 
-export const CONTACT_PROMPT_VERSION = "v5";
+export const CONTACT_PROMPT_VERSION = "v6";
 
 export const contactOutputSchema = z.object({
   absatz: z.string().min(40).max(1000),
@@ -71,6 +71,26 @@ export function pickFindings(findings: readonly Finding[]): Finding[] {
   return sorted[0]?.severity === "high" ? sorted.slice(0, 1) : sorted.slice(0, 3);
 }
 
+/**
+ * Gesamteindruck für die Mail (04.10.2026, Christian: ein einzelnes Detail wie ein schlecht sichtbarer Knopf ist kein
+ * Grund für eine neue Website). Die schwachen Rubrik-Punkte des Audits (Note 1 bis 2) mit Beleg, schwächste zuerst,
+ * dazu die Zusammenfassung; daraus formt das LLM ein Urteil über den ersten Eindruck.
+ */
+export function overallImpression(
+  audit: { summary: string | null; rubric: unknown } | null,
+): { zusammenfassung: string | null; schwaechen: { punkt: string; note: number; beleg: string }[] } | null {
+  if (!audit) return null;
+  const rubric = (audit.rubric ?? {}) as Partial<Record<string, { score?: number; evidence?: string }>>;
+  const schwaechen = RUBRIC_CRITERIA.flatMap((key) => {
+    const item = rubric[key];
+    return item?.score !== undefined && item.score <= 2 && item.evidence
+      ? [{ punkt: RUBRIC_LABELS[key], note: item.score, beleg: item.evidence }]
+      : [];
+  }).sort((a, b) => a.note - b.note);
+  if (!audit.summary && schwaechen.length === 0) return null;
+  return { zusammenfassung: audit.summary, schwaechen };
+}
+
 /** Wie der Betrieb im Alltag heißt: "Hotel Ariadne GmbH | Rosenheim" → "Hotel Ariadne". */
 export function shortCompanyName(name: string): string {
   const parts = name
@@ -91,24 +111,46 @@ export function shortCompanyName(name: string): string {
   return words.length > 4 ? words.slice(0, 4).join(" ") : n;
 }
 
-/** Grußzeile aus den Impressum-Daten; das Geschlecht wird nie geraten. */
+export type AnredeConfig = OutreachConfig["anrede"];
+const DEFAULT_ANREDE: AnredeConfig = {
+  sie: "Grüß Sie, {anrede} {nachname},",
+  du: "Servus {vorname},",
+  ohne_name: "Hallo Team {firma},",
+};
+
+/**
+ * Wen die Mail persönlich anspricht: bei "sie" nur mit feststehendem Frau/Herr (Impressum oder weibliche
+ * Berufsbezeichnung im Firmennamen), bei "du" reicht der Vorname. Das Geschlecht wird nie geraten; ohne geht die
+ * Mail ans Team (04.10.2026, Christian: kein "Hallo Christina Heider,").
+ */
+export function personalContact(
+  form: Form,
+  contact: { name: string | null; salutation: "Herr" | "Frau" | null },
+  companyName: string,
+): { name: string; salutation: "Herr" | "Frau" | null } | null {
+  const fromName = contact.name?.trim() ? null : personInCompanyName(companyName);
+  const name = contact.name?.trim() || fromName?.name;
+  if (!name) return null;
+  const salutation = contact.salutation ?? fromName?.salutation ?? null;
+  if (form === "sie" && !salutation) return null;
+  if (form === "ihr") return null;
+  return { name, salutation };
+}
+
+/** Grußzeile ("Grüß Sie, Frau Heider,"), Texte aus config/outreach.yaml → anrede. */
 export function salutationLine(
   form: Form,
   contact: { name: string | null; salutation: "Herr" | "Frau" | null },
   companyName: string,
-  /** Anrede ohne bekannten Namen, z. B. "Liebes Praxisteam," (config/outreach.yaml → team_anrede). */
+  /** Anrede ohne persönlichen Ansprechpartner, z. B. "Liebes Praxisteam," (config/outreach.yaml → team_anrede). */
   team?: string | null,
+  anrede: AnredeConfig = DEFAULT_ANREDE,
 ): string {
-  // Ohne Namen im Impressum: Inhaberin aus dem Firmennamen ("Christina Heider Physiotherapeutin" → Frau Heider),
-  // sonst das Team.
-  const fromName = contact.name?.trim() ? null : personInCompanyName(companyName);
-  const name = contact.name?.trim() || fromName?.name;
-  if (!name) return team ?? `Hallo Team ${shortCompanyName(companyName)},`;
-  if (!contact.salutation && fromName?.salutation) contact = { ...contact, salutation: fromName.salutation };
-  const parts = name.split(/\s+/);
-  if (form === "du") return `Hallo ${parts[0]},`;
-  if (contact.salutation) return `Hallo ${contact.salutation} ${parts.at(-1)},`;
-  return `Hallo ${name},`;
+  const person = personalContact(form, contact, companyName);
+  if (!person) return team ?? anrede.ohne_name.replace("{firma}", shortCompanyName(companyName));
+  const parts = person.name.split(/\s+/);
+  if (form !== "sie") return anrede.du.replace("{vorname}", parts[0]!);
+  return anrede.sie.replace("{anrede}", person.salutation!).replace("{nachname}", parts.at(-1)!);
 }
 
 /** Kompliment mit Fakt, nur wenn die Bewertung wirklich gut ist. */
@@ -213,9 +255,10 @@ export async function draftEmail(
   const { email, emailSource, name: impressumName, salutation } = await recipient(db, company.id);
   // Kein Name im Impressum: vielleicht steht die Inhaberin im Firmennamen; sonst Team-Anrede mit Bitte um Weiterleitung.
   const name = impressumName ?? personFromCompanyName(company.name);
-  const team = !name && company.branch_key ? (o.team_anrede[company.branch_key] ?? null) : null;
   const duBranch = company.branch_key !== null && o.du_branchen.includes(company.branch_key);
   const form: Form = !duBranch ? "sie" : name ? "du" : "ihr";
+  const personal = personalContact(form, { name: impressumName, salutation }, company.name);
+  const team = !personal && company.branch_key ? (o.team_anrede[company.branch_key] ?? null) : null;
   const du = form !== "sie";
   const inForm = (sieText: string, duText: string) =>
     form === "sie" ? sieText : form === "du" ? duText : duToIhr(duText);
@@ -230,6 +273,7 @@ export async function draftEmail(
   const previous = prior[0]?.body?.split("\n\n")[1] ?? null;
 
   const branch = company.branch_key ? deps.branches[company.branch_key] : undefined;
+  const impression = overallImpression(audit);
   const input = {
     betrieb: { name: company.name, ort: company.city, branche: branch?.label ?? company.category },
     anrede: form,
@@ -259,6 +303,7 @@ export async function draftEmail(
     ...(company.branch_key && o.branche_kontext[company.branch_key]
       ? { branche_kontext: o.branche_kontext[company.branch_key] }
       : {}),
+    ...(impression ? { gesamteindruck: impression } : {}),
     kompliment_fakt: complimentFact(places),
     ...(previous ? { vorheriger_text: previous } : {}),
   };
@@ -342,7 +387,7 @@ export async function draftEmail(
   // 04.10.2026 (mit Christian): kurz, Bild früh, genau eine Bitte (Termin), Weiterleiten als P.S.; mit Entwurfs-Link
   // bleibt der Antwort-Hinweis, ohne Link keine weitere Aufforderung (auch kein WhatsApp-Link in der Erstmail).
   const body = [
-    salutationLine(form, { name, salutation }, company.name, team?.anrede),
+    salutationLine(form, { name: impressumName, salutation }, company.name, team?.anrede, o.anrede),
     lowerFirst(clean.text),
     ...(draftSentence ? [draftSentence] : []),
     [prepared, slotSentence].filter(Boolean).join(" "),

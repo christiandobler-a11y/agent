@@ -7,7 +7,7 @@ positionierung: >-
   Direkt nach dem Befund kommt ein Kompliment mit Fakt, damit "zeitgemäß" nicht nach "veraltet" klingt.
 
 absender_name: Christian Dobler
-absender_zusatz: Websites für Physiotherapie-Praxen · Avelio, Peißenberg
+absender_zusatz: Websites für lokale Betriebe · Avelio, Peißenberg
 # Du für diese Branchen, sonst Sie.
 du_branchen: [fahrrad, gastro, friseur, kosmetik]
 
@@ -23,19 +23,27 @@ branche_kontext:
 
 # Termin bestätigen (04.10.2026): Lead antwortet, Christian tippt den genannten Termin an, Avelio schreibt die
 # Bestätigung (mit Kalender-Einladung) im selben Verlauf; gesendet wird per Knopf. Mit OUTREACH_MEETING_URL in der
-# .env (z. B. ein fester Google-Meet- oder Zoom-Link) steht der Link gleich drin, sonst ruft Christian an.
+# .env (z. B. ein fester Google-Meet- oder Zoom-Link) steht der Link gleich drin, sonst kommt er kurz vorher.
 bestaetigung:
   text: "super, dann machen wir {termin}. {ablauf} Eine Kalender-Einladung hängt an, ich freu mich drauf."
   text_du: "super, dann machen wir {termin}. {ablauf} Eine Kalender-Einladung hängt an, ich freu mich drauf."
-  ablauf_telefon: Ich rufe Sie dann kurz an und zeige Ihnen den Entwurf dabei am Bildschirm, den Link dazu schicke ich Ihnen ein paar Minuten vorher.
-  ablauf_telefon_du: Ich ruf dich dann kurz an und zeig dir den Entwurf dabei am Bildschirm, den Link dazu schick ich dir ein paar Minuten vorher.
-  ablauf_link: "Hier schon mal der Link für das kurze Gespräch, das läuft einfach im Browser: {link}"
-  ablauf_link_du: "Hier schon mal der Link für das kurze Gespräch, das läuft einfach im Browser: {link}"
+  # Ohne OUTREACH_MEETING_URL: Link kommt kurz vorher (Video-Call, damit Christian den Bildschirm teilen kann).
+  ablauf_telefon: Den Link zum Video-Call (läuft einfach im Browser, nichts installieren) schicke ich Ihnen ein paar Minuten vorher, dann zeige ich Ihnen den Entwurf direkt am Bildschirm.
+  ablauf_telefon_du: Den Link zum Video-Call (läuft einfach im Browser, nichts installieren) schick ich dir ein paar Minuten vorher, dann zeig ich dir den Entwurf direkt am Bildschirm.
+  ablauf_link: "Hier schon mal der Link zum Video-Call, der läuft einfach im Browser, nichts installieren: {link}"
+  ablauf_link_du: "Hier schon mal der Link zum Video-Call, der läuft einfach im Browser, nichts installieren: {link}"
   erinnerung_minuten: 30 # Telegram-Erinnerung vor dem Gespräch
   dauer_minuten: 15 # Länge des Kalendereintrags
 
-# Ohne Namen im Impressum (und ohne Vornamen im Firmennamen) geht die Mail ans Team, mit der Bitte, sie an die
+# Ohne Namen mit Frau/Herr (Impressum, Firmenname) geht die Mail ans Team, mit der Bitte, sie an die
 # Leitung weiterzugeben (04.10.2026, Christian: "Hallo Team Christina Heider Physiotherapeutin" ist zu generisch).
+# Grußzeile mit Namen (04.10.2026, Christian: kein Vor- und Nachname, lieber bayerisch "Grüß Sie, Frau Heider,").
+# Frau/Herr nur, wenn es feststeht (Impressum, "Inhaberin", "Physiotherapeutin"); sonst geht die Mail ans Team.
+anrede:
+  sie: "Grüß Sie, {anrede} {nachname},"
+  du: "Servus {vorname},"
+  ohne_name: "Grüß Gott, liebes Team von {firma},"
+
 team_anrede:
   physiotherapie:
     anrede: "Liebes Praxisteam,"
@@ -112,18 +120,18 @@ kontaktweg:
   # Überleitung zum Terminvorschlag ("ich hab was vorbereitet"), wird abgewechselt.
   # 04.10.2026: kurz, "unverbindlich" steckt drin, danach direkt die Terminfrage.
   vorbereitet:
-    - Ich hab dazu schon etwas vorbereitet und zeige es Ihnen gern in 10 Minuten am Telefon, unverbindlich.
-    - Dazu hab ich schon etwas vorbereitet, das zeige ich Ihnen gern in 10 Minuten am Telefon, ganz unverbindlich.
+    - Ich hab dazu schon etwas vorbereitet und zeige es Ihnen gern in einem kurzen Video-Call, 10 Minuten, unverbindlich.
+    - Dazu hab ich schon etwas vorbereitet, das zeige ich Ihnen gern in 10 Minuten per Video-Call am Bildschirm, ganz unverbindlich.
   # Mit Entwurf-Link davor: kein zweites "vorbereitet".
   vorbereitet_mit_entwurf:
-    - Den Rest zeige ich Ihnen gern in 10 Minuten am Telefon, unverbindlich.
-    - Mehr dazu zeige ich Ihnen gern in 10 Minuten am Telefon, ganz unverbindlich.
+    - Den Rest zeige ich Ihnen gern in einem kurzen Video-Call, 10 Minuten, unverbindlich.
+    - Mehr dazu zeige ich Ihnen gern in 10 Minuten per Video-Call am Bildschirm, ganz unverbindlich.
   vorbereitet_mit_entwurf_du:
-    - Den Rest zeig ich dir gern in 10 Minuten am Telefon, unverbindlich.
-    - Mehr dazu zeig ich dir gern in 10 Minuten am Telefon, ganz unverbindlich.
+    - Den Rest zeig ich dir gern in einem kurzen Video-Call, 10 Minuten, unverbindlich.
+    - Mehr dazu zeig ich dir gern in 10 Minuten per Video-Call am Bildschirm, ganz unverbindlich.
   vorbereitet_du:
-    - Ich hab dazu schon was vorbereitet und zeig es dir gern in 10 Minuten am Telefon, unverbindlich.
-    - Dazu hab ich schon was vorbereitet, das zeig ich dir gern in 10 Minuten am Telefon, ganz unverbindlich.
+    - Ich hab dazu schon was vorbereitet und zeig es dir gern in einem kurzen Video-Call, 10 Minuten, unverbindlich.
+    - Dazu hab ich schon was vorbereitet, das zeig ich dir gern in 10 Minuten per Video-Call am Bildschirm, ganz unverbindlich.
 
 # Terminvorschläge statt offenem Kalender (03.10.2026): Knappheit erzeugen, nicht "Mo bis Fr alles frei".
 # Jede Nachricht schlägt 2 konkrete Tage mit je 2 Uhrzeiten vor, z. B. "Dienstag um 12 oder 18 Uhr, sonst Donnerstag

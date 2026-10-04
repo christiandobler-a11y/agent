@@ -301,7 +301,9 @@ describeDb("CRM mit Datenbank", () => {
     expect(info).toContain("keine Adresse gefunden");
     expect(info).toMatch(/<b>Betreff:<\/b> <code>[^<]+<\/code>/);
     expect(info).toContain("<b>Ansprechpartner:</b> keiner im Impressum");
-    expect(String(msg.text)).toContain("<pre>Hallo Team Physio Entwurf,\n\nich heiße Christian.");
+    expect(String(msg.text)).toContain(
+      "<pre>Grüß Gott, liebes Team von Physio Entwurf,\n\nich heiße Christian.",
+    );
     expect(String(msg.text)).not.toContain("mailto:");
     const buttons = (
       msg.reply_markup as { inline_keyboard: { text: string; callback_data: string }[][] }
