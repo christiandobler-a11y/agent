@@ -10,7 +10,7 @@ import {
   xpOf,
   type GameStats,
 } from "../src/game/xp.js";
-import { celebrationText, levelText, progressBar } from "../src/telegram/game.js";
+import { celebrationText, levelPath, levelText, progressBar } from "../src/telegram/game.js";
 import { describeDb, useTestDb } from "./helpers/db.js";
 
 const c = loadGameConfig();
@@ -63,6 +63,9 @@ describe("Spiel (rein)", () => {
     const overview = levelText(state, c);
     expect(overview).toContain("Leads angeschrieben: <b>10</b>");
     expect(overview).toContain("🔒 Erster Kunde");
+    expect(overview).toContain("📤 Erster Schuss · 💬 Eis gebrochen");
+    expect(overview).toContain("ca. 7 Mails"); // 65 XP, noch 35 bis Postbote, 5 XP je Mail
+    expect(levelPath(state, c)).toBe("🌱 👉📬 " + Array(9).fill("◽").join(" "));
   });
 });
 
