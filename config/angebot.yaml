@@ -1,0 +1,53 @@
+# Angebot als PDF (04.10.2026, mit Christian): Lead-Karte → "📄 Angebot" bzw. `avelio angebot <Firma> [onepager|mehrseitig]`.
+# Preise netto, zzgl. Mehrwertsteuer. Selbstverständliches wird bewusst einzeln aufgeführt (wirkt vollständiger),
+# aber nur, was wirklich gemacht wird.
+mwst_prozent: 19
+gueltig_tage: 30
+lieferzeit: in der Regel 2 bis 3 Wochen nach Eingang der Fotos und Freigabe des Entwurfs
+zahlung: 50 % bei Auftrag, 50 % beim Livegang der Website
+
+pakete:
+  onepager:
+    titel: Neue Website (Onepager)
+    preis_netto: 990
+    leistungen:
+      - Individuelles, modernes Design passend zu Ihrer Praxis
+      - Eine übersichtliche Seite mit allen wichtigen Bereichen (Start, Leistungen, Team, Praxis, Kontakt)
+      - Optimiert für Smartphone, Tablet und Computer
+      - Texte von Ihrer bisherigen Website übernommen und überarbeitet
+      - Einbindung Ihrer Fotos bzw. passender lizenzfreier Bilder
+      - Telefon, E-Mail und Anfahrt mit einem Klick erreichbar
+      - Öffnungszeiten und Google-Bewertungen gut sichtbar
+      - SEO-Grundoptimierung (Seitentitel, Beschreibungen, saubere Überschriften, regionale Suchbegriffe)
+      - Schnelle Ladezeiten und SSL-Verschlüsselung (https)
+      - Impressum und Datenschutzerklärung eingebunden
+      - Datenschutzfreundlich ohne Tracking
+      - Umzug Ihrer bestehenden Domain (auf Wunsch auch eine neue Domain)
+      - Abstimmung des Entwurfs mit Ihnen vor dem Livegang
+  mehrseitig:
+    titel: Neue Website (mehrseitig)
+    preis_netto: 1290
+    leistungen:
+      - Alles aus dem Onepager, dazu
+      - Eigene Unterseiten, z. B. für Leistungen, Team, Praxis, Kontakt und Stellenangebote
+      - Übersichtliches Menü und klare Wege zu Termin und Kontakt
+      - SEO-Grundoptimierung für jede Unterseite
+
+hosting:
+  titel: Hosting und Pflege
+  preis_monat_netto: 29.90
+  hinweis: Der erste Monat nach dem Livegang ist kostenlos. Monatlich kündbar.
+  leistungen:
+    - Sicheres Hosting auf Servern in der EU inklusive SSL-Zertifikat
+    - Änderungswünsche (Texte, Öffnungszeiten, Fotos, Team) tagesaktuell umgesetzt
+    - Technische Pflege und regelmäßige Sicherungen
+
+optional:
+  - titel: KI-Telefonassistent
+    text: nimmt Anrufe an, wenn an der Anmeldung niemand rangehen kann, beantwortet häufige Fragen und notiert Terminwünsche
+    preis: auf Anfrage
+
+mitwirkung:
+  - Fotos der Praxis und des Teams (falls keine passenden vorhanden sind, verwenden wir hochwertige lizenzfreie Bilder)
+  - Zugang zur bestehenden Domain bzw. Freigabe für den Umzug
+  - Kurze Rückmeldung zum Entwurf

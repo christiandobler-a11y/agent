@@ -5,6 +5,7 @@ import { loadEnv } from "./config/env.js";
 import { findLead } from "./manager/leads.js";
 import { loadOutreachConfig } from "./outreach/config.js";
 import { draftLetter } from "./outreach/letter.js";
+import { createOffer, loadOfferConfig } from "./outreach/offer.js";
 import { chromiumLetterRenderer } from "./outreach/letterPdf.js";
 import { buildPrototype, loadPrototypeConfig, type PrototypeDeps } from "./prototype/run.js";
 import { chromiumTeaserShooter, teaserForCompany } from "./prototype/teaser.js";
@@ -136,6 +137,54 @@ export async function teaser(argv: string[]): Promise<number> {
       found.company,
     );
     console.log(`Vorschau-Bild: ${path}`);
+    return 0;
+  } finally {
+    await app.close();
+  }
+}
+
+/** Angebot als PDF: `avelio angebot <Firma> [onepager|mehrseitig]` schreibt nach data/angebote/. */
+export async function angebot(argv: string[]): Promise<number> {
+  const last = argv.at(-1);
+  const paket = last === "onepager" || last === "mehrseitig" ? last : "onepager";
+  const ref = (last === paket ? argv.slice(0, -1) : argv).join(" ").trim();
+  if (!ref) {
+    console.error("Verwendung: avelio angebot <Firmen-ID|Domain|Name> [onepager|mehrseitig]");
+    return 2;
+  }
+  const env = loadEnv();
+  const app = await createApp();
+  try {
+    const found = await findLead(app.ctx.db, ref);
+    if (found.kind !== "found") {
+      console.log(
+        found.kind === "none"
+          ? `Keine Firma gefunden für "${ref}".`
+          : `Mehrere Treffer: ${found.candidates.map((c) => c.name).join(", ")}`,
+      );
+      return 1;
+    }
+    const o = loadOutreachConfig();
+    const offer = await createOffer(
+      {
+        db: app.ctx.db,
+        render: chromiumLetterRenderer(process.env.CHROMIUM_PATH),
+        config: loadOfferConfig(),
+        sender: {
+          name: o.absender_name,
+          line: o.absender_zusatz ?? null,
+          address: process.env.AVELIO_ANSCHRIFT?.trim() || null,
+          phone: env.OUTREACH_PHONE ?? null,
+          email: process.env.OUTREACH_MAIL_ADDRESS?.trim() || null,
+        },
+        dir: "data/angebote",
+        now: app.ctx.now,
+      },
+      found.company,
+      paket,
+      "cli",
+    );
+    console.log(`Angebot ${offer.number}: ${offer.pdf}`);
     return 0;
   } finally {
     await app.close();

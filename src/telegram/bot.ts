@@ -29,6 +29,7 @@ import { gameState, loadGameConfig } from "../game/xp.js";
 import { buildPrototype, type PrototypeDeps } from "../prototype/run.js";
 import { chromiumTeaserShooter } from "../prototype/teaser.js";
 import { pickProbeLead, runProbe } from "../outreach/probe.js";
+import { createOffer, loadOfferConfig } from "../outreach/offer.js";
 import { chromiumLetterRenderer, type LetterRenderer } from "../outreach/letterPdf.js";
 import { raiseBudgetToday } from "../llm/budget.js";
 import { askManager, type ManagerDeps } from "../manager/agent.js";
@@ -525,6 +526,39 @@ export function createBot(options: BotOptions): AvelioBot {
           parse_mode: "HTML",
           reply_markup: { inline_keyboard: m.keyboard },
         });
+        return;
+      }
+      if (crm.kind === "offer") {
+        await ctx.answerCallbackQuery({ text: "Erstelle Angebot …" });
+        await ctx.replyWithChatAction("upload_document").catch(() => undefined);
+        const o = options.outreach?.config;
+        try {
+          const offer = await createOffer(
+            {
+              db: pipeline.db,
+              render: options.outreach?.renderLetter ?? chromiumLetterRenderer(process.env.CHROMIUM_PATH),
+              config: loadOfferConfig(),
+              sender: {
+                name: o?.absender_name ?? "Christian Dobler",
+                line: o?.absender_zusatz ?? null,
+                address: process.env.AVELIO_ANSCHRIFT?.trim() || null,
+                phone: options.outreach?.contact.phone ?? null,
+                email: mailbox?.address ?? (process.env.OUTREACH_MAIL_ADDRESS?.trim() || null),
+              },
+              dir: "data/angebote",
+              now: pipeline.now,
+            },
+            company,
+            crm.paket,
+            by(ctx.chat?.id),
+          );
+          await ctx.replyWithDocument(new InputFile(offer.pdf, offer.filename), {
+            caption: `📄 Angebot ${offer.number} für ${company.name}: ${offer.gross.toLocaleString("de-DE", { style: "currency", currency: "EUR" })} brutto einmalig plus Hosting. Kurz prüfen und an die Praxis schicken.`,
+          });
+        } catch (err) {
+          log("error", "Angebot fehlgeschlagen", { error: err instanceof Error ? err.message : String(err) });
+          await ctx.reply("Das Angebot hat gerade nicht geklappt. Versuch es bitte gleich noch einmal.");
+        }
         return;
       }
       if (crm.kind === "letter") {

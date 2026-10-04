@@ -168,6 +168,7 @@ export type CrmCallback =
   | { kind: "email"; companyId: string }
   | { kind: "letter"; companyId: string }
   | { kind: "prototype"; companyId: string }
+  | { kind: "offer"; paket: "onepager" | "mehrseitig"; companyId: string }
   | { kind: "remind"; days: number; companyId: string }
   | { kind: "done"; interactionId: string }
   | { kind: "snooze"; interactionId: string };
@@ -184,6 +185,8 @@ export function crmCallback(c: CrmCallback): string {
       return `bl:${c.companyId}`;
     case "prototype":
       return `pt:${c.companyId}`;
+    case "offer":
+      return `ao:${c.paket === "onepager" ? "o" : "m"}:${c.companyId}`;
     case "remind":
       return `sr:${c.days}:${c.companyId}`;
     case "done":
@@ -205,6 +208,8 @@ export function parseCrmCallback(data: string): CrmCallback | null {
   if (m) return { kind: "letter", companyId: m[1]! };
   m = new RegExp(`^pt:(${UUID})$`).exec(data);
   if (m) return { kind: "prototype", companyId: m[1]! };
+  m = new RegExp(`^ao:([om]):(${UUID})$`).exec(data);
+  if (m) return { kind: "offer", paket: m[1] === "o" ? "onepager" : "mehrseitig", companyId: m[2]! };
   m = new RegExp(`^sr:(\\d{1,2}):(${UUID})$`).exec(data);
   if (m) return { kind: "remind", days: Number(m[1]), companyId: m[2]! };
   m = new RegExp(`^r([dz]):(${UUID})$`).exec(data);
@@ -266,6 +271,16 @@ export function leadCrmCard(
       [
         { text: "✍️ E-Mail-Entwurf", callback_data: crmCallback({ kind: "email", companyId: c.id }) },
         { text: "🖨️ Befund-Seite", callback_data: crmCallback({ kind: "letter", companyId: c.id }) },
+      ],
+      [
+        {
+          text: "📄 Angebot Onepager",
+          callback_data: crmCallback({ kind: "offer", paket: "onepager", companyId: c.id }),
+        },
+        {
+          text: "📄 Angebot mehrseitig",
+          callback_data: crmCallback({ kind: "offer", paket: "mehrseitig", companyId: c.id }),
+        },
       ],
       [{ text: "🎨 Prototyp bauen", callback_data: crmCallback({ kind: "prototype", companyId: c.id }) }],
       [
