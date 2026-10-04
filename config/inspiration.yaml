@@ -64,6 +64,29 @@ physiotherapie:
       - echte Teamfotos und Video statt Stockfotos, Mission und Vision kurz und persönlich
       - Kontakt-Section über einem Teamfoto mit allen drei Standorten und Telefonnummern
     gespeichert: 2026-10-03
+  - url: https://www.corpore.health/
+    name: Physiotherapie by CORPORE
+    warum: >-
+      Mir gefällt das "runde" Design, keine harten Kanten, oben der Header ist rund, selbst der Hero-Ausschnitt ist oval
+      ausgeschnitten, ich finde das smooth. Online-Rezeption auch cool, natürlich nur auf Wunsch. Nicht 1:1 übernehmen.
+    merkmale:
+      - durchgehend runde Formen, keine harten Kanten (Karten, Buttons, Bilder mit großen Radien)
+      - Kopfleiste als schwebende, abgerundete Pille über der Seite
+      - Hero-Foto oval ausgeschnitten statt rechteckig oder randlos
+      - Online-Terminanfrage bzw. Online-Rezeption als Option (nur wenn die Praxis das möchte)
+    gespeichert: 2026-10-04
+  - url: http://www.physio-burkart.de/
+    name: Physiotherapie Burkart
+    warum: >-
+      Hero eindeutig zu viel Text, die restlichen Elemente finde ich gut. Ovaler Bildausschnitt im Hero, leichte
+      Bewegung hoch/runter wirkt lebendig. Leistungen als einzelne Kacheln mit schönen Grafiken, die eine Unterseite
+      öffnen, weitaus besser als reine Textform. Google-Bewertungen auch cool. Gut durchdachte Seite.
+    merkmale:
+      - ovaler Bildausschnitt im Hero mit sanfter Schwebe-Bewegung (langsam hoch und runter, CSS-Animation)
+      - Leistungen als einzelne Kacheln mit Grafik/Icon, jede öffnet eine eigene Unterseite, kein reiner Fließtext
+      - Google-Bewertungen sichtbar auf der Startseite
+      - Hero-Text kurz halten (dort hatte Burkart zu viel Text)
+    gespeichert: 2026-10-04
 
 alle:
   - url: https://www.mediana-zentrum.de/

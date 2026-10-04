@@ -85,6 +85,19 @@ describe("Vorschau-Bild Physio (rein)", () => {
     expect(html).not.toContain("<script");
   });
 
+  it("Stil rund: ovales Foto, Bewertung als Karte, Leistungs-Kacheln, auch als Geräte-Bild", () => {
+    const rund = renderPhysioTeaser(data({ name: "Physio <b>Test</b>" }), assets, "rund");
+    expect(rund).toContain("Physio &lt;b&gt;Test&lt;/b&gt;");
+    expect(rund).toContain('class="oval"');
+    expect(rund).toContain("4,9 · 63 Bewertungen");
+    expect(rund.match(/class="tile"/g)).toHaveLength(4);
+    expect(rund).not.toContain("<script");
+    expect(renderPhysioTeaser(data({ rating: 4 }), assets, "rund")).not.toContain("Bewertungen");
+    const mock = renderTeaserMockup(data(), assets, "rund");
+    expect(mock.match(/<iframe srcdoc="/g)).toHaveLength(2);
+    expect(mock).toContain("class=&quot;oval&quot;");
+  });
+
   it("nur für die eingestellten Branchen", () => {
     const t = { branches: ["physiotherapie"] };
     expect(usesTeaser(t, { branch_key: "physiotherapie" } as never)).toBe(true);

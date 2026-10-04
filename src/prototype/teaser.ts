@@ -162,7 +162,7 @@ export function monogram(title: string): string {
  * Physio-Seiten (z. B. therapie-welt.de, 04.10.2026 mit Christian): schwebende Kopfleiste, Höhenlinien, Aussage mit
  * markiertem Praxisnamen, Google-Bewertung, Foto-Collage, Leiste mit Kassen und Qualifikationen.
  */
-export type TeaserStyle = "welt" | "vital";
+export type TeaserStyle = "welt" | "vital" | "rund";
 
 export function renderPhysioTeaser(
   d: TeaserData,
@@ -170,6 +170,7 @@ export function renderPhysioTeaser(
   style: TeaserStyle = "welt",
 ): string {
   if (style === "vital") return renderVital(d, assets);
+  if (style === "rund") return renderRund(d, assets);
   const { title } = teaserName(d.name, d.city);
   const start = seedOf(d.seed) % PHYSIO_PHOTOS.length;
   const photo = (k: number) => PHYSIO_PHOTOS[(start + k) % PHYSIO_PHOTOS.length]!;
@@ -407,14 +408,171 @@ p{font-weight:300;font-size:19px;margin-top:14px;opacity:.95}
 </body></html>`;
 }
 
+const rundFonts = (assets: TeaserAssets) =>
+  (
+    [
+      ["Barlow Condensed", "Barlow Condensed 300", 300],
+      ["Barlow Condensed", "Barlow Condensed 600", 600],
+      ["Manrope", "Manrope 600", 600],
+      ["Manrope", "Manrope 800", 800],
+    ] as const
+  )
+    .map(
+      ([family, key, weight]) =>
+        `@font-face{font-family:"${family}";src:url("${assets.font(key)}") format("woff2");font-weight:${weight}}`,
+    )
+    .join("\n");
+
+/** Leistungs-Kacheln der runden Variante: Icon in einer Blase, zwei Zeilen Text (übliche Physio-Leistungen). */
+const RUND_SERVICES = [STRIP[3]!, STRIP[1]!, STRIP[2]!, STRIP[4]!];
+
+/**
+ * Dritte Variante (04.10.2026, Christians Vorbild-Notizen zu corpore.health und physio-burkart.de): „rundes“ Design
+ * ohne harte Kanten, Kopfleiste als schwebende Pille, Foto oval ausgeschnitten mit weichen Farbkreisen dahinter,
+ * Google-Bewertung als Karte, Leistungen als Kacheln mit Icon statt reinem Text. Farben wie "vital".
+ */
+function renderRund(d: TeaserData, assets: TeaserAssets): string {
+  const { title } = teaserName(d.name, d.city);
+  const photo = pickPhoto(d.seed);
+  const city = d.city?.trim() || null;
+  const showRating = d.rating !== null && d.rating >= 4.3 && (d.reviewCount ?? 0) >= 5;
+  const size = title.length <= 16 ? 88 : title.length <= 26 ? 72 : 58;
+  const tiles = RUND_SERVICES.map(
+    (x) =>
+      `<div class="tile"><span class="bubble"><svg viewBox="0 0 24 24" width="30" height="30" aria-hidden="true"><path d="${x.icon}" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"/></svg></span><span><small>${x.top}</small>${x.main}</span><i>→</i></div>`,
+  ).join("");
+  return `<!doctype html>
+<html lang="de"><head><meta charset="utf-8"><title>${esc(title)}</title>
+<style>
+${rundFonts(assets)}
+:root{--petrol:#1f5f68;--orange:#e46a1c;--ink:#24515a;--mint:#e3efed;--bg:#f5f8f7}
+*{box-sizing:border-box;margin:0;padding:0}
+html,body{width:1440px;height:900px;overflow:hidden}
+body{position:relative;background:var(--bg);font-family:Manrope,sans-serif;-webkit-font-smoothing:antialiased;color:var(--ink)}
+header{position:absolute;z-index:5;top:26px;left:72px;right:72px;height:78px;background:#fff;border-radius:999px;box-shadow:0 14px 40px rgba(31,95,104,.10);display:flex;align-items:center;justify-content:space-between;padding:0 14px 0 18px}
+.brand{display:flex;align-items:center;gap:12px;min-width:0}
+.mark{flex:none;width:52px;height:52px;border-radius:50%;background:var(--petrol);color:#fff;display:grid;place-items:center;font-family:"Barlow Condensed",sans-serif;font-weight:600;font-size:22px}
+.brand b{display:block;font-family:"Barlow Condensed",sans-serif;font-weight:600;font-size:${title.length <= 22 ? 26 : 21}px;letter-spacing:.03em;text-transform:uppercase;line-height:1.02;max-width:420px}
+.brand small{display:block;color:var(--orange);font-weight:800;font-size:11px;letter-spacing:.2em;margin-top:3px}
+nav{display:flex;gap:34px;font-weight:600;font-size:16px}
+.pill{background:var(--orange);color:#fff;font-weight:800;font-size:16px;padding:16px 28px;border-radius:999px}
+.blob{position:absolute;border-radius:50%}
+.b1{left:770px;top:150px;width:620px;height:620px;background:var(--mint)}
+.b2{left:1250px;top:120px;width:120px;height:120px;background:#fbe3d3}
+.b3{left:790px;top:610px;width:70px;height:70px;background:var(--orange);opacity:.9}
+.oval{position:absolute;z-index:2;left:830px;top:140px;width:500px;height:600px;border-radius:50%;overflow:hidden;box-shadow:0 30px 60px rgba(31,95,104,.18);border:8px solid #fff}
+.oval img{width:100%;height:100%;object-fit:cover;object-position:${photo.position}}
+.left{position:absolute;z-index:3;left:116px;top:196px;width:660px}
+.chip{display:inline-block;background:var(--mint);color:var(--petrol);font-weight:800;font-size:14px;letter-spacing:.14em;text-transform:uppercase;padding:10px 20px;border-radius:999px}
+h1{font-family:"Barlow Condensed",sans-serif;font-weight:600;font-size:${size}px;line-height:1;color:var(--petrol);margin-top:22px}
+p{font-size:21px;line-height:1.5;margin-top:20px;max-width:520px;color:#3d5f66}
+.row{display:flex;align-items:center;gap:18px;margin-top:34px}
+.cta{background:var(--orange);color:#fff;font-weight:800;font-size:18px;padding:20px 38px;border-radius:999px;box-shadow:0 12px 26px rgba(228,106,28,.28)}
+.rating{display:flex;align-items:center;gap:12px;background:#fff;border-radius:999px;padding:10px 22px 10px 12px;box-shadow:0 10px 26px rgba(31,95,104,.10);font-size:14px;font-weight:600}
+.rating b{display:block;font-size:17px;font-weight:800}
+.rating .stars{display:flex;color:#f5b400}
+.tiles{position:absolute;z-index:4;left:116px;right:116px;top:760px;display:flex;gap:22px}
+.tile{flex:1;display:flex;align-items:center;gap:16px;background:#fff;border-radius:28px;padding:18px 22px;box-shadow:0 14px 34px rgba(31,95,104,.09)}
+.bubble{flex:none;width:62px;height:62px;border-radius:50%;background:var(--mint);color:var(--petrol);display:grid;place-items:center}
+.tile span:not(.bubble){flex:1;font-family:"Barlow Condensed",sans-serif;font-weight:600;font-size:23px;line-height:1.05;color:var(--petrol)}
+.tile small{display:block;font-family:Manrope,sans-serif;font-weight:600;font-size:13px;color:#6c8a90}
+.tile i{font-style:normal;color:var(--orange);font-weight:800;font-size:20px}
+</style></head>
+<body>
+<header>
+  <div class="brand"><span class="mark">${esc(monogram(title))}</span><span><b>${esc(title)}</b><small>PHYSIOTHERAPIE</small></span></div>
+  <nav><span>Leistungen</span><span>Über uns</span><span>Team</span><span>Kontakt</span></nav>
+  <span class="pill">Termin vereinbaren</span>
+</header>
+<span class="blob b1"></span><span class="blob b2"></span>
+<div class="oval"><img src="${assets.photo(photo.file)}" alt=""></div>
+<span class="blob b3" style="z-index:3"></span>
+<div class="left">
+  <span class="chip">Physiotherapie${city ? ` in ${esc(city)}` : ""}</span>
+  <h1>${esc(title)}</h1>
+  <p>Wir machen Sie wieder fit für den Alltag. Persönlich betreut, mit Zeit für Ihre Beschwerden.</p>
+  <div class="row"><span class="cta">Termin vereinbaren</span>${showRating ? `<span class="rating">${GOOGLE}<span><span class="stars">${STAR.repeat(5)}</span><b>${de(d.rating!)} · ${d.reviewCount} Bewertungen</b></span></span>` : ""}</div>
+</div>
+<div class="tiles">${tiles}</div>
+</body></html>`;
+}
+
+/** Runde Variante in Handy-Breite (390 × 844) für das Geräte-Bild. */
+function renderRundMobile(d: TeaserData, assets: TeaserAssets): string {
+  const { title } = teaserName(d.name, d.city);
+  const photo = pickPhoto(d.seed);
+  const city = d.city?.trim() || null;
+  const showRating = d.rating !== null && d.rating >= 4.3 && (d.reviewCount ?? 0) >= 5;
+  const size = title.length <= 14 ? 48 : title.length <= 24 ? 40 : 32;
+  return `<!doctype html>
+<html lang="de"><head><meta charset="utf-8"><title>${esc(title)}</title>
+<style>
+${rundFonts(assets)}
+:root{--petrol:#1f5f68;--orange:#e46a1c;--ink:#24515a;--mint:#e3efed;--bg:#f5f8f7}
+*{box-sizing:border-box;margin:0;padding:0}
+html,body{width:390px;height:844px;overflow:hidden}
+body{position:relative;background:var(--bg);font-family:Manrope,sans-serif;-webkit-font-smoothing:antialiased;color:var(--ink)}
+header{position:absolute;z-index:5;top:52px;left:14px;right:14px;height:60px;background:#fff;border-radius:999px;box-shadow:0 10px 26px rgba(31,95,104,.10);display:flex;align-items:center;justify-content:space-between;padding:0 18px 0 10px}
+.brand{display:flex;align-items:center;gap:9px;min-width:0}
+.mark{flex:none;width:40px;height:40px;border-radius:50%;background:var(--petrol);color:#fff;display:grid;place-items:center;font-family:"Barlow Condensed",sans-serif;font-weight:600;font-size:17px}
+.brand b{display:block;font-family:"Barlow Condensed",sans-serif;font-weight:600;font-size:${title.length <= 18 ? 18 : 15}px;letter-spacing:.03em;text-transform:uppercase;line-height:1.05}
+.brand small{display:block;color:var(--orange);font-weight:800;font-size:8px;letter-spacing:.2em;margin-top:2px}
+.burger{flex:none;width:22px;height:14px;border-top:2px solid var(--ink);border-bottom:2px solid var(--ink);position:relative}
+.burger::after{content:"";position:absolute;left:0;right:0;top:4px;border-top:2px solid var(--ink)}
+.blob{position:absolute;border-radius:50%;background:var(--mint);left:45px;top:140px;width:300px;height:300px}
+.oval{position:absolute;z-index:2;left:75px;top:132px;width:240px;height:290px;border-radius:50%;overflow:hidden;border:6px solid #fff;box-shadow:0 20px 40px rgba(31,95,104,.18)}
+.oval img{width:100%;height:100%;object-fit:cover;object-position:${photo.position}}
+.dot{position:absolute;z-index:3;left:270px;top:380px;width:40px;height:40px;border-radius:50%;background:var(--orange)}
+.body{position:absolute;left:22px;right:22px;top:450px;text-align:center}
+.chip{display:inline-block;background:var(--mint);color:var(--petrol);font-weight:800;font-size:10px;letter-spacing:.14em;text-transform:uppercase;padding:7px 14px;border-radius:999px}
+h1{font-family:"Barlow Condensed",sans-serif;font-weight:600;font-size:${size}px;line-height:1;color:var(--petrol);margin-top:12px}
+p{font-size:15px;line-height:1.45;margin-top:10px;color:#3d5f66}
+.cta{display:inline-block;margin-top:18px;background:var(--orange);color:#fff;font-weight:800;font-size:16px;padding:14px 30px;border-radius:999px}
+.rating{display:inline-flex;align-items:center;gap:8px;margin-top:14px;background:#fff;border-radius:999px;padding:7px 16px;box-shadow:0 8px 20px rgba(31,95,104,.10);font-size:12px;font-weight:800}
+.rating .stars{display:flex;color:#f5b400}
+.rating svg{width:12px;height:12px}
+.tiles{position:absolute;left:18px;right:18px;top:742px;display:flex;gap:10px}
+.tile{flex:1;display:flex;align-items:center;gap:8px;background:#fff;border-radius:20px;padding:10px 12px;box-shadow:0 8px 20px rgba(31,95,104,.09)}
+.bubble{flex:none;width:36px;height:36px;border-radius:50%;background:var(--mint);color:var(--petrol);display:grid;place-items:center}
+.tile span:not(.bubble){font-family:"Barlow Condensed",sans-serif;font-weight:600;font-size:15px;line-height:1.05;color:var(--petrol)}
+.tile small{display:block;font-family:Manrope,sans-serif;font-weight:600;font-size:9px;color:#6c8a90}
+</style></head>
+<body>
+<header>
+  <div class="brand"><span class="mark">${esc(monogram(title))}</span><span><b>${esc(title)}</b><small>PHYSIOTHERAPIE</small></span></div>
+  <span class="burger"></span>
+</header>
+<span class="blob"></span>
+<div class="oval"><img src="${assets.photo(photo.file)}" alt=""></div>
+<span class="dot"></span>
+<div class="body">
+  <span class="chip">Physiotherapie${city ? ` in ${esc(city)}` : ""}</span>
+  <h1>${esc(title)}</h1>
+  <p>Wir machen Sie wieder fit für den Alltag.</p>
+  <span class="cta">Termin vereinbaren</span><br>
+  ${showRating ? `<span class="rating"><span class="stars">${STAR.repeat(5)}</span>${de(d.rating!)} · ${d.reviewCount} Bewertungen</span>` : ""}
+</div>
+<div class="tiles">${RUND_SERVICES.slice(0, 2)
+    .map(
+      (x) =>
+        `<div class="tile"><span class="bubble"><svg viewBox="0 0 24 24" width="20" height="20" aria-hidden="true"><path d="${x.icon}" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"/></svg></span><span><small>${x.top}</small>${x.main}</span></div>`,
+    )
+    .join("")}</div>
+</body></html>`;
+}
+
 /**
  * Geräte-Bild (04.10.2026, Christian): die Startseite auf einem Laptop, daneben dieselbe Seite auf einem Smartphone.
  * Wirkt wie ein fertiges Produkt und zeigt nebenbei, dass die Seite am Handy funktioniert. Beide Seiten stecken als
  * iframe (srcdoc) in der Szene, ein Screenshot reicht. Bildgröße 1440 × 900 wie die Seite selbst.
  */
-export function renderTeaserMockup(d: TeaserData, assets: TeaserAssets = fileAssets): string {
-  const desktop = renderVital(d, assets);
-  const mobile = renderVitalMobile(d, assets);
+export function renderTeaserMockup(
+  d: TeaserData,
+  assets: TeaserAssets = fileAssets,
+  style: Exclude<TeaserStyle, "welt"> = "vital",
+): string {
+  const desktop = style === "rund" ? renderRund(d, assets) : renderVital(d, assets);
+  const mobile = style === "rund" ? renderRundMobile(d, assets) : renderVitalMobile(d, assets);
   const lw = 1060; // Bildschirmbreite Laptop
   const ls = lw / 1440;
   const pw = 250; // Bildschirmbreite Handy
@@ -486,9 +644,11 @@ export async function buildTeaser(
   await mkdir(dir, { recursive: true });
   const out = teaserPath(dir, companyId);
   const d = { ...data, seed: companyId };
-  // Laptop + Smartphone gibt es für den Stil "vital".
+  // Laptop + Smartphone gibt es für die Stile "vital" und "rund".
   await shoot(
-    devices && style === "vital" ? renderTeaserMockup(d) : renderPhysioTeaser(d, fileAssets, style),
+    devices && style !== "welt"
+      ? renderTeaserMockup(d, fileAssets, style)
+      : renderPhysioTeaser(d, fileAssets, style),
     out,
   );
   return out;
@@ -500,7 +660,7 @@ export interface TeaserDeps {
   branches: readonly string[];
   shoot: TeaserShooter;
   style?: TeaserStyle;
-  /** Startseite auf Laptop und Smartphone statt nur der Seite (nur Stil "vital"). */
+  /** Startseite auf Laptop und Smartphone statt nur der Seite (Stile "vital" und "rund"). */
   devices?: boolean;
 }
 
