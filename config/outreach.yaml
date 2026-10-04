@@ -11,6 +11,14 @@ absender_zusatz: Avelio, Peißenberg
 # Du für diese Branchen, sonst Sie.
 du_branchen: [fahrrad, gastro, friseur, kosmetik]
 
+# Ohne Namen im Impressum (und ohne Vornamen im Firmennamen) geht die Mail ans Team, mit der Bitte, sie an die
+# Leitung weiterzugeben (04.10.2026, Christian: "Hallo Team Christina Heider Physiotherapeutin" ist zu generisch).
+team_anrede:
+  physiotherapie:
+    anrede: "Liebes Praxisteam,"
+    weiterleiten: Falls sich bei Ihnen jemand anderes um die Website kümmert, leiten Sie die Mail gern an die Praxisleitung weiter.
+    weiterleiten_du: Falls sich bei euch jemand anderes um die Website kümmert, leitet die Mail gern an die Praxisleitung weiter.
+
 # Gewählter Einstieg (Variante 2, 03.10.2026). Die anderen nur zur Abwechslung, damit nicht jede Mail gleich klingt.
 einstieg: Ich heiße Christian und mache Online-Auftritte zeitgemäß. Für die meisten Kunden ist die Website ja das Erste, was sie von einem sehen.
 einstiege_abwechslung:

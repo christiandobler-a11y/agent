@@ -20,6 +20,13 @@ export const outreachConfigSchema = z.object({
   absender_name: z.string().min(1),
   absender_zusatz: z.string().default(""),
   du_branchen: z.array(z.string()).default([]),
+  // Ohne Ansprechpartner: Anrede ans Team und Bitte um Weiterleitung, je Branche (sonst "Hallo Team {Firma}").
+  team_anrede: z
+    .record(
+      z.string(),
+      z.object({ anrede: z.string(), weiterleiten: z.string(), weiterleiten_du: z.string() }),
+    )
+    .default({}),
   einstieg: z.string().min(1),
   einstiege_abwechslung: z.array(z.string()).default([]),
   regeln: z.array(z.string()),

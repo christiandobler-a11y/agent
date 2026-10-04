@@ -1,4 +1,6 @@
+import { randomUUID } from "node:crypto";
 import { existsSync } from "node:fs";
+import sharp from "sharp";
 import type { Db, DbClient } from "../db/client.js";
 import type { Company } from "../db/companies.js";
 import { getState, setState } from "../db/appState.js";
@@ -72,19 +74,30 @@ export async function sentToday(db: DbClient, now: Date): Promise<number> {
 const ACTIVE_OR_LATER = new Set(["CONTACTED", "REPLIED", "INTERESTED", "PROTOTYPE", "WON", "LOST"]);
 
 /** Vorschau-Bild als eingebettetes Bild unter seinem Satz; fehlt die Datei, geht die Mail als reiner Text raus. */
-export function withTeaser(
+export async function withTeaser(
   draft: Pick<DraftRow, "body" | "meta">,
-): Pick<OutgoingMail, "html" | "attachments"> {
+): Promise<Pick<OutgoingMail, "html" | "attachments">> {
   const path = draft.meta.teaser;
   if (!path || !existsSync(path) || !draft.body) return {};
-  const cid = "startseite-entwurf@avelio";
+  // Klein halten (iPhone-Mail lädt große eingebettete Bilder sonst nicht sofort und zeigt nur einen Strich) und
+  // eine Content-ID im üblichen Format "teil@domain".
+  const content = await sharp(path).resize({ width: 1200 }).jpeg({ quality: 78, mozjpeg: true }).toBuffer();
+  const cid = `startseite-${randomUUID().slice(0, 8)}@avelio.digital`;
   return {
     html: textToHtml(draft.body, {
       cid,
       alt: "Entwurf Ihrer neuen Startseite",
       after: draft.meta.teaser_after ?? null,
     }),
-    attachments: [{ filename: "startseite-entwurf.jpg", path, cid }],
+    attachments: [
+      {
+        filename: "startseite-entwurf.jpg",
+        content,
+        contentType: "image/jpeg",
+        cid,
+        contentDisposition: "inline",
+      },
+    ],
   };
 }
 
@@ -120,7 +133,7 @@ export async function sendDraft(deps: SendDeps, draftId: string, by: string): Pr
       subject: draft.meta.subject,
       text: draft.body,
       inReplyTo: draft.meta.in_reply_to ?? null,
-      ...withTeaser(draft),
+      ...(await withTeaser(draft)),
     }));
   } catch (err) {
     await db.query("update interactions set meta = meta - 'sending_at' where id = $1", [draftId]);

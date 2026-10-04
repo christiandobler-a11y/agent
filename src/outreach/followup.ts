@@ -91,7 +91,7 @@ export async function createFollowUpDraft(
   const inForm = (sie: string, du: string) => (form === "sie" ? sie : form === "du" ? du : duToIhr(du));
   const seed = seedOf(company.id);
   const body = followUpBody({
-    greeting: salutationLine(form, person, company.name),
+    greeting: salutationLine(form, person, company.name, o.team_anrede[company.branch_key ?? ""]?.anrede),
     sentence: inForm(pick(n.saetze, seed, 5, 0), pick(n.saetze_du, seed, 5, 0)),
     preview: first.previewUrl ? inForm(n.entwurf, n.entwurf_du).replace("{link}", first.previewUrl) : null,
     exit: inForm(n.ausstieg, n.ausstieg_du),

@@ -36,7 +36,14 @@ export interface OutgoingMail {
   /** HTML-Fassung (z. B. mit eingebettetem Vorschau-Bild); `text` bleibt die Textfassung. */
   html?: string;
   /** Eingebettete Bilder (`cid` wie im HTML) bzw. Anhänge. */
-  attachments?: { filename: string; path: string; cid?: string }[];
+  attachments?: {
+    filename: string;
+    path?: string;
+    content?: Buffer;
+    contentType?: string;
+    cid?: string;
+    contentDisposition?: "inline" | "attachment";
+  }[];
 }
 
 const escapeHtml = (s: string) =>
@@ -59,7 +66,7 @@ export function textToHtml(
       .replace(/\n/g, "<br>");
     const img =
       image && i === index
-        ? `<p><img src="cid:${image.cid}" alt="${escapeHtml(image.alt)}" width="600" style="width:100%;max-width:600px;height:auto;border:1px solid #e3e3e3;border-radius:8px"></p>`
+        ? `<p><img src="cid:${image.cid}" alt="${escapeHtml(image.alt)}" width="600" height="375" style="display:block;width:100%;max-width:600px;height:auto;border:0;border-radius:6px"></p>`
         : "";
     return `<p>${body}</p>${img}`;
   });

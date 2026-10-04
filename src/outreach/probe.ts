@@ -65,7 +65,7 @@ export async function runProbe(
       to: deps.mailbox.address,
       subject: `[Probe] ${draft.subject}`,
       text: draft.body,
-      ...withTeaser({ body: rows[0]?.body ?? draft.body, meta: rows[0]?.meta ?? {} }),
+      ...(await withTeaser({ body: rows[0]?.body ?? draft.body, meta: rows[0]?.meta ?? {} })),
     });
     sentTo = deps.mailbox.address;
   }

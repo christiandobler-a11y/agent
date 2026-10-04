@@ -11,6 +11,7 @@ import type { OutreachConfig } from "./config.js";
 import { proposeSlots, seedOf } from "./slots.js";
 import { duToIhr, lowerFirst, subjectFor, type Form } from "./form.js";
 import { teaserExists, teaserPath } from "../prototype/teaser.js";
+import { personFromCompanyName } from "./names.js";
 
 /**
  * Kontakt-Entwurf per E-Mail (Phase 2, Stufe 2): Das LLM schreibt nur den Mittelteil (Einstieg, ein starker oder
@@ -95,9 +96,12 @@ export function salutationLine(
   form: Form,
   contact: { name: string | null; salutation: "Herr" | "Frau" | null },
   companyName: string,
+  /** Anrede ohne bekannten Namen, z. B. "Liebes Praxisteam," (config/outreach.yaml → team_anrede). */
+  team?: string | null,
 ): string {
-  const name = contact.name?.trim();
-  if (!name) return `Hallo Team ${shortCompanyName(companyName)},`;
+  // Ohne Namen im Impressum: Inhaber aus dem Firmennamen ("Christina Heider Physiotherapeutin"), sonst das Team.
+  const name = contact.name?.trim() || personFromCompanyName(companyName);
+  if (!name) return team ?? `Hallo Team ${shortCompanyName(companyName)},`;
   const parts = name.split(/\s+/);
   if (form === "du") return `Hallo ${parts[0]},`;
   if (contact.salutation) return `Hallo ${contact.salutation} ${parts.at(-1)},`;
@@ -197,7 +201,10 @@ export async function draftEmail(
   if (!audit && company.segment !== "NO_WEBSITE") return { kind: "no_audit" };
 
   const places = await latestPlacesSnapshot(db, company.id);
-  const { email, emailSource, name, salutation } = await recipient(db, company.id);
+  const { email, emailSource, name: impressumName, salutation } = await recipient(db, company.id);
+  // Kein Name im Impressum: vielleicht steht die Inhaberin im Firmennamen; sonst Team-Anrede mit Bitte um Weiterleitung.
+  const name = impressumName ?? personFromCompanyName(company.name);
+  const team = !name && company.branch_key ? (o.team_anrede[company.branch_key] ?? null) : null;
   const duBranch = company.branch_key !== null && o.du_branchen.includes(company.branch_key);
   const form: Form = !duBranch ? "sie" : name ? "du" : "ihr";
   const du = form !== "sie";
@@ -310,7 +317,7 @@ export async function draftEmail(
   const signature = [o.absender_name, o.absender_zusatz, deps.contact.phone].filter(Boolean).join("\n");
 
   const body = [
-    salutationLine(form, { name, salutation }, company.name),
+    salutationLine(form, { name, salutation }, company.name, team?.anrede),
     lowerFirst(clean.text),
     ...(draftSentence ? [draftSentence] : []),
     [
@@ -320,7 +327,7 @@ export async function draftEmail(
     ]
       .filter(Boolean)
       .join(" "),
-    cta,
+    [team ? inForm(team.weiterleiten, team.weiterleiten_du) : null, cta].filter(Boolean).join(" "),
     `${greeting}\n${signature}`,
   ].join("\n\n");
 

@@ -3,7 +3,7 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import sharp from "sharp";
 import { describe, expect, it } from "vitest";
-import { upsertCompany } from "../src/db/companies.js";
+import { upsertCompany, type Company } from "../src/db/companies.js";
 import { insertDraft } from "../src/db/drafts.js";
 import type { LlmGateway } from "../src/llm/gateway.js";
 import { loadOutreachConfig } from "../src/outreach/config.js";
@@ -104,12 +104,16 @@ describeDb("Vorschau-Bild in Mail und Versand", () => {
 
   it("Entwurf mit Bild-Satz, Versand als HTML mit eingebettetem Bild", async () => {
     const dir = mkdtempSync(join(tmpdir(), "avelio-teaser-"));
-    const { company: c } = await upsertCompany(db(), {
+    const { company: created } = await upsertCompany(db(), {
       name: "Physio Bild",
       placeId: "teaser-1",
       city: "Weilheim",
     });
-    await db().query("update companies set branch_key = 'physiotherapie' where id = $1", [c.id]);
+    const { rows: updated } = await db().query<Company>(
+      "update companies set branch_key = 'physiotherapie' where id = $1 returning *",
+      [created.id],
+    );
+    const c = updated[0]!;
     await db().query(
       `insert into audits (company_id, prompt_version, model, findings, rubric, commercial, summary)
        values ($1, 'v1', 'm', '[]', '{}', '{}', 's')`,
@@ -172,10 +176,21 @@ describeDb("Vorschau-Bild in Mail und Versand", () => {
       "test",
     );
     expect(r.kind).toBe("sent");
-    expect(sent[0]!.attachments).toEqual([
-      { filename: "startseite-entwurf.jpg", path, cid: "startseite-entwurf@avelio" },
-    ]);
-    expect(sent[0]!.html).toContain('src="cid:startseite-entwurf@avelio"');
+    const att = sent[0]!.attachments!;
+    expect(att).toHaveLength(1);
+    expect(att[0]).toMatchObject({
+      filename: "startseite-entwurf.jpg",
+      contentType: "image/jpeg",
+      contentDisposition: "inline",
+    });
+    expect(att[0]!.cid).toMatch(/^startseite-[0-9a-f]{8}@avelio\.digital$/);
+    expect(sent[0]!.html).toContain(`src="cid:${att[0]!.cid}"`);
+    expect(sent[0]!.html).toContain('height="375"');
+    // Für iPhone-Mail verkleinert
+    expect((await sharp(att[0]!.content).metadata()).width).toBeLessThanOrEqual(1200);
+    // Ohne Namen: Praxisteam mit Bitte um Weiterleitung
+    expect(mail.body.startsWith("Liebes Praxisteam,")).toBe(true);
+    expect(mail.body).toContain("an die Praxisleitung weiter");
     expect(sent[0]!.text).toBe(mail.body);
 
     // Ohne Bild bleibt es eine reine Text-Mail.
@@ -265,7 +280,7 @@ describeDb("Probelauf", () => {
     expect(r.sentTo).toBe("christian@example.de");
     expect(sent[0]!.to).toBe("christian@example.de");
     expect(sent[0]!.subject).toMatch(/^\[Probe\] /);
-    expect(sent[0]!.html).toContain("cid:startseite-entwurf@avelio");
+    expect(sent[0]!.html).toMatch(/cid:startseite-[0-9a-f]{8}@avelio\.digital/);
     const { rows } = await db().query<{ n: number; status: string }>(
       `select (select count(*)::int from interactions where company_id = $1) as n,
               (select status from companies where id = $1) as status`,

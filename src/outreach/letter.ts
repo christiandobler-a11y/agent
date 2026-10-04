@@ -250,7 +250,12 @@ export async function draftLetter(deps: LetterDeps, company: Company, by: string
   const marks = normalizeMarks(result.output.markierungen, findings.length);
 
   const b = o.brief;
-  const greeting = salutationLine(form, person, company.name);
+  const greeting = salutationLine(
+    form,
+    person,
+    company.name,
+    o.team_anrede[company.branch_key ?? ""]?.anrede,
+  );
   const whatsapp = deps.contact.whatsapp;
   const qr = whatsapp
     ? {
