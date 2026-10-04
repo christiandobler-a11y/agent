@@ -137,11 +137,13 @@ export async function teaser(argv: string[]): Promise<number> {
         shoot: chromiumTeaserShooter(process.env.CHROMIUM_PATH),
         photo: config.foto,
         palette: config.farbe,
-        details: cachedPlaceDetails({
-          db: app.ctx.db,
-          budget: app.ctx.budget,
-          apiKey: loadEnv().GOOGLE_API_KEY,
-        }),
+        details: !config.google_details
+          ? null
+          : cachedPlaceDetails({
+              db: app.ctx.db,
+              budget: app.ctx.budget,
+              apiKey: loadEnv().GOOGLE_API_KEY,
+            }),
       },
       found.company,
     );

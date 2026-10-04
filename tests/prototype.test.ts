@@ -389,6 +389,7 @@ describeDb("Prototyp mit Datenbank", () => {
           stil: "welt" as const,
           geraete: false,
           farbe: "petrol",
+          google_details: false,
           foto: null,
         },
       },

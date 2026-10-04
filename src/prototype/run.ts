@@ -47,6 +47,9 @@ const configSchema = z.object({
       foto: z.string().nullable().default(null),
       // Farbwelt des Stils "vital": petrol, salbei, navy, wald, ozean, anthrazit (src/prototype/teaser.ts).
       farbe: z.string().default("petrol"),
+      // Echte Bewertungstexte und Öffnungszeiten von Google (Place Details, ca. 2,5 Cent je Praxis). Aus: nur Note
+      // und Anzahl aus der Suche (kostenlos).
+      google_details: z.boolean().default(false),
     })
     .default({
       dir: "data/teasers",
@@ -55,6 +58,7 @@ const configSchema = z.object({
       geraete: false,
       foto: null,
       farbe: "petrol",
+      google_details: false,
     }),
 });
 export type PrototypeConfig = z.infer<typeof configSchema>;

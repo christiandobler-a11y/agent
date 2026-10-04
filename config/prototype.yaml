@@ -36,3 +36,6 @@ teaser:
   foto: 1519824145371-296894a0daa9.jpg
   # Farbwelt (vital und elementa): petrol (Petrol + Orange), salbei, navy, wald, ozean, anthrazit, gelb (Elementa-Original)
   farbe: ozean # 04.10.2026 Christian
+  # Echte Bewertungstexte und Öffnungszeiten von Google (ca. 2,5 Cent je Praxis). Aus (Christian, 04.10.2026): auf dem
+  # Handy stehen dann Note und Anzahl der Bewertungen, beides echt und kostenlos.
+  google_details: false

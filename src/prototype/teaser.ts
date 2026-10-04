@@ -780,6 +780,11 @@ h2{font-family:"Barlow Condensed",sans-serif;font-weight:600;font-size:30px;colo
 .rhead svg{width:20px;height:20px}
 .rstars{display:flex;color:#f5b400}
 .rstars svg{width:13px;height:13px}
+.review.score{display:flex;align-items:center;gap:14px;padding:14px 16px}
+.review.score svg{flex:none}
+.review.score > svg{width:34px;height:34px}
+.review.score b{display:block;margin-top:4px;font-family:"Barlow Condensed",sans-serif;font-weight:600;font-size:22px;color:var(--petrol)}
+.review.score small{display:block;font-weight:600;font-size:12px;color:#6c8a90}
 .review p{margin-top:8px;font-weight:600;font-size:13px;line-height:1.45;color:var(--ink)}
 .review small{display:block;margin-top:5px;font-weight:600;font-size:11px;color:#6c8a90}
 .fade{position:absolute;left:0;right:0;bottom:0;height:120px;background:linear-gradient(rgba(255,255,255,0),#fff 80%)}
@@ -805,7 +810,10 @@ ${statsHtml}
   ${
     d.quote
       ? `<div class="review"><div class="rhead">${GOOGLE}<span class="rstars">${STAR.repeat(5)}</span></div><p>„${esc(teaserQuote(d.quote.text, 120))}“</p><small>${esc(d.quote.author)} auf Google</small></div>`
-      : `<div class="hours"><small>Öffnungszeiten</small><ul>${info}</ul></div>`
+      : good
+        ? // Ohne Bewertungstext (kostet eine extra Google-Abfrage): Note und Anzahl, beides echt und kostenlos.
+          `<div class="review score">${GOOGLE}<div><span class="rstars">${STAR.repeat(5)}</span><b>${de(d.rating!)} von 5 Sternen</b><small>${d.reviewCount} Bewertungen auf Google</small></div></div>`
+        : `<div class="hours"><small>Öffnungszeiten</small><ul>${info}</ul></div>`
   }
 </section>
 <div class="fade"></div>

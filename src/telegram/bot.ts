@@ -404,11 +404,13 @@ export function createBot(options: BotOptions): AvelioBot {
               shoot: chromiumTeaserShooter(process.env.CHROMIUM_PATH),
               photo: teaserConfig.foto,
               palette: teaserConfig.farbe,
-              details: cachedPlaceDetails({
-                db: pipeline.db,
-                budget: pipeline.budget,
-                apiKey: options.prototype?.googleApiKey,
-              }),
+              details: !teaserConfig.google_details
+                ? null
+                : cachedPlaceDetails({
+                    db: pipeline.db,
+                    budget: pipeline.budget,
+                    apiKey: options.prototype?.googleApiKey,
+                  }),
             },
           },
           company,

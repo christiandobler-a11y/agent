@@ -123,9 +123,11 @@ describe("Vorschau-Bild Physio (rein)", () => {
     expect(withQuote).toContain("Anna M. auf Google");
     expect(withQuote).not.toContain('class="quote"');
     expect(withQuote).not.toContain("<script");
-    // Ohne Bewertungstext: Öffnungszeiten statt Bewertung
-    const noQuote = renderTeaserMockup(data({ hours: ["Mo–Fr: 07:30–19:00 Uhr"] }), assets, "vital");
-    expect(noQuote).toContain("Öffnungszeiten");
+    // Ohne Bewertungstext (keine extra Google-Abfrage): Note und Anzahl, beides echt; ohne gute Note die Öffnungszeiten
+    const noQuote = renderTeaserMockup(data(), assets, "vital");
+    expect(noQuote).toContain("4,9 von 5 Sternen");
+    expect(noQuote).toContain("63 Bewertungen auf Google");
+    expect(renderTeaserMockup(data({ rating: 4 }), assets, "vital")).toContain("Öffnungszeiten");
     expect(teaserServices(undefined)).toEqual([
       "Krankengymnastik",
       "Manuelle Therapie",
