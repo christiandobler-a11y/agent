@@ -113,7 +113,7 @@ export function shortCompanyName(name: string): string {
 
 export type AnredeConfig = OutreachConfig["anrede"];
 const DEFAULT_ANREDE: AnredeConfig = {
-  sie: "Grüß Sie, {anrede} {nachname},",
+  sie: "Grüß Gott, {anrede} {nachname},",
   du: "Servus {vorname},",
   ohne_name: "Hallo Team {firma},",
   vorname_geschlecht: true,
@@ -140,7 +140,7 @@ export function personalContact(
   return { name, salutation };
 }
 
-/** Grußzeile ("Grüß Sie, Frau Heider,"), Texte aus config/outreach.yaml → anrede. */
+/** Grußzeile ("Grüß Gott, Frau Heider,"), Texte aus config/outreach.yaml → anrede. */
 export function salutationLine(
   form: Form,
   contact: { name: string | null; salutation: "Herr" | "Frau" | null },

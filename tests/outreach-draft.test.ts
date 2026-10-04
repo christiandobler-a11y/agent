@@ -56,10 +56,10 @@ describe("Entwurf (rein)", () => {
 
   it("Grußzeile: Frau/Herr nur wenn es feststeht, sonst an das Team", () => {
     expect(salutationLine("sie", { name: "Monika Späth", salutation: "Frau" }, "x")).toBe(
-      "Grüß Sie, Frau Späth,",
+      "Grüß Gott, Frau Späth,",
     );
     expect(salutationLine("sie", { name: "Kai Ernst", salutation: "Herr" }, "x")).toBe(
-      "Grüß Sie, Herr Ernst,",
+      "Grüß Gott, Herr Ernst,",
     );
     // Nie Vor- und Nachname, nie Geschlecht raten: ohne Frau/Herr ans Team.
     expect(salutationLine("sie", { name: "Kai Ernst", salutation: null }, "Physio Ernst")).toBe(
@@ -73,7 +73,7 @@ describe("Entwurf (rein)", () => {
     // Weibliche Berufsbezeichnung im Firmennamen ist eine Angabe, kein Raten → "Frau".
     expect(
       salutationLine("sie", { name: null, salutation: null }, "Christina Heider Physiotherapeutin"),
-    ).toBe("Grüß Sie, Frau Heider,");
+    ).toBe("Grüß Gott, Frau Heider,");
     expect(
       salutationLine(
         "sie",
@@ -81,7 +81,7 @@ describe("Entwurf (rein)", () => {
         "Physiotherapie Christina Heider",
         "Liebes Praxisteam,",
       ),
-    ).toBe("Grüß Sie, Frau Heider,"); // eindeutiger Vorname
+    ).toBe("Grüß Gott, Frau Heider,"); // eindeutiger Vorname
     expect(
       salutationLine(
         "sie",
@@ -89,7 +89,7 @@ describe("Entwurf (rein)", () => {
         "Max Huber Physiotherapeut",
         "Liebes Praxisteam,",
       ),
-    ).toBe("Grüß Sie, Herr Huber,");
+    ).toBe("Grüß Gott, Herr Huber,");
     // Abgeschaltet: nur, was im Impressum steht
     expect(personalContact("sie", { name: "Max Huber", salutation: null }, "x", false)).toBeNull();
     // Mehrdeutige Vornamen gehen weiter ans Team
@@ -288,7 +288,7 @@ describeDb("E-Mail-Entwurf (Datenbank)", () => {
     expect(outreach.spamschutz.betreffe.map((b) => b.replace("{firma}", c.name))).toContain(d.subject);
     expect(d.subject).not.toContain("Kagerer"); // kein Praxisname im Betreff
     // Name im Impressum ohne Frau/Herr, aber eindeutiger Vorname → persönlich, kein P.S.
-    expect(d.body).toMatch(/^Grüß Sie, Frau Kagerer,\n\nmir ist Ihre Praxis/);
+    expect(d.body).toMatch(/^Grüß Gott, Frau Kagerer,\n\nmir ist Ihre Praxis/);
     expect(d.body).not.toContain("P.S.");
     expect(d.body).not.toMatch(/[–—]/);
     expect(d.body).toMatch(/unverbindlich\. (Hätten Sie|Passt Ihnen) \w+/);

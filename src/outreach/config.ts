@@ -61,7 +61,7 @@ export const outreachConfigSchema = z.object({
       vorname_geschlecht: z.boolean().default(true),
     })
     .default({
-      sie: "Grüß Sie, {anrede} {nachname},",
+      sie: "Grüß Gott, {anrede} {nachname},",
       du: "Servus {vorname},",
       ohne_name: "Hallo Team {firma},",
       vorname_geschlecht: true,

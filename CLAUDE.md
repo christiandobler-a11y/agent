@@ -89,7 +89,7 @@ ausprobieren kann. Nach Schritt 6 ist ein Abstimmungstermin (Kalibrierung) vorge
   Manager-Werkzeuge `set_status`/`add_note`/`add_reminder`/`pipeline`); jeder Wechsel, jede Notiz und Erinnerung steht
   in `interactions` (`src/db/crm.ts`). Erinnerungen stellt der Sweep zu, nie in der Ruhezeit (`config/crm.yaml`).
 - **Kontakt-Entwürfe:** Das LLM (Rolle `contact`) schreibt nur Anrede und Mittelteil; Betreff, Termine
-  (`src/outreach/slots.ts`), Kontaktweg, Grußzeile („Grüß Sie, Frau X,“ mit Frau/Herr aus Impressum oder eindeutigem Vornamen `names.ts`, sonst ans Team;
+  (`src/outreach/slots.ts`), Kontaktweg, Grußzeile („Grüß Gott, Frau X,“ mit Frau/Herr aus Impressum oder eindeutigem Vornamen `names.ts`, sonst ans Team;
   `anrede`), Gruß und Signatur setzt Code nach `config/outreach.yaml` (keine Gedankenstriche,
   ein Befund, Abwechslung gegen Spamfilter). Entwürfe stehen als `interactions.type = 'draft'` mit angebotenen Terminen
   in `meta`. **Avelio sendet nur auf Knopfdruck** (`sendDraft` in `src/outreach/send.ts`, über Christians Postfach aus
