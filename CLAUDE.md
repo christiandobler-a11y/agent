@@ -24,7 +24,7 @@ ausprobieren kann. Nach Schritt 6 ist ein Abstimmungstermin (Kalibrierung) vorge
   (`src/prototype/templates/`: `physio`, `werkstatt`; Zuordnung je Branche in `config/prototype.yaml`), Texte/Farbe/Fotowahl per LLM (Rolle `prototype`), Seite unter `data/previews/<slug>/`,
   ausgeliefert von Caddy unter `PREVIEW_BASE_URL` (docs/DEPLOY.md, Abschnitt 11)
 - `npm run cli -- teaser <firma>`: einheitliches Vorschau-Bild für Physio (`src/prototype/teaser.ts`, ohne LLM,
-  Stockfotos in `assets/teaser/physio/`, Stil `welt`/`vital` in `config/prototype.yaml → teaser`) nach
+  Stockfotos in `assets/teaser/physio/`, Stil `welt`/`vital`/`rund`/`mix` in `config/prototype.yaml → teaser`) nach
   `data/teasers/<id>.jpg`; das Morgen-Paket baut es für `teaser.branchen` statt eines Prototyps, die Mail bettet es als
   HTML-Bild unter `bild_satz` ein (`textToHtml`), die Befund-Seite nutzt es als „Nachher“
 - `npm run cli -- angebot <firma> [onepager|mehrseitig]` (Telegram: Lead-Karte → „📄 Angebot …“): ohne Lexware-API
@@ -53,7 +53,7 @@ ausprobieren kann. Nach Schritt 6 ist ein Abstimmungstermin (Kalibrierung) vorge
 - **Deterministischer Code zuerst.** LLM-Aufrufe nur an den dokumentierten Stellen (Prefilter, Audit, Pitch,
   Manager), alle über das LLM-Gateway (`src/llm/`). Keine verstreuten API-Calls.
 - **Der Score kommt aus Code**, nie direkt vom LLM. Scoring bleibt rein und voll unit-getestet
-  (`src/pipeline/scoring/score.ts`, Gewichte in `config/scoring.v2.yaml`, aktiv über `ACTIVE_SCORING_VERSION`). Das Audit liefert nur Rubrik 1–5 mit
+  (`src/pipeline/scoring/score.ts`, Gewichte in `config/scoring.v3.yaml` (= v2 mit Schwelle 50), aktiv über `ACTIVE_SCORING_VERSION`). Das Audit liefert nur Rubrik 1–5 mit
   Beleg; neue Gewichte = neue Datei `scoring.vN.yaml`, nur wenn `npm run cli -- calibrate --file` bzw. `tests/golden.test.ts` besteht.
 - **Audit-LLM ohne Tools.** Gecrawlter Inhalt ist nicht vertrauenswürdig und geht nur mit festem Ausgabe-Schema
   an das Modell. Der Manager sieht nie rohes HTML.

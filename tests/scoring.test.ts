@@ -206,10 +206,14 @@ describe("explain", () => {
 });
 
 describe("Score v2 (kalibriert)", () => {
-  const v2 = loadScoringConfig();
+  const v2 = loadScoringConfig("v2");
 
-  it("ist die aktive Version und vergibt 100 Punkte", () => {
+  it("vergibt 100 Punkte; v3 (aktiv) unterscheidet sich nur in der Schwelle", () => {
     expect(v2.version).toBe("v2");
+    const v3 = loadScoringConfig();
+    expect(v3.version).toBe("v3");
+    expect(v3.qualify_min_total).toBe(50);
+    expect({ ...v3, version: "v2", qualify_min_total: 55 }).toEqual(v2);
     const max = v2.dimensions;
     expect(max.business.max + max.website.max + max.potential.max + max.gap.max + max.reach.max).toBe(100);
   });

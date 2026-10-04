@@ -64,8 +64,8 @@ export const scoringConfigSchema = z.object({
 
 export type ScoringConfig = z.infer<typeof scoringConfigSchema>;
 
-/** Aktive Score-Version (config/scoring.<version>.yaml). v2 = kalibriert am Golden Set vom 03.10.2026. */
-export const ACTIVE_SCORING_VERSION = "v2";
+/** Aktive Score-Version (config/scoring.<version>.yaml). v2 = kalibriert am Golden Set vom 03.10.2026, v3 = Schwelle 50. */
+export const ACTIVE_SCORING_VERSION = "v3";
 
 export function loadScoringConfig(version = ACTIVE_SCORING_VERSION): ScoringConfig {
   const config = loadYamlConfig(`scoring.${version}.yaml`, scoringConfigSchema);

@@ -162,7 +162,7 @@ export function monogram(title: string): string {
  * Physio-Seiten (z. B. therapie-welt.de, 04.10.2026 mit Christian): schwebende Kopfleiste, Höhenlinien, Aussage mit
  * markiertem Praxisnamen, Google-Bewertung, Foto-Collage, Leiste mit Kassen und Qualifikationen.
  */
-export type TeaserStyle = "welt" | "vital" | "rund";
+export type TeaserStyle = "welt" | "vital" | "rund" | "mix";
 
 export function renderPhysioTeaser(
   d: TeaserData,
@@ -170,7 +170,7 @@ export function renderPhysioTeaser(
   style: TeaserStyle = "welt",
 ): string {
   if (style === "vital") return renderVital(d, assets);
-  if (style === "rund") return renderRund(d, assets);
+  if (style === "rund" || style === "mix") return renderRund(d, assets);
   const { title } = teaserName(d.name, d.city);
   const start = seedOf(d.seed) % PHYSIO_PHOTOS.length;
   const photo = (k: number) => PHYSIO_PHOTOS[(start + k) % PHYSIO_PHOTOS.length]!;
@@ -562,6 +562,76 @@ p{font-size:15px;line-height:1.45;margin-top:10px;color:#3d5f66}
 }
 
 /**
+ * Mischung (04.10.2026, Christian: "rund gefällt mir mehr, die mobile Ansicht bei vital weitaus besser, gut dass gleich
+ * die 4 wichtigsten Punkte zu sehen sind"): Handy wie vital (Foto über die ganze Breite mit Petrol-Schleier, Welle),
+ * darunter die vier Leistungen als runde Kacheln. Am Rechner die runde Variante.
+ */
+function renderMixMobile(d: TeaserData, assets: TeaserAssets): string {
+  const { title } = teaserName(d.name, d.city);
+  const photo = pickPhoto(d.seed);
+  const city = d.city?.trim() || null;
+  const showRating = d.rating !== null && d.rating >= 4.3 && (d.reviewCount ?? 0) >= 5;
+  const size = title.length <= 14 ? 44 : title.length <= 24 ? 38 : 30;
+  const tiles = RUND_SERVICES.map(
+    (x) =>
+      `<div class="tile"><span class="bubble"><svg viewBox="0 0 24 24" width="20" height="20" aria-hidden="true"><path d="${x.icon}" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"/></svg></span><span><small>${x.top}</small>${x.main}</span></div>`,
+  ).join("");
+  return `<!doctype html>
+<html lang="de"><head><meta charset="utf-8"><title>${esc(title)}</title>
+<style>
+${rundFonts(assets)}
+:root{--petrol:#1f5f68;--orange:#e46a1c;--ink:#24515a;--mint:#e3efed;--bg:#f5f8f7}
+*{box-sizing:border-box;margin:0;padding:0}
+html,body{width:390px;height:844px;overflow:hidden}
+body{background:var(--bg);font-family:"Barlow Condensed",sans-serif;-webkit-font-smoothing:antialiased;color:var(--ink)}
+.status{height:44px;background:#fff}
+header{height:64px;display:flex;align-items:center;justify-content:space-between;padding:0 18px;background:#fff}
+.brand{display:flex;align-items:center;gap:10px;min-width:0}
+.mark{flex:none;width:40px;height:40px;border-radius:50%;background:var(--petrol);color:#fff;display:grid;place-items:center;font-weight:600;font-size:17px}
+.brand b{display:block;font-weight:600;font-size:${title.length <= 18 ? 19 : 15}px;letter-spacing:.03em;text-transform:uppercase;line-height:1.05}
+.brand small{display:block;color:var(--orange);font-family:Manrope,sans-serif;font-weight:800;font-size:8px;letter-spacing:.2em;margin-top:3px}
+.burger{flex:none;width:24px;height:16px;border-top:2px solid var(--ink);border-bottom:2px solid var(--ink);position:relative}
+.burger::after{content:"";position:absolute;left:0;right:0;top:5px;border-top:2px solid var(--ink)}
+.hero{position:relative;height:540px;overflow:hidden}
+.hero img{position:absolute;inset:0;width:100%;height:100%;object-fit:cover;object-position:${photo.position}}
+.hero::before{content:"";position:absolute;inset:0;z-index:1;background:rgba(27,86,95,.74)}
+.inner{position:relative;z-index:2;height:100%;display:flex;flex-direction:column;align-items:center;justify-content:center;text-align:center;color:#fff;padding:0 22px 70px}
+.eyebrow{font-weight:300;font-size:13px;letter-spacing:.26em;text-transform:uppercase}
+h1{font-weight:600;font-size:${size}px;line-height:1.02;margin-top:10px}
+p{font-weight:300;font-size:18px;margin-top:10px;opacity:.95}
+.cta{margin-top:20px;background:var(--orange);color:#fff;font-size:18px;font-weight:600;padding:12px 36px;border-radius:999px}
+.rating{margin-top:12px;display:flex;align-items:center;gap:8px;background:rgba(255,255,255,.14);border:1px solid rgba(255,255,255,.35);border-radius:999px;padding:7px 15px;font-family:Manrope,sans-serif;font-size:12px;font-weight:600}
+.rating .stars{display:flex;color:#ffc24a}
+.rating svg{width:12px;height:12px}
+.wave{position:absolute;z-index:3;left:0;right:0;bottom:-1px;width:100%;height:60px}
+.tiles{display:grid;grid-template-columns:1fr 1fr;gap:10px;padding:4px 16px 0}
+.tile{display:flex;align-items:center;gap:9px;background:#fff;border-radius:22px;padding:11px 12px;box-shadow:0 8px 20px rgba(31,95,104,.09)}
+.bubble{flex:none;width:38px;height:38px;border-radius:50%;background:var(--mint);color:var(--petrol);display:grid;place-items:center}
+.tile span:not(.bubble){font-weight:600;font-size:16px;line-height:1.05;color:var(--petrol)}
+.tile small{display:block;font-family:Manrope,sans-serif;font-weight:600;font-size:9px;color:#6c8a90}
+</style></head>
+<body>
+<div class="status"></div>
+<header>
+  <div class="brand"><span class="mark">${esc(monogram(title))}</span><span><b>${esc(title)}</b><small>PHYSIOTHERAPIE</small></span></div>
+  <span class="burger"></span>
+</header>
+<section class="hero">
+  <img src="${assets.photo(photo.file)}" alt="">
+  <div class="inner">
+    <div class="eyebrow">Physiotherapie${city ? ` ${esc(city)}` : ""}</div>
+    <h1>${esc(title)}</h1>
+    <p>Wir machen Sie wieder fit für den Alltag.</p>
+    <span class="cta">Termin vereinbaren</span>
+    ${showRating ? `<span class="rating"><span class="stars">${STAR.repeat(5)}</span>${de(d.rating!)} · ${d.reviewCount} Bewertungen</span>` : ""}
+  </div>
+  <svg class="wave" viewBox="0 0 390 60" preserveAspectRatio="none" aria-hidden="true"><path fill="#f5f8f7" d="M0 24 C 110 0, 190 60, 300 44 S 370 18, 390 26 L390 60 L0 60 Z"/></svg>
+</section>
+<div class="tiles">${tiles}</div>
+</body></html>`;
+}
+
+/**
  * Geräte-Bild (04.10.2026, Christian): die Startseite auf einem Laptop, daneben dieselbe Seite auf einem Smartphone.
  * Wirkt wie ein fertiges Produkt und zeigt nebenbei, dass die Seite am Handy funktioniert. Beide Seiten stecken als
  * iframe (srcdoc) in der Szene, ein Screenshot reicht. Bildgröße 1440 × 900 wie die Seite selbst.
@@ -571,8 +641,13 @@ export function renderTeaserMockup(
   assets: TeaserAssets = fileAssets,
   style: Exclude<TeaserStyle, "welt"> = "vital",
 ): string {
-  const desktop = style === "rund" ? renderRund(d, assets) : renderVital(d, assets);
-  const mobile = style === "rund" ? renderRundMobile(d, assets) : renderVitalMobile(d, assets);
+  const desktop = style === "vital" ? renderVital(d, assets) : renderRund(d, assets);
+  const mobile =
+    style === "rund"
+      ? renderRundMobile(d, assets)
+      : style === "mix"
+        ? renderMixMobile(d, assets)
+        : renderVitalMobile(d, assets);
   const lw = 1060; // Bildschirmbreite Laptop
   const ls = lw / 1440;
   const pw = 250; // Bildschirmbreite Handy
@@ -644,7 +719,7 @@ export async function buildTeaser(
   await mkdir(dir, { recursive: true });
   const out = teaserPath(dir, companyId);
   const d = { ...data, seed: companyId };
-  // Laptop + Smartphone gibt es für die Stile "vital" und "rund".
+  // Laptop + Smartphone gibt es für alle Stile außer "welt".
   await shoot(
     devices && style !== "welt"
       ? renderTeaserMockup(d, fileAssets, style)
@@ -660,7 +735,7 @@ export interface TeaserDeps {
   branches: readonly string[];
   shoot: TeaserShooter;
   style?: TeaserStyle;
-  /** Startseite auf Laptop und Smartphone statt nur der Seite (Stile "vital" und "rund"). */
+  /** Startseite auf Laptop und Smartphone statt nur der Seite (alle Stile außer "welt"). */
   devices?: boolean;
 }
 

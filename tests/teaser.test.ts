@@ -96,6 +96,11 @@ describe("Vorschau-Bild Physio (rein)", () => {
     const mock = renderTeaserMockup(data(), assets, "rund");
     expect(mock.match(/<iframe srcdoc="/g)).toHaveLength(2);
     expect(mock).toContain("class=&quot;oval&quot;");
+    // Mischung: am Rechner rund, am Handy Foto über die ganze Breite und die vier Kacheln
+    const mix = renderTeaserMockup(data(), assets, "mix");
+    expect(mix).toContain("class=&quot;oval&quot;");
+    expect(mix).toContain("class=&quot;wave&quot;");
+    expect(mix.match(/class=&quot;tile&quot;/g)).toHaveLength(8);
   });
 
   it("nur für die eingestellten Branchen", () => {

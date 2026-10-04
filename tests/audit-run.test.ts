@@ -211,7 +211,7 @@ describeDb("Audit → Score → Pitch", () => {
     });
 
     const text = await explainStoredLead(db(), await row(c.id));
-    expect(text).toMatch(/^Radhaus \d+ – \d+\/100 \(Scoring v2/);
+    expect(text).toMatch(/^Radhaus \d+ – \d+\/100 \(Scoring v3/);
     expect(text).toContain("audit (claude-sonnet-5-5");
     expect(text).toContain("Hauptchance (claude-opus-5-5): Starke Bewertungen, schwache Website.");
   });

@@ -24,6 +24,8 @@ teaser:
   dir: data/teasers
   branchen: [physiotherapie]
   # welt = helle Seite mit Foto-Collage und Google-Bewertung (angelehnt an therapie-welt.de),
-  # vital = großes Foto mit Petrol-Schleier und Bogen (angelehnt an revitalis-physio.de)
-  stil: vital # 04.10.2026 Christian: "finde vital viel besser"
-  geraete: true # Startseite auf Laptop und Smartphone nebeneinander (nur vital)
+  # vital = großes Foto mit Petrol-Schleier und Bogen (angelehnt an revitalis-physio.de),
+  # rund = Pillen-Kopfleiste, ovales Foto, Leistungs-Kacheln (Vorbilder CORPORE und Burkart),
+  # mix = am Rechner rund, am Handy vital mit den vier Leistungen als runde Kacheln darunter
+  stil: mix # 04.10.2026 Christian: rund am Rechner, vital am Handy, die 4 wichtigsten Punkte gleich sichtbar
+  geraete: true # Startseite auf Laptop und Smartphone nebeneinander (alle Stile außer welt)
