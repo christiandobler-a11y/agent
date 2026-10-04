@@ -19,6 +19,14 @@ export const mailConfigSchema = z.object({
     z.object({ smtp: server, imap: server.omit({ secure: true }), append_sent: z.boolean() }),
   ),
   max_per_day: z.number().int().min(1),
+  verteilt: z
+    .object({
+      abstand_min: z.number().min(0),
+      abstand_max: z.number().min(0),
+      von: z.string().regex(/^\d{2}:\d{2}$/),
+      bis: z.string().regex(/^\d{2}:\d{2}$/),
+    })
+    .default({ abstand_min: 5, abstand_max: 15, von: "08:00", bis: "18:00" }),
   reply_window_days: z.number().int().min(1),
 });
 export type MailConfig = z.infer<typeof mailConfigSchema>;

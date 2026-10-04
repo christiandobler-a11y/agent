@@ -25,6 +25,7 @@ import { mailEventMessage } from "../src/telegram/format.js";
 import { countPlan, planItems, type PlanItem } from "../src/db/plan.js";
 import { insertWebsiteSnapshot } from "../src/db/websiteSnapshots.js";
 import type { LlmGateway } from "../src/llm/gateway.js";
+import { nextOpen, queuePlanMails, sendNextQueued, spreadTimes } from "../src/outreach/queue.js";
 import { loadOutreachConfig } from "../src/outreach/config.js";
 import {
   createFollowUpDraft,
@@ -43,7 +44,7 @@ import {
   type OutgoingMail,
 } from "../src/outreach/mail.js";
 import { createMxCheck } from "../src/outreach/mx.js";
-import { checkReplies, sendDraft } from "../src/outreach/send.js";
+import { checkReplies, sendDraft, sentToday } from "../src/outreach/send.js";
 import type { PipelineContext } from "../src/queue/pipeline.js";
 import { createBot } from "../src/telegram/bot.js";
 import { parsePlanCallback, planCallback, planHeaderText } from "../src/telegram/plan.js";
@@ -119,14 +120,47 @@ describe("Termin-Bestätigung (rein)", () => {
 });
 
 describe("Morgen-Paket (rein)", () => {
-  it("Menge je Tag: Start, später mehr, am Wochenende keine neuen", () => {
+  it("Menge je Tag: Stufen zum Aufwärmen, Bremse bei Unzustellbaren, am Wochenende keine neuen", () => {
     const monday = new Date("2026-10-05T06:00:00Z");
     const saturday = new Date("2026-10-03T06:00:00Z");
-    const c = config({ start: 15, spaeter: 30, steigern_nach_tagen: 14, nur_werktags: true });
-    expect(dailyNewCount(c, monday, null)).toBe(15);
-    expect(dailyNewCount(c, monday, new Date("2026-09-30T06:00:00Z"))).toBe(15);
-    expect(dailyNewCount(c, monday, new Date("2026-09-01T06:00:00Z"))).toBe(30);
-    expect(dailyNewCount(c, saturday, null)).toBe(0);
+    const c = config({
+      stufen: [
+        { ab_tag: 0, pro_tag: 20 },
+        { ab_tag: 7, pro_tag: 30 },
+        { ab_tag: 14, pro_tag: 45 },
+      ],
+      nur_werktags: true,
+    });
+    const n = (first: string | null, bounces?: { sent: number; bounced: number }) =>
+      dailyNewCount(c, monday, first ? new Date(first) : null, bounces);
+    expect(n(null)).toEqual({ count: 20, braked: false });
+    expect(n("2026-10-01T06:00:00Z").count).toBe(20);
+    expect(n("2026-09-27T06:00:00Z").count).toBe(30);
+    expect(n("2026-09-01T06:00:00Z").count).toBe(45);
+    // 3 von 40 unzustellbar (7,5 %) → eine Stufe zurück; bei wenigen Mails noch keine Aussage
+    expect(n("2026-09-01T06:00:00Z", { sent: 40, bounced: 3 })).toEqual({ count: 30, braked: true });
+    expect(n("2026-09-01T06:00:00Z", { sent: 40, bounced: 1 }).braked).toBe(false);
+    expect(n("2026-09-01T06:00:00Z", { sent: 10, bounced: 3 }).braked).toBe(false);
+    expect(dailyNewCount(c, saturday, null).count).toBe(0);
+  });
+
+  it("Verteilt senden: Zeitpunkte nur Mo bis Fr im Fenster, mit Abstand", () => {
+    const w = { abstand_min: 5, abstand_max: 15, von: "08:00", bis: "18:00" };
+    const berlin = (d: Date) =>
+      d.toLocaleString("de-DE", {
+        timeZone: "Europe/Berlin",
+        weekday: "short",
+        hour: "2-digit",
+        minute: "2-digit",
+      });
+    // Montag 06:00 → ab 08:00, dann alle 10 Minuten (rand = 0,5)
+    const mon = spreadTimes(3, new Date("2026-10-05T04:00:00Z"), w, () => 0.5);
+    expect(mon.map(berlin)).toEqual(["Mo., 08:00", "Mo., 08:10", "Mo., 08:20"]);
+    // Freitag 17:50 → zweite Mail erst am Montag 08:00
+    const fri = spreadTimes(2, new Date("2026-10-09T15:50:00Z"), w, () => 1);
+    expect(fri.map(berlin)).toEqual(["Fr., 17:50", "Mo., 08:00"]);
+    // Samstag → Montag
+    expect(berlin(nextOpen(new Date("2026-10-10T10:00:00Z"), w))).toBe("Mo., 08:00");
   });
 
   it("Kanal: Erstkontakt per Mail, Brief nur ohne erreichbare Mail-Adresse", () => {
@@ -499,7 +533,10 @@ describeDb("Morgen-Paket mit Datenbank", () => {
     const result = await buildDailyPlan({
       db: db(),
       now: () => NOW,
-      config: { ...config({ start: 5 }), briefe: { pro_tag: 1, ab_score: 80, nachfassen_nach_tagen: 7 } },
+      config: {
+        ...config({ stufen: [{ ab_tag: 0, pro_tag: 5 }] }),
+        briefe: { pro_tag: 1, ab_score: 80, nachfassen_nach_tagen: 7 },
+      },
       letter: letterDeps,
       prototype: null,
       mx: (a) => Promise.resolve(!a.endsWith("gibtsnicht.de")),
@@ -645,15 +682,78 @@ describeDb("Morgen-Paket mit Datenbank", () => {
     const headerButtons = (
       header.reply_markup as { inline_keyboard: { text: string; callback_data?: string }[][] }
     ).inline_keyboard.flat();
-    expect(headerButtons.map((x) => x.text)).toContain("📤 Alle 2 Mails senden");
+    expect(headerButtons.map((x) => x.text)).toContain("📤 Alle 2 Mails verteilt senden");
     await bot.handleUpdate(callbackUpdate("pl:a"));
     expect(box.sent).toHaveLength(0); // erst die Rückfrage
     expect(String(calls.filter((c) => c.method === "sendMessage").at(-1)!.payload.text)).toContain(
-      "Wirklich alle 2 Mails",
+      "Alle 2 Mails freigeben?",
     );
     await bot.handleUpdate(callbackUpdate("pl:A"));
+    // Nichts sofort: eingeplant ab 08:00 (NOW ist 06:00), mit Abstand
+    expect(box.sent).toHaveLength(0);
+    expect(
+      calls.some(
+        (c) =>
+          c.method === "editMessageText" &&
+          String(c.payload.text).includes("2 Mails eingeplant. Die erste geht um 08:00 Uhr raus"),
+      ),
+    ).toBe(true);
+    const queued = await planItems(db(), date);
+    expect(queued.every((i) => i.status === "queued")).toBe(true);
+    const [t1, t2] = queued.map((i) => i.send_after!.getTime()).sort();
+    expect(t1).toBe(Date.parse("2026-10-05T06:00:00Z"));
+    expect((t2! - t1!) / 60_000).toBeGreaterThanOrEqual(5);
+    expect((t2! - t1!) / 60_000).toBeLessThanOrEqual(15);
+
+    // Der Sweep schickt jeweils die nächste fällige.
+    const notes: string[] = [];
+    const deps = (at: Date) => ({
+      db: db(),
+      mailbox: box,
+      mail: { ...mail, max_per_day: 50 },
+      now: () => at,
+      followUpDays: 5,
+      notify: (t: string) => Promise.resolve(void notes.push(t)),
+    });
+    expect(await sendNextQueued(deps(NOW))).toBe("idle");
+    expect(await sendNextQueued(deps(new Date(t1!)))).toBe("sent");
+    expect(await sendNextQueued(deps(new Date(t1!)))).toBe("idle"); // die zweite ist noch nicht dran
+    expect(await sendNextQueued(deps(new Date(t2!)))).toBe("sent");
     expect(box.sent).toHaveLength(2);
     expect((await planItems(db(), date)).every((i) => i.status === "done")).toBe(true);
+    expect(notes).toEqual(["📤 Alle eingeplanten Mails sind raus. Antworten melde ich dir hier."]);
+  });
+
+  it("Verteilt senden: Tageslimit stoppt und gibt den Rest zurück ins Paket", async () => {
+    await db().query("update companies set status = 'LOST'");
+    await db().query("delete from outreach_plan");
+    const date = "2026-10-05";
+    const box = fakeMailbox();
+    for (const c of [await lead(), await lead(), await lead()]) {
+      const d = await emailDraft(c);
+      await db().query(
+        "insert into outreach_plan (plan_date, company_id, kind, channel, draft_id, position) values ($1, $2, 'new', 'email', $3, 1)",
+        [date, c.id, d.id],
+      );
+    }
+    const at = new Date("2026-10-05T08:00:00Z");
+    expect((await queuePlanMails(db(), date, at, mail.verteilt, () => 0)).count).toBe(3);
+    const notes: string[] = [];
+    const late = new Date("2026-10-05T12:00:00Z");
+    const limit = (await sentToday(db(), late)) + 1; // genau eine geht noch
+    const deps = (t: Date) => ({
+      db: db(),
+      mailbox: box,
+      mail: { ...mail, max_per_day: limit },
+      now: () => t,
+      followUpDays: 5,
+      notify: (x: string) => Promise.resolve(void notes.push(x)),
+    });
+    expect(await sendNextQueued(deps(late))).toBe("sent");
+    expect(await sendNextQueued(deps(late))).toBe("problem");
+    expect(box.sent).toHaveLength(1);
+    expect(notes.at(-1)).toContain(`Tageslimit erreicht (${limit} neue Mails). 2 Mails bleiben offen`);
+    expect((await planItems(db(), date)).map((i) => i.status).sort()).toEqual(["done", "ready", "ready"]);
   });
 
   it("Nachtsuche: nächste offene Kombination, eine je Nacht, nie zwei gleichzeitig", async () => {
@@ -721,7 +821,10 @@ describeDb("Morgen-Paket mit Datenbank", () => {
     const result = await buildDailyPlan({
       db: db(),
       now: () => NOW,
-      config: { ...config({ start: 5 }), briefe: { pro_tag: 0, ab_score: 80, nachfassen_nach_tagen: 7 } },
+      config: {
+        ...config({ stufen: [{ ab_tag: 0, pro_tag: 5 }] }),
+        briefe: { pro_tag: 0, ab_score: 80, nachfassen_nach_tagen: 7 },
+      },
       letter: {
         db: db(),
         llm,

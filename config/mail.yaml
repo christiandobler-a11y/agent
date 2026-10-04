@@ -24,6 +24,13 @@ providers:
     append_sent: true
 
 # Sicherheitsgrenze: mehr neue Mails (ohne Nachfassen) gehen an einem Tag nicht raus, egal was der Plan sagt.
-max_per_day: 40
+max_per_day: 45
+# "Alle senden" im Morgen-Paket (04.10.2026): Avelio verschickt die freigegebenen Mails einzeln über den Tag verteilt,
+# mit zufälligem Abstand, nur zwischen `von` und `bis` (Mo bis Fr). Wirkt wie normales Schreiben statt Massenversand.
+verteilt:
+  abstand_min: 5 # Minuten
+  abstand_max: 15
+  von: "08:00"
+  bis: "18:00"
 # Nur Antworten auf Mails der letzten so vielen Tage zuordnen.
 reply_window_days: 60

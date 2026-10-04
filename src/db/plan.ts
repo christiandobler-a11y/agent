@@ -4,7 +4,7 @@ import type { DbClient } from "./client.js";
 
 export type PlanKind = "new" | "followup";
 export type PlanChannel = "email" | "letter";
-export type PlanStatus = "ready" | "done" | "later" | "dropped";
+export type PlanStatus = "ready" | "queued" | "done" | "later" | "dropped";
 
 export interface PlanItem {
   id: string;
@@ -16,6 +16,7 @@ export interface PlanItem {
   status: PlanStatus;
   position: number;
   done_at: Date | null;
+  send_after: Date | null;
 }
 
 export interface PlanItemWithCompany extends PlanItem {

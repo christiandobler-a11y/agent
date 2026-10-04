@@ -19,7 +19,7 @@ import type { Notifier, RunSummary, TopLead } from "./notifier.js";
 import { dueReminders, markNotified } from "../db/crm.js";
 import { isQuietTime, loadCrmConfig, type CrmConfig } from "../crm/status.js";
 import { claimState } from "../db/appState.js";
-import { autopilotTick, mailTick } from "../autopilot/schedule.js";
+import { autopilotTick, mailTick, queueTick } from "../autopilot/schedule.js";
 import type { AutopilotConfig, PlanDeps } from "../autopilot/plan.js";
 import type { MailConfig, Mailbox } from "../outreach/mail.js";
 import { cleanupPrototypes, loadPrototypeConfig } from "../prototype/run.js";
@@ -384,6 +384,15 @@ export async function sweep(ctx: PipelineContext): Promise<void> {
   await autopilotTick(ctx).catch((err: unknown) =>
     console.error(
       JSON.stringify({ level: "error", msg: "Morgen-Paket-Takt fehlgeschlagen", error: String(err) }),
+    ),
+  );
+  await queueTick(ctx).catch((err: unknown) =>
+    console.error(
+      JSON.stringify({
+        level: "error",
+        msg: "Verteilt senden fehlgeschlagen",
+        error: err instanceof Error ? err.message : String(err),
+      }),
     ),
   );
   await mailTick(ctx).catch((err: unknown) =>

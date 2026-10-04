@@ -16,11 +16,12 @@ import {
   type PlanCounts,
   type PlanItemWithCompany,
 } from "../db/plan.js";
-import { berlinDate } from "../autopilot/plan.js";
+import { berlinDate, berlinTime } from "../autopilot/plan.js";
 import { draftEmail, type OutreachDeps } from "../outreach/draft.js";
 import { draftLetter, type LetterDeps } from "../outreach/letter.js";
 import type { MailConfig, Mailbox } from "../outreach/mail.js";
 import { createConfirmDraft, icsInvite, terminLabel } from "../outreach/confirm.js";
+import { queuePlanMails } from "../outreach/queue.js";
 import { sendDraft } from "../outreach/send.js";
 import { gameState } from "../game/xp.js";
 import { callbackData, escapeHtml } from "./format.js";
@@ -100,7 +101,8 @@ export function planHeaderKeyboard(counts: PlanCounts, canSend = false): InlineK
   const mails = counts.email.total - counts.email.done + counts.followup.total - counts.followup.done;
   const rows: InlineKeyboardButton[][] = [];
   if (open > 0) rows.push([{ text: "▶️ Weiter", callback_data: planCallback({ kind: "next" }) }]);
-  if (canSend && mails > 1) rows.push([{ text: `📤 Alle ${mails} Mails senden`, callback_data: "pl:a" }]);
+  if (canSend && mails > 1)
+    rows.push([{ text: `📤 Alle ${mails} Mails verteilt senden`, callback_data: "pl:a" }]);
   return rows;
 }
 
@@ -440,7 +442,7 @@ export async function handlePlanCallback(ctx: Context, deps: PlanBotDeps, by: st
     }
     return true;
   }
-  // Alle offenen Mails auf einmal (mit Rückfrage).
+  // Alle offenen Mails freigeben (mit Rückfrage); Avelio verschickt sie verteilt über den Tag (src/outreach/queue.ts).
   if (data === "pl:a" || data === "pl:A" || data === "pl:x") {
     await ctx.answerCallbackQuery();
     const date = berlinDate(now);
@@ -449,14 +451,15 @@ export async function handlePlanCallback(ctx: Context, deps: PlanBotDeps, by: st
       await ctx.editMessageText("Abgebrochen, nichts gesendet.").catch(() => undefined);
       return true;
     }
+    const w = deps.mail.verteilt;
     if (data === "pl:a") {
       await ctx.reply(
-        `Wirklich alle ${open.length} Mails jetzt senden? Jede geht einzeln über dein Postfach raus, Befund-Seiten bleiben offen.`,
+        `Alle ${open.length} Mails freigeben? Avelio schickt sie einzeln über dein Postfach, verteilt über den Tag (alle ${w.abstand_min} bis ${w.abstand_max} Minuten, Mo bis Fr ${w.von} bis ${w.bis} Uhr). Befund-Seiten bleiben offen.`,
         {
           reply_markup: {
             inline_keyboard: [
               [
-                { text: `✅ Ja, alle ${open.length} senden`, callback_data: "pl:A" },
+                { text: `✅ Ja, alle ${open.length} freigeben`, callback_data: "pl:A" },
                 { text: "Abbrechen", callback_data: "pl:x" },
               ],
             ],
@@ -466,38 +469,21 @@ export async function handlePlanCallback(ctx: Context, deps: PlanBotDeps, by: st
       return true;
     }
     if (!deps.mailbox) return true;
-    let sent = 0;
-    const problems: string[] = [];
-    for (const item of open) {
-      if (!item.draft_id) continue;
-      const r = await sendDraft(
-        { db, mailbox: deps.mailbox, mail: deps.mail, now: deps.now, followUpDays: deps.followUpDays },
-        item.draft_id,
-        by,
-      ).catch((err: unknown) => ({
-        kind: "error" as const,
-        message: err instanceof Error ? err.message : String(err),
-      }));
-      if (r.kind === "sent" || r.kind === "already_sent") {
-        await setPlanStatus(db, item.id, "done", now);
-        if (r.kind === "sent") sent++;
-      } else if (r.kind === "limit") {
-        problems.push(`Tageslimit erreicht (${r.max}), Rest bleibt offen`);
-        break;
-      } else {
-        problems.push(
-          `${item.company_name}: ${r.kind === "error" ? r.message.slice(0, 80) : "keine Adresse"}`,
-        );
-      }
+    const q = await queuePlanMails(db, date, now, w);
+    if (q.count === 0) {
+      await ctx
+        .editMessageText("Keine offenen Mails mehr, alles schon eingeplant oder gesendet.")
+        .catch(() => undefined);
+      return true;
     }
-    const p = sent > 0 ? await progress(ctx, deps) : null;
+    const hm = (d: Date) => berlinTime(d);
+    const sameDay = berlinDate(q.last!) === date;
     await ctx
       .editMessageText(
-        `📤 ${sent} Mails gesendet${xpSuffix(p)}.${problems.length ? `\n⚠️ ${problems.join("\n⚠️ ")}` : ""}`,
+        `📤 ${q.count} Mails eingeplant. Die erste geht um ${hm(q.first!)} Uhr raus, die letzte ${sameDay ? "" : "am nächsten Werktag "}gegen ${hm(q.last!)} Uhr. Ich melde mich, wenn alle raus sind.`,
       )
       .catch(() => undefined);
     await refreshHeader(ctx.api, db, date, true);
-    await showNext(ctx, deps);
     return true;
   }
   const cb = data ? parsePlanCallback(data) : null;

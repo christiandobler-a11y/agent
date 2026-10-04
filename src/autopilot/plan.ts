@@ -23,10 +23,15 @@ const hm = z.string().regex(/^\d{2}:\d{2}$/);
 export const autopilotConfigSchema = z.object({
   zeiten: z.object({ vorbereiten: hm, morgens: hm, abends: hm }),
   neue_kontakte: z.object({
-    start: z.number().int().min(0),
-    spaeter: z.number().int().min(0),
-    steigern_nach_tagen: z.number().int().min(0),
+    stufen: z.array(z.object({ ab_tag: z.number().int().min(0), pro_tag: z.number().int().min(0) })).min(1),
     nur_werktags: z.boolean(),
+    bremse: z
+      .object({
+        quote: z.number().min(0).max(1),
+        mindestens: z.number().int().min(1),
+        tage: z.number().int().min(1),
+      })
+      .default({ quote: 0.05, mindestens: 20, tage: 7 }),
   }),
   briefe: z.object({
     pro_tag: z.number().int().min(0),
@@ -94,13 +99,40 @@ export function isWeekday(d: Date): boolean {
   return !["Sat", "Sun"].includes(day);
 }
 
-/** Wie viele neue Kontakte heute: Start-Menge, nach `steigern_nach_tagen` seit der ersten Mail die spätere. */
-export function dailyNewCount(config: AutopilotConfig, now: Date, firstSentAt: Date | null): number {
+/**
+ * Wie viele neue Kontakte heute: Stufe nach Tagen seit der ersten gesendeten Mail (Aufwärmen der Adresse). Kamen
+ * zuletzt zu viele Mails als unzustellbar zurück (`bremse`), eine Stufe tiefer.
+ */
+export function dailyNewCount(
+  config: AutopilotConfig,
+  now: Date,
+  firstSentAt: Date | null,
+  bounces: { sent: number; bounced: number } = { sent: 0, bounced: 0 },
+): { count: number; braked: boolean } {
   const n = config.neue_kontakte;
-  if (n.nur_werktags && !isWeekday(now)) return 0;
-  if (!firstSentAt) return n.start;
-  const days = (now.getTime() - firstSentAt.getTime()) / 86_400_000;
-  return days >= n.steigern_nach_tagen ? n.spaeter : n.start;
+  if (n.nur_werktags && !isWeekday(now)) return { count: 0, braked: false };
+  const stages = [...n.stufen].sort((a, b) => a.ab_tag - b.ab_tag);
+  const days = firstSentAt ? (now.getTime() - firstSentAt.getTime()) / 86_400_000 : 0;
+  let stage = 0;
+  stages.forEach((s, i) => {
+    if (days >= s.ab_tag) stage = i;
+  });
+  const braked =
+    bounces.sent >= n.bremse.mindestens && bounces.bounced / bounces.sent > n.bremse.quote && stage > 0;
+  return { count: stages[braked ? stage - 1 : stage]!.pro_tag, braked };
+}
+
+/** Gesendete neue Mails und davon unzustellbare in den letzten `days` Tagen. */
+async function recentBounces(db: Db, now: Date, days: number): Promise<{ sent: number; bounced: number }> {
+  const { rows } = await db.query<{ sent: number; bounced: number }>(
+    `select count(*)::int as sent, count(*) filter (where meta ? 'bounced_at')::int as bounced
+       from interactions
+      where type = 'draft' and channel = 'email' and meta ? 'sent_at'
+        and coalesce((meta->>'follow_up')::boolean, false) = false
+        and (meta->>'sent_at')::timestamptz > $1::timestamptz - make_interval(days => $2)`,
+    [now, days],
+  );
+  return rows[0] ?? { sent: 0, bounced: 0 };
 }
 
 /** Kanal je Lead: Brief für die stärksten (solange Platz) und für Leads ohne Mail; sonst Mail; sonst nichts. */
@@ -243,7 +275,12 @@ export async function buildDailyPlan(deps: PlanDeps, by = "autopilot"): Promise<
     }
 
     // 2. Neue Leads.
-    const target = dailyNewCount(config, now, await firstSentAt(db));
+    const bounces = await recentBounces(db, now, config.neue_kontakte.bremse.tage);
+    const { count: target, braked } = dailyNewCount(config, now, await firstSentAt(db), bounces);
+    if (braked)
+      result.warnings.push(
+        `Bremse: ${bounces.bounced} von ${bounces.sent} Mails der letzten ${config.neue_kontakte.bremse.tage} Tage waren unzustellbar, heute nur ${target} neue`,
+      );
     const already = (await planItems(db, date)).filter((i) => i.kind === "new").length;
     let lettersLeft = config.briefe.pro_tag;
     for (const company of await candidates(db, date, Math.max(0, target - already) * 3)) {

@@ -40,6 +40,8 @@ export interface Notifier {
   eveningSummary?(summary: EveningSummary): Promise<void>;
   /** Antwort erkannt oder Mail unzustellbar. */
   mailEvent?(event: MailEvent): Promise<void>;
+  /** Kurze Statusmeldung als reiner Text (z. B. verteilt gesendete Mails sind raus). */
+  info?(text: string): Promise<void>;
 }
 
 export type DueReminder = Interaction & { company_name: string };

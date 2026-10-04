@@ -5,11 +5,17 @@ zeiten:
   morgens: "07:00" # Telegram-Nachricht "Heute: …"
   abends: "19:00" # kurze Bilanz des Tages
 
+# 04.10.2026 (Christian: mehr als 15, aber nicht im Spam landen): Die neue Adresse wird langsam aufgewärmt.
+# Stufen nach Tagen seit der ersten gesendeten Mail; Spamfilter gewöhnen sich an den Absender.
 neue_kontakte:
-  start: 15 # neue Leads pro Tag in den ersten Wochen
-  spaeter: 30 # danach, wenn nichts zurückkommt (Spamfilter gewöhnen sich an den Absender)
-  steigern_nach_tagen: 14 # Tage seit der ersten gesendeten Mail
+  stufen:
+    - { ab_tag: 0, pro_tag: 20 }
+    - { ab_tag: 7, pro_tag: 30 }
+    - { ab_tag: 14, pro_tag: 45 }
   nur_werktags: true # Mo bis Fr; am Wochenende nur Nachfassen
+  # Bremse: Kommen in den letzten `tage` Tagen mehr als `quote` der Mails als unzustellbar zurück (ab `mindestens`
+  # gesendeten), geht es eine Stufe zurück und der Morgenbericht sagt es. Unzustellbare schaden dem Ruf am meisten.
+  bremse: { quote: 0.05, mindestens: 20, tage: 7 }
 # Befund-Seiten (Briefe), 04.10.2026 (Christian): Erstkontakt nur noch per Mail. Briefe gibt es für Leads ohne
 # erreichbare Mail-Adresse und als zweites Nachfassen für sehr gute Leads (ab_score), wenn auch die Nachfass-Mail
 # nach `nachfassen_nach_tagen` Tagen unbeantwortet blieb. Höchstens `pro_tag` je Tag.

@@ -99,7 +99,10 @@ ausprobieren kann. Nach Schritt 6 ist ein Abstimmungstermin (Kalibrierung) vorge
 - **Morgen-Paket** (`src/autopilot/`, `config/autopilot.yaml`, Tabelle `outreach_plan`): Sweep stößt um `vorbereiten`
   den Job `daily-plan` an (Nachfassen, dann neue Leads: Prototyp, Mail oder Befund-Seite), meldet ab `morgens` in
   Telegram von selbst (Kopf mit Nachtbericht und gleich die erste Karte, `sendMorning`; `/heute` holt es erneut),
-  abends Bilanz. Jeder Schritt einmal je Tag über `claimState`. **Nachtsuche** (`src/autopilot/search.ts`): ab
+  abends Bilanz. Jeder Schritt einmal je Tag über `claimState`. Menge neuer Kontakte in Stufen zum Aufwärmen der
+  Adresse (`neue_kontakte.stufen`, Bremse bei Unzustellbaren). „Alle verteilt senden“ plant die Mails ein (Status
+  `queued`, `send_after`, `config/mail.yaml → verteilt`), der Sweep schickt je Takt die nächste fällige
+  (`src/outreach/queue.ts`). **Nachtsuche** (`src/autopilot/search.ts`): ab
   `suche.ab` die nächste nicht vollständig abgesuchte Kombination Region × Branche als Komplett-Suche
   (`requested_by = 'autopilot'`, keine Einzelmeldung in der Nacht), höchstens `pro_nacht`, nie zwei gleichzeitig.
 - **Spiel** (`src/game/xp.ts`, `config/game.yaml`, Telegram `/level`, `src/telegram/game.ts`): XP, Level und Abzeichen

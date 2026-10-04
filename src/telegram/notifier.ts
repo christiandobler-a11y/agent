@@ -86,6 +86,9 @@ export function telegramNotifier(
         : "";
       await sendAll(targets(), eveningSummaryText(s) + game);
     },
+    async info(text) {
+      await sendAll(targets(), escapeHtml(text));
+    },
     async mailEvent(e) {
       const { text, keyboard } = mailEventMessage(e);
       await sendAll(targets(), text, keyboard);

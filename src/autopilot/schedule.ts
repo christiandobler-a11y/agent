@@ -1,6 +1,8 @@
 import { claimState, getState, setState } from "../db/appState.js";
 import { countPlan, planItems, type PlanCounts } from "../db/plan.js";
 import { gameState, gameStats, loadGameConfig, xpOf, type GameState } from "../game/xp.js";
+import { loadCrmConfig } from "../crm/status.js";
+import { sendNextQueued } from "../outreach/queue.js";
 import { checkReplies } from "../outreach/send.js";
 import { PLAN_QUEUE } from "../queue/boss.js";
 import type { PipelineContext } from "../queue/pipeline.js";
@@ -134,6 +136,20 @@ export async function mailTick(ctx: PipelineContext): Promise<void> {
     mailbox: ctx.mailbox,
     mail: ctx.mail,
     now: ctx.now,
+    ...(notify ? { notify } : {}),
+  });
+}
+
+/** Verteilt senden: die nächste fällige eingeplante Mail verschicken (src/outreach/queue.ts). */
+export async function queueTick(ctx: PipelineContext): Promise<void> {
+  if (!ctx.mailbox || !ctx.mail) return;
+  const notify = ctx.notifier.info?.bind(ctx.notifier);
+  await sendNextQueued({
+    db: ctx.db,
+    mailbox: ctx.mailbox,
+    mail: ctx.mail,
+    now: ctx.now,
+    followUpDays: (ctx.crm ?? loadCrmConfig()).follow_up_days,
     ...(notify ? { notify } : {}),
   });
 }
