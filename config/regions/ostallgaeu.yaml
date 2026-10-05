@@ -1,0 +1,21 @@
+# Landkreis Ostallgäu mit Kaufbeuren (05.10.2026, Christian: erst die Gegend um Peißenberg, Schongau grenzt an).
+# Ortsmitten gerundet, größere Orte zuerst. Zugehörigkeit siehe config/regions/rosenheim.yaml.
+name: Landkreis Ostallgäu
+admin_areas: [Ostallgäu, Kaufbeuren, Kreisfreie Stadt Kaufbeuren]
+search_radius_km: 5
+fallback_max_km: 8
+tiles:
+  - { name: Kaufbeuren, lat: 47.88, lng: 10.622 }
+  - { name: Füssen, lat: 47.57, lng: 10.7 }
+  - { name: Marktoberdorf, lat: 47.778, lng: 10.617 }
+  - { name: Buchloe, lat: 48.033, lng: 10.725 }
+  - { name: Schwangau, lat: 47.577, lng: 10.74 }
+  - { name: Pfronten, lat: 47.583, lng: 10.56 }
+  - { name: Lechbruck am See, lat: 47.7, lng: 10.8 }
+  - { name: Roßhaupten, lat: 47.65, lng: 10.72 }
+  - { name: Obergünzburg, lat: 47.846, lng: 10.419 }
+  - { name: Nesselwang, lat: 47.623, lng: 10.5 }
+  - { name: Seeg, lat: 47.653, lng: 10.608 }
+  - { name: Halblech, lat: 47.637, lng: 10.823 }
+  - { name: Bidingen, lat: 47.83, lng: 10.73 }
+  - { name: Waal, lat: 48.0, lng: 10.78 }

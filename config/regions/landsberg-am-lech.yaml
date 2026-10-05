@@ -1,0 +1,22 @@
+# Landkreis Landsberg am Lech (05.10.2026, Christian: erst die Gegend um Peißenberg). Ortsmitten gerundet, größere
+# Orte zuerst. Zugehörigkeit siehe config/regions/rosenheim.yaml.
+name: Landkreis Landsberg am Lech
+admin_areas: [Landsberg am Lech]
+search_radius_km: 5
+fallback_max_km: 8
+tiles:
+  - { name: Landsberg am Lech, lat: 48.048, lng: 10.882 }
+  - { name: Kaufering, lat: 48.09, lng: 10.877 }
+  - { name: Dießen am Ammersee, lat: 47.953, lng: 11.101 }
+  - { name: Utting am Ammersee, lat: 48.026, lng: 11.087 }
+  - { name: Schondorf am Ammersee, lat: 48.053, lng: 11.09 }
+  - { name: Geltendorf, lat: 48.117, lng: 11.033 }
+  - { name: Penzing, lat: 48.073, lng: 10.929 }
+  - { name: Fuchstal, lat: 47.93, lng: 10.83 }
+  - { name: Denklingen, lat: 47.917, lng: 10.854 }
+  - { name: Igling, lat: 48.072, lng: 10.808 }
+  - { name: Weil, lat: 48.117, lng: 10.92 }
+  - { name: Scheuring, lat: 48.17, lng: 10.895 }
+  - { name: Prittriching, lat: 48.2, lng: 10.92 }
+  - { name: Eresing, lat: 48.088, lng: 11.022 }
+  - { name: Hofstetten, lat: 47.997, lng: 10.968 }
