@@ -15,7 +15,7 @@ describe("Fotos aus dem Google-Profil (rein)", () => {
     expect(isOwnerPhoto(undefined, "Physiotherapie Lorre")).toBe(false);
   });
 
-  it("eigene, große Fotos aus der Liste; höchstens zwei", () => {
+  it("eigene, große Fotos aus der Liste; höchstens drei", () => {
     const photo = (name: string, author: string, w = 1600, h = 1066) => ({
       name,
       widthPx: w,
@@ -35,7 +35,7 @@ describe("Fotos aus dem Google-Profil (rein)", () => {
       },
       "Physiotherapie Lorre",
     );
-    expect(refs.map((r) => r.name)).toEqual(["p/2", "p/5"]);
+    expect(refs.map((r) => r.name)).toEqual(["p/2", "p/5", "p/6"]);
     expect(ownerPhotos({}, "X")).toEqual([]);
   });
 });

@@ -319,7 +319,7 @@ describeDb("Hero-Foto mit Datenbank", () => {
     expect(await teaserLook(db(), company.id)).toMatchObject({
       foto: "praxis",
       farbe: "logo", // Logo hat Vorrang vor dem Foto
-      primary: r.palette!.primary,
+      primary: r.logoPalette!.primary,
     });
 
     // Kein passendes Foto: Stockfoto, Ergebnis gemerkt.
