@@ -425,7 +425,8 @@ export async function draftEmail(
         lowerFirst(inForm(call.nach_anruf.sie, call.nach_anruf.du)),
         upperFirst(clean.text),
         ...(imageSentence ? [imageSentence] : []),
-        ...(previewUrl ? [inForm(call.link_satz.sie, call.link_satz.du).replace("{link}", previewUrl)] : []),
+        // Kein Link zur Vorschau-Seite (06.10.2026, Christian): die gibt es erst, wenn die Praxis auf die Skizze
+        // antwortet. Der Schluss bietet sie an.
         inForm(call.abschluss.sie, call.abschluss.du),
       ]
     : [

@@ -234,6 +234,8 @@ export async function prepareVisuals(
   company: Company,
   by: string,
   warnings: string[] = [],
+  /** Nur das Vorschau-Bild (Mail nach dem Ja; die Vorschau-Seite kommt erst nach der Antwort der Praxis). */
+  teaserOnly = false,
 ): Promise<number> {
   let built = 0;
   const teaser = usesTeaser(deps.teaser, company);
@@ -246,6 +248,7 @@ export async function prepareVisuals(
     }
   }
   if (
+    !(teaserOnly && teaser) &&
     deps.prototype &&
     deps.config.prototyp_fuer_neue &&
     company.segment !== "NO_WEBSITE" &&

@@ -289,7 +289,8 @@ describeDb("E-Mail-Entwurf (Datenbank)", () => {
     expect(d.body).toMatch(
       /^Grüß Gott, Frau Huber,\n\nwie telefonisch besprochen, hier mein Vorschlag für Ihre Praxis\.\n\nAuf Ihrer jetzigen Seite ist mir aufgefallen/,
     );
-    expect(d.body).toContain("antworten Sie einfach kurz auf diese Mail.");
+    expect(d.body).toContain("Wenn Ihnen die Richtung gefällt, sagen Sie kurz Bescheid");
+    expect(d.body).not.toContain("Die ganze Seite");
     expect(d.body).not.toContain("Video-Call");
     expect(d.body).not.toContain("aus dem Impressum");
     expect(d.body).toContain("Eine kurze Antwort genügt, dann melde ich mich nicht mehr.");

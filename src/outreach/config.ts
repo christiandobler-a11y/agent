@@ -40,7 +40,6 @@ export const outreachConfigSchema = z.object({
         .array(z.object({ bis: z.string().regex(/^\d\d:\d\d$/), text: z.string() }))
         .default([{ bis: "24:00", text: "Grüß Gott" }]),
       nach_anruf: z.object({ sie: z.string(), du: z.string() }),
-      link_satz: z.object({ sie: z.string(), du: z.string() }),
       abschluss: z.object({ sie: z.string(), du: z.string() }),
       // Versand nach dem Ja: so viele Minuten später (zufällig dazwischen), damit die Mail nicht vorgefertigt wirkt.
       verzoegerung_min: z.tuple([z.number().min(0), z.number().min(0)]).default([5, 10]),

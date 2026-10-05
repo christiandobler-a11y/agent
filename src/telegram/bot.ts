@@ -380,7 +380,7 @@ export function createBot(options: BotOptions): AvelioBot {
                       callGoal: config.anrufe.ziel_ja,
                       // Nach dem Ja: Vorschau-Bild und Vorschau-Seite bauen, bevor die Mail geschrieben wird.
                       beforeMail: async (company: Company) => {
-                        await prepareVisuals(ap.planDeps(), company, "telegram");
+                        await prepareVisuals(ap.planDeps(), company, "telegram", [], true);
                       },
                       // Karten aufgebraucht, Ziel noch nicht erreicht: nachlegen (nur Karten, das geht schnell).
                       refill: async () => {

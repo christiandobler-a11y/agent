@@ -42,12 +42,10 @@ anruf:
   nach_anruf:
     sie: wie telefonisch besprochen, hier mein Vorschlag für Ihre Praxis.
     du: wie telefonisch besprochen, hier mein Vorschlag für deine Praxis.
-  link_satz:
-    sie: "Die ganze Seite können Sie sich hier in Ruhe anschauen: {link}"
-    du: "Die ganze Seite kannst du dir hier in Ruhe anschauen: {link}"
+  # Die Vorschau-Seite gibt es erst, wenn die Praxis auf die Skizze antwortet (06.10.2026, Christian).
   abschluss:
-    sie: Schauen Sie gern rein, wann es Ihnen passt. Wenn Ihnen etwas gefällt oder Sie Fragen haben, antworten Sie einfach kurz auf diese Mail.
-    du: Schau gern rein, wann es dir passt. Wenn dir etwas gefällt oder du Fragen hast, antworte einfach kurz auf diese Mail.
+    sie: Das ist ein erster Eindruck. Wenn Ihnen die Richtung gefällt, sagen Sie kurz Bescheid, dann baue ich daraus eine richtige Vorschau-Seite, die Sie sich in Ruhe anschauen können. Und wenn nicht, ist das natürlich auch völlig in Ordnung.
+    du: Das ist ein erster Eindruck. Wenn dir die Richtung gefällt, sag kurz Bescheid, dann bau ich daraus eine richtige Vorschau-Seite, die du dir in Ruhe anschauen kannst. Und wenn nicht, ist das natürlich auch völlig in Ordnung.
   # Versand nach dem Ja mit Knopf "In 5–10 Minuten senden": zufällige Verzögerung in Minuten (von, bis), damit die Mail
   # nicht vorgefertigt wirkt.
   verzoegerung_min: [5, 10]
