@@ -50,6 +50,9 @@ const configSchema = z.object({
       // Echte Bewertungstexte und Öffnungszeiten von Google (Place Details, ca. 2,5 Cent je Praxis). Aus: nur Note
       // und Anzahl aus der Suche (kostenlos).
       google_details: z.boolean().default(false),
+      // Eigenes Foto von der Website der Praxis als Hero, Farben daraus (heroPhoto.ts, ca. 1 Cent je Praxis).
+      eigenes_foto: z.boolean().default(false),
+      foto_dir: z.string().default("data/heroes"),
     })
     .default({
       dir: "data/teasers",
@@ -59,6 +62,8 @@ const configSchema = z.object({
       foto: null,
       farbe: "petrol",
       google_details: false,
+      eigenes_foto: false,
+      foto_dir: "data/heroes",
     }),
 });
 export type PrototypeConfig = z.infer<typeof configSchema>;

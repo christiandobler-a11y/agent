@@ -10,7 +10,7 @@ import type { Branches } from "../pipeline/research/branches.js";
 import type { OutreachConfig } from "./config.js";
 import { proposeSlots, seedOf } from "./slots.js";
 import { duToIhr, lowerFirst, subjectFor, type Form } from "./form.js";
-import { teaserExists, teaserName, teaserPath } from "../prototype/teaser.js";
+import { teaserExists, teaserLook, teaserName, teaserPath } from "../prototype/teaser.js";
 import { personFromCompanyName, personInCompanyName, salutationFromFirstName } from "./names.js";
 
 /**
@@ -421,7 +421,9 @@ export async function draftEmail(
       prompt: CONTACT_PROMPT_VERSION,
       variant,
       preview_url: previewUrl,
-      ...(teaser ? { teaser, teaser_after: draftSentence } : {}),
+      ...(teaser
+        ? { teaser, teaser_after: draftSentence, teaser_look: await teaserLook(db, company.id) }
+        : {}),
     },
     by,
     now,

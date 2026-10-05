@@ -1,4 +1,5 @@
 import { Bot, InputFile, type Context } from "grammy";
+import { heroForCompany } from "../prototype/heroPhoto.js";
 import type { UserFromGetMe } from "grammy/types";
 import { getState, setState } from "../db/appState.js";
 import { setRating } from "../db/calibration.js";
@@ -412,6 +413,13 @@ export function createBot(options: BotOptions): AvelioBot {
                     budget: pipeline.budget,
                     apiKey: options.prototype?.googleApiKey,
                   }),
+              hero: teaserConfig.eigenes_foto
+                ? (company) =>
+                    heroForCompany(
+                      { db: pipeline.db, llm: options.manager.llm, dir: teaserConfig.foto_dir },
+                      company,
+                    )
+                : null,
             },
           },
           company,

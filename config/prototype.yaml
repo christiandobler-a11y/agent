@@ -40,3 +40,9 @@ teaser:
   # Echte Bewertungstexte und Öffnungszeiten von Google (ca. 2,5 Cent je Praxis). Aus (Christian, 04.10.2026): auf dem
   # Handy stehen dann Note und Anzahl der Bewertungen, beides echt und kostenlos.
   google_details: false
+  # Eigenes Foto (05.10.2026, Christian: "bringt mehr Nähe als ein generisches Bild"): Avelio sucht auf der Startseite
+  # der Praxis große Fotos, prüft sie per Regeln und lässt das Modell (Rolle hero) das passende wählen (ca. 1 Cent je
+  # Praxis, einmal je Praxis). Die Farben der Seite kommen dann aus dem Foto (src/prototype/colors.ts). Passt keins,
+  # bleiben Stockfoto und `farbe`.
+  eigenes_foto: true
+  foto_dir: data/heroes

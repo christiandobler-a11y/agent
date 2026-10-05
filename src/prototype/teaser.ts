@@ -6,10 +6,13 @@ import { join } from "node:path";
 import { fileURLToPath, pathToFileURL } from "node:url";
 import { chromium } from "playwright";
 import sharp from "sharp";
+import { getState, setState } from "../db/appState.js";
 import type { DbClient } from "../db/client.js";
 import type { Company } from "../db/companies.js";
 import { latestAudit, latestPlacesSnapshot } from "../db/leads.js";
 import { seedOf } from "../outreach/slots.js";
+import type { HeroPalette } from "./colors.js";
+import type { HeroResult } from "./heroPhoto.js";
 import type { PlaceDetails } from "./placeDetails.js";
 
 /**
@@ -39,6 +42,10 @@ export interface TeaserData {
   photo?: string | null;
   /** Farbwelt des Stils "vital" (VITAL_PALETTES), Standard petrol. */
   palette?: string | null;
+  /** Eigenes Foto von der Website der Praxis (heroPhoto.ts); ersetzt das Stockfoto. */
+  hero?: { file: string; position: string } | null;
+  /** Farbwelt aus dem eigenen Foto (colors.ts); hat Vorrang vor `palette`. */
+  colors?: HeroPalette | null;
 }
 
 /**
@@ -121,8 +128,23 @@ export const VITAL_PALETTES = {
 } satisfies Record<string, Palette>;
 export type VitalPalette = keyof typeof VITAL_PALETTES;
 
-const paletteOf = (d: Pick<TeaserData, "palette">): Palette =>
-  (VITAL_PALETTES as Record<string, Palette>)[d.palette ?? "petrol"] ?? VITAL_PALETTES.petrol;
+const paletteOf = (d: Pick<TeaserData, "palette" | "colors">): Palette =>
+  d.colors ?? (VITAL_PALETTES as Record<string, Palette>)[d.palette ?? "petrol"] ?? VITAL_PALETTES.petrol;
+
+/** Hero-Foto: das eigene der Praxis, sonst das Stockfoto. */
+function heroImage(d: TeaserData, assets: TeaserAssets): { src: string; position: string; own: boolean } {
+  if (d.hero) return { src: pathToFileURL(d.hero.file).href, position: d.hero.position, own: true };
+  const p = photoFor(d);
+  return { src: assets.photo(p.file), position: p.position, own: false };
+}
+
+/**
+ * Google-Bewertung als Zeile (05.10.2026, Christian: statt des Stern-Badges, in dem die Zahl gequetscht wirkte).
+ * Weiße Pille mit Google-Logo, fünf Sternen, Note und Anzahl; `size` = Schriftgröße in px.
+ */
+function googleLine(rating: number, count: number, ink: string, size = 17): string {
+  return `<span class="gline" style="display:inline-flex;align-items:center;gap:${Math.round(size * 0.6)}px;background:#fff;color:${ink};border-radius:999px;padding:${Math.round(size * 0.55)}px ${Math.round(size * 1.3)}px ${Math.round(size * 0.55)}px ${Math.round(size * 0.8)}px;box-shadow:0 10px 30px rgba(0,0,0,.18);font-weight:600;font-size:${size}px;line-height:1">${GOOGLE.replace(/width="\d+" height="\d+"/, `width="${Math.round(size * 1.35)}" height="${Math.round(size * 1.35)}"`)}<span style="display:flex;color:#fbbc04">${STAR.replace(/width="16" height="16"/, `width="${size}" height="${size}"`).repeat(5)}</span><b style="font-weight:800">${de(rating)}</b><span style="opacity:.75">${count} Google-Bewertungen</span></span>`;
+}
 
 /** Stockfotos (Unsplash-Lizenz, kommerziell frei, siehe assets/teaser/physio/QUELLEN.md); erstes = Favorit. */
 export const PHYSIO_PHOTOS = [
@@ -726,7 +748,9 @@ const ELEMENTA_THEME: RestTheme = { primary: "#1f2633", accent: "#c48a00", ink: 
 
 function renderVitalRest(d: TeaserData, assets: TeaserAssets, theme: RestTheme = VITAL_THEME): string {
   const { title } = teaserName(d.name, d.city);
-  const photo = photoFor(d);
+  const photo = heroImage(d, assets);
+  // Eigenes Foto der Praxis: auch am Handy oben zeigen (mit Farbschleier), statt der Farbflächen.
+  const showPhoto = theme.stub === "photo" || photo.own;
   const services = teaserServices(d.services);
   const hours = (d.hours ?? []).slice(0, 3);
   const fonts = (
@@ -785,7 +809,7 @@ header{height:56px;display:flex;align-items:center;justify-content:space-between
 .burger::after{content:"";position:absolute;left:0;right:0;top:4px;border-top:2px solid var(--ink)}
 .hero{position:relative;height:120px;overflow:hidden}
 .hero img{position:absolute;inset:0;width:100%;height:100%;object-fit:cover;object-position:${photo.position}}
-.hero::before{content:"";position:absolute;inset:0;z-index:1;background:${theme.stub === "photo" ? (theme.veil ?? "rgba(27,86,95,.74)") : "transparent"}}
+.hero::before{content:"";position:absolute;inset:0;z-index:1;background:${showPhoto ? (theme.veil ?? "rgba(27,86,95,.74)") : "transparent"}}
 .hero .shapes{position:absolute;inset:0;width:100%;height:100%}
 .hero span{position:absolute;z-index:2;left:0;right:0;top:26px;text-align:center;color:#fff;font-family:"Barlow Condensed",sans-serif;font-weight:600;font-size:24px}
 .wave{position:absolute;z-index:3;left:0;right:0;bottom:-1px;width:100%;height:46px}
@@ -822,8 +846,8 @@ h2{font-family:"Barlow Condensed",sans-serif;font-weight:600;font-size:30px;colo
 <div class="status"></div>
 <header><div class="brand"><span class="mark">${esc(monogram(title))}</span><b>${esc(title)}</b></div><span class="burger"></span></header>
 <div class="hero">${
-    theme.stub === "photo"
-      ? `<img src="${assets.photo(photo.file)}" alt="">`
+    showPhoto
+      ? `<img src="${photo.src}" alt="">`
       : `<svg class="shapes" viewBox="0 0 390 120" preserveAspectRatio="none" aria-hidden="true"><rect width="390" height="120" fill="#a9aeb3"/><path d="M0 0H150L0 70Z" fill="${theme.shapeAccent ?? "#ffd24c"}"/><path d="M250 0H390V90Z" fill="${theme.shapeDark ?? "#2b303b"}"/><path d="M390 60V120H200Z" fill="${theme.shapeAccent ?? "#ffd24c"}"/></svg>`
   }<span>Termin vereinbaren</span>
 <svg class="wave" viewBox="0 0 390 46" preserveAspectRatio="none" aria-hidden="true"><path fill="${theme.bg ?? "#fff"}" d="M0 18 C 110 0, 190 46, 300 34 S 370 12, 390 20 L390 46 L0 46 Z"/></svg></div>
@@ -847,14 +871,14 @@ ${statsHtml}
 
 /**
  * Stil "elementa" (04.10.2026, Christians Favorit elementa-therapie.de): geometrische Farbflächen in Gelb, Dunkelblau
- * und Grau, schwebende weiße Kopfleiste, große fette Überschrift, Stern-Badge mit der Google-Note, gelber und weißer
+ * und Grau, schwebende weiße Kopfleiste, große fette Überschrift, Google-Zeile mit Note und Anzahl, gelber und weißer
  * Knopf, Adresse und Telefon, grüner Anruf-Knopf. Das Praxisfoto liegt gedämpft dahinter.
  */
 function renderElementa(d: TeaserData, assets: TeaserAssets): string {
   // Farben aus der Farbwelt (teaser.farbe): Dreiecke in Akzent, Hauptfarbe und Hellgrau.
   const pal = paletteOf(d);
   const { title } = teaserName(d.name, d.city);
-  const photo = photoFor(d);
+  const photo = heroImage(d, assets);
   const city = d.city?.trim() || null;
   const good = d.rating !== null && d.rating >= 4.3 && (d.reviewCount ?? 0) >= 5;
   const fonts = (
@@ -881,8 +905,8 @@ ${fonts}
 *{box-sizing:border-box;margin:0;padding:0}
 html,body{width:1440px;height:900px;overflow:hidden}
 body{position:relative;font-family:Manrope,sans-serif;-webkit-font-smoothing:antialiased;color:${pal.ink};background:#a9aeb3}
-.photo{position:absolute;inset:0;width:100%;height:100%;object-fit:cover;object-position:${photo.position};filter:grayscale(.35)}
-.veil{position:absolute;inset:0;background:${pal.veil};opacity:.85}
+.photo{position:absolute;inset:0;width:100%;height:100%;object-fit:cover;object-position:${photo.position};filter:${photo.own ? "saturate(.9)" : "grayscale(.35)"}}
+.veil{position:absolute;inset:0;background:${pal.veil};opacity:${photo.own ? ".78" : ".85"}}
 .shapes{position:absolute;inset:0;width:100%;height:100%}
 header{position:absolute;z-index:5;top:20px;left:70px;right:70px;height:78px;background:#fff;border-radius:18px;display:flex;align-items:center;justify-content:space-between;padding:0 16px 0 18px;box-shadow:0 10px 30px rgba(0,0,0,.08)}
 .brand{display:flex;align-items:center;gap:12px}
@@ -901,14 +925,12 @@ h2{font-weight:800;font-size:${Math.round(size * 0.62)}px;margin-top:6px}
 .big.y{background:${pal.accent};color:${pal.onAccent ?? "#fff"}}.big.w{background:#fff;color:${pal.ink}}
 .meta{margin-top:30px;font-weight:800;font-size:17px;line-height:1.7}
 .meta div{display:flex;align-items:center;justify-content:center;gap:8px}
-.star{position:absolute;z-index:6;right:150px;top:228px;width:124px;height:124px;transform:rotate(14deg)}
-.star b{position:absolute;left:0;right:0;top:36px;text-align:center;color:${pal.onAccent ?? "#fff"};font-weight:800;font-size:38px}
-.star small{position:absolute;left:0;right:0;top:80px;text-align:center;color:${pal.onAccent ?? "#fff"};font-weight:800;font-size:12px}
+.rate{margin-top:26px}
 .call{position:absolute;z-index:6;right:48px;bottom:48px;width:104px;height:104px;border-radius:50%;background:rgba(80,210,110,.45);display:grid;place-items:center}
 .call i{width:82px;height:82px;border-radius:50%;background:#2fd15a;display:grid;place-items:center}
 </style></head>
 <body>
-<img class="photo" src="${assets.photo(photo.file)}" alt="">
+<img class="photo" src="${photo.src}" alt="">
 <div class="veil"></div>
 <svg class="shapes" viewBox="0 0 1440 900" preserveAspectRatio="none" aria-hidden="true">
   <path d="M0 0H430L0 185Z" fill="${pal.accent}"/>
@@ -920,11 +942,11 @@ h2{font-weight:800;font-size:${Math.round(size * 0.62)}px;margin-top:6px}
   <div class="brand"><span class="ring"><i></i></span><span><b>${esc(title)}</b><small>PHYSIOTHERAPIE</small></span></div>
   <nav><span>Leistungen</span><span>Praxis</span><span>Team</span><span>Kontakt</span><span class="btn dark">Rezept einreichen</span><span class="btn yellow">Termin vereinbaren</span></nav>
 </header>
-${good ? `<div class="star"><svg viewBox="0 0 100 100" width="124" height="124" aria-hidden="true"><path fill="${pal.accent}" d="M50 4l13 30 32 3-24 21 7 32-28-17-28 17 7-32L5 37l32-3z"/></svg><b>${de(d.rating!)}</b><small>Bei Google</small></div>` : ""}
 <div class="center">
   <h1>${esc(title)}</h1>
   ${/physio/i.test(title) && !city ? "" : `<h2>${/physio/i.test(title) ? "" : "Physiotherapie "}${city ? `in ${esc(city)}` : ""}</h2>`}
   <div class="row"><span class="big y">Jetzt Termin vereinbaren</span><span class="big w">Öffnungszeiten</span></div>
+  ${good ? `<div class="rate">${googleLine(d.rating!, d.reviewCount!, pal.ink)}</div>` : ""}
   <div class="meta">${address ? `<div>${PIN} ${address}</div>` : ""}${d.phone ? `<div>${PHONE_ICON} ${esc(d.phone)}</div>` : ""}</div>
 </div>
 <div class="call"><i><svg viewBox="0 0 24 24" width="36" height="36" aria-hidden="true"><path fill="none" stroke="#fff" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" d="M5 4h4l2 5-2.5 1.5a11 11 0 0 0 5 5L15 13l5 2v4a2 2 0 0 1-2 2A16 16 0 0 1 3 6a2 2 0 0 1 2-2"/></svg></i></div>
@@ -965,6 +987,7 @@ export function renderTeaserMockup(
                   accent: paletteOf(d).onAccent ? paletteOf(d).primary : paletteOf(d).accent,
                   shapeAccent: paletteOf(d).accent,
                   shapeDark: paletteOf(d).primary,
+                  veil: paletteOf(d).veil,
                   ...(paletteOf(d).bg ? { bg: paletteOf(d).bg } : {}),
                   ...(paletteOf(d).soft ? { soft: paletteOf(d).soft } : {}),
                 }
@@ -1075,7 +1098,22 @@ export interface TeaserDeps {
   palette?: string | null;
   /** Google-Details (Bewertungstext, Öffnungszeiten), siehe cachedPlaceDetails; fehlt es, ohne. */
   details?: ((company: Company) => Promise<PlaceDetails | null>) | null;
+  /** Eigenes Hero-Foto der Praxis samt Farbwelt (heroPhoto.ts); fehlt es oder passt keins, Stockfoto und `palette`. */
+  hero?: ((company: Company) => Promise<HeroResult | null>) | null;
 }
+
+/** Foto und Farben eines gebauten Vorschau-Bildes. */
+export interface TeaserLook {
+  foto: "praxis" | "stock";
+  motiv: string | null;
+  /** Name der Farbwelt oder "aus_foto". */
+  farbe: string;
+  primary: string;
+  accent: string;
+}
+export const teaserLookKey = (companyId: string) => `teaser-look:${companyId}`;
+export const teaserLook = (db: DbClient, companyId: string) =>
+  getState<TeaserLook>(db, teaserLookKey(companyId));
 
 export const usesTeaser = (t: Pick<TeaserDeps, "branches"> | null | undefined, company: Company) =>
   Boolean(t && company.branch_key && t.branches.includes(company.branch_key));
@@ -1090,6 +1128,17 @@ export async function teaserForCompany(db: DbClient, t: TeaserDeps, company: Com
     (x): x is string => typeof x === "string",
   );
   const details = t.details ? await t.details(company).catch(() => null) : null;
+  const hero = t.hero ? await t.hero(company).catch(() => null) : null;
+  const own = hero?.status === "ok" && hero.file && existsSync(hero.file) ? hero : null;
+  // Was das Bild zeigt (Foto und Farben), für die spätere Auswertung je Mail (outreach/draft.ts → meta.teaser_look).
+  const pal = paletteOf({ palette: t.palette ?? null, colors: own?.palette ?? null });
+  await setState(db, teaserLookKey(company.id), {
+    foto: own ? "praxis" : "stock",
+    motiv: own?.motiv ?? null,
+    farbe: own?.palette ? "aus_foto" : (t.palette ?? "petrol"),
+    primary: pal.primary,
+    accent: pal.accent,
+  } satisfies TeaserLook);
   return buildTeaser(
     t.dir,
     company.id,
@@ -1105,6 +1154,8 @@ export async function teaserForCompany(db: DbClient, t: TeaserDeps, company: Com
       hours: details?.hours ?? [],
       photo: t.photo ?? null,
       palette: t.palette ?? null,
+      hero: own ? { file: own.file!, position: own.position ?? "50% 50%" } : null,
+      colors: own?.palette ?? null,
     },
     t.shoot,
     t.style,

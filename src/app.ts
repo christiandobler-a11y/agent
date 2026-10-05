@@ -1,4 +1,5 @@
 import { loadEnv, requireKeys } from "./config/env.js";
+import { heroForCompany } from "./prototype/heroPhoto.js";
 import { createDb, type Db } from "./db/client.js";
 import { createBudgetGuard } from "./llm/budget.js";
 import { loadModelsConfig } from "./llm/config.js";
@@ -149,6 +150,9 @@ export async function createApp(options: { notifier?: Notifier; worker?: boolean
         palette: prototypeConfig.teaser.farbe,
         details: prototypeConfig.teaser.google_details
           ? cachedPlaceDetails({ db, budget, apiKey: keys.GOOGLE_API_KEY })
+          : null,
+        hero: prototypeConfig.teaser.eigenes_foto
+          ? (company) => heroForCompany({ db, llm, dir: prototypeConfig.teaser.foto_dir }, company)
           : null,
       },
       mx: createMxCheck(),

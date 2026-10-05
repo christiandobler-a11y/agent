@@ -25,7 +25,9 @@ ausprobieren kann. Nach Schritt 6 ist ein Abstimmungstermin (Kalibrierung) vorge
   ausgeliefert von Caddy unter `PREVIEW_BASE_URL` (docs/DEPLOY.md, Abschnitt 11)
 - `npm run cli -- teaser <firma>`: einheitliches Vorschau-Bild für Physio (`src/prototype/teaser.ts`, ohne LLM,
   Stockfotos in `assets/teaser/physio/`, Stil `welt`/`vital`/`rund`/`mix`/`elementa` in `config/prototype.yaml → teaser`; Geräte-Bild: Handy mit echten Leistungen, Kennzahlen und einer Google-Bewertung als Abschnitt) nach
-  `data/teasers/<id>.jpg`; das Morgen-Paket baut es für `teaser.branchen` statt eines Prototyps, die Mail bettet es als
+  `data/teasers/<id>.jpg`; mit `teaser.eigenes_foto` sucht `src/prototype/heroPhoto.ts` ein passendes Foto auf der
+  Startseite der Praxis (Regeln im Code, Auswahl Rolle `hero`, einmal je Firma in `app_state`), die Farben kommen dann
+  aus dem Foto (`colors.ts`, rein), Foto und Farben je Mail in `meta.teaser_look`; das Morgen-Paket baut es für `teaser.branchen` statt eines Prototyps, die Mail bettet es als
   HTML-Bild unter `bild_satz` ein (`textToHtml`), die Befund-Seite nutzt es als „Nachher“
 - `npm run cli -- angebot <firma> [onepager|mehrseitig]` (Telegram: Lead-Karte → „📄 Angebot …“): ohne Lexware-API
   (Tarif M) Teile zum Kopieren in Lexware (Artikel einmalig über `/lexware`), mit `LEXWARE_API_KEY` (XL) Entwurf direkt

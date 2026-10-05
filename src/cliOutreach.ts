@@ -1,4 +1,5 @@
 import { mkdir, writeFile } from "node:fs/promises";
+import { heroForCompany } from "./prototype/heroPhoto.js";
 import { join } from "node:path";
 import { createApp } from "./app.js";
 import { loadEnv } from "./config/env.js";
@@ -144,6 +145,9 @@ export async function teaser(argv: string[]): Promise<number> {
               budget: app.ctx.budget,
               apiKey: loadEnv().GOOGLE_API_KEY,
             }),
+        hero: config.eigenes_foto
+          ? (company) => heroForCompany({ db: app.ctx.db, llm: app.llm, dir: config.foto_dir }, company)
+          : null,
       },
       found.company,
     );
