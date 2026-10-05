@@ -19,6 +19,7 @@ import {
   missedCalls,
   parseConsentInput,
   phoneDigits,
+  pitchAt,
   prepareCall,
   recordCall,
 } from "../src/outreach/call.js";
@@ -68,9 +69,12 @@ describe("Anruf-Liste (rein)", () => {
   });
 
   it("Kurzer Satz aus der Konfiguration, Wähl-Ziffern", () => {
-    expect(o.anruf!.pitch).toBe(
+    expect(pitchAt(o.anruf!, "08:15")).toBe(
       "Guten Morgen, Dobler mein Name. Ich habe etwas für die Praxis vorbereitet und würde Ihnen das gerne einmal per Mail zeigen. Ist es in Ordnung, wenn ich Ihnen das schicke?",
     );
+    expect(pitchAt(o.anruf!, "10:59")).toMatch(/^Guten Morgen,/);
+    expect(pitchAt(o.anruf!, "11:00")).toMatch(/^Grüß Gott,/);
+    expect(pitchAt(o.anruf!, "17:45")).toMatch(/^Guten Abend,/);
     expect(phoneDigits("08031 12-34 56")).toBe("498031123456");
   });
 

@@ -26,7 +26,7 @@ import { sendDraft } from "../outreach/send.js";
 import { gameState } from "../game/xp.js";
 import { callbackData, escapeHtml, websiteButton } from "./format.js";
 import { hoursOn } from "../prototype/placeDetails.js";
-import { missedCalls, parseConsentInput, phoneDigits, recordCall } from "../outreach/call.js";
+import { missedCalls, parseConsentInput, phoneDigits, pitchAt, recordCall } from "../outreach/call.js";
 
 const DAY_INDEX: Record<string, number> = { Sun: 0, Mon: 1, Tue: 2, Wed: 3, Thu: 4, Fri: 5, Sat: 6 };
 /** Wochentag in Deutschland (0 = Sonntag). */
@@ -394,9 +394,12 @@ export async function sendNextCard(
   if (next.channel === "phone") {
     const base = deps.outreach.previewBaseUrl ?? null;
     const digits = draft.meta.phone ? phoneDigits(draft.meta.phone) : "";
+    // Begrüßung nach der Uhrzeit, zu der die Karte aufgeht.
+    const anruf = deps.outreach.outreach.anruf;
+    const pitch = anruf ? pitchAt(anruf, berlinTime(deps.now()), draft.meta.pitch ?? anruf.pitch) : null;
     const card = planCallCard(
       next,
-      draft,
+      { ...draft, meta: { ...draft.meta, ...(pitch ? { pitch } : {}) } },
       pos,
       berlinWeekdayIndex(deps.now()),
       base && digits.length >= 6 ? `${base}/tel/${digits}` : null,

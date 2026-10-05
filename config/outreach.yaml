@@ -28,8 +28,14 @@ abmeldung:
 # nerven"). Mit dem Ja ist die Mail mit dem Entwurf erlaubt (Einwilligung). Jedes Nein sofort akzeptieren.
 anruf:
   pitch: >-
-    Guten Morgen, Dobler mein Name. Ich habe etwas für die Praxis vorbereitet und würde Ihnen das gerne einmal per
+    {gruss}, Dobler mein Name. Ich habe etwas für die Praxis vorbereitet und würde Ihnen das gerne einmal per
     Mail zeigen. Ist es in Ordnung, wenn ich Ihnen das schicke?
+  # {gruss} nach der Uhrzeit, zu der die Karte aufgeht (06.10.2026): bis 11 Uhr "Guten Morgen", dann "Grüß Gott",
+  # ab 17:30 "Guten Abend".
+  gruesse:
+    - { bis: "11:00", text: Guten Morgen }
+    - { bis: "17:30", text: Grüß Gott }
+    - { bis: "24:00", text: Guten Abend }
   # Erster Satz der Mail nach dem Ja am Telefon (statt Herkunft der Adresse).
   nach_anruf:
     sie: danke für das nette Gespräch eben! Wie besprochen schicke ich Ihnen hier meinen Entwurf für Ihre Startseite.

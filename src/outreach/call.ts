@@ -52,6 +52,12 @@ export async function prepareCall(
   return { draftId: draft.id };
 }
 
+/** Satz für den Anruf mit Begrüßung nach Uhrzeit ("HH:MM", deutsche Zeit). Rein. */
+export function pitchAt(a: NonNullable<OutreachConfig["anruf"]>, time: string, pitch = a.pitch): string {
+  const greeting = a.gruesse.find((g) => time < g.bis)?.text ?? a.gruesse.at(-1)?.text ?? "Grüß Gott";
+  return pitch.trim().replace("{gruss}", greeting);
+}
+
 /** Nur Ziffern mit Ländervorwahl ("+49 881 12345" → "4988112345"), für den Wähl-Link. Rein. */
 export function phoneDigits(phone: string): string {
   return dialable(phone).replace(/\D/g, "");

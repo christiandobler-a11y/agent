@@ -36,6 +36,9 @@ export const outreachConfigSchema = z.object({
   anruf: z
     .object({
       pitch: z.string(),
+      gruesse: z
+        .array(z.object({ bis: z.string().regex(/^\d\d:\d\d$/), text: z.string() }))
+        .default([{ bis: "24:00", text: "Grüß Gott" }]),
       nach_anruf: z.object({ sie: z.string(), du: z.string() }),
       versuche: z.number().int().min(1).default(3),
     })
