@@ -114,7 +114,7 @@ describe("Hero-Foto: Regeln (rein)", () => {
     ...over,
   });
 
-  it("nur große Querformat-Fotos, keine Logos, Grafiken oder Daumen; groß und weit oben zuerst", () => {
+  it("nur große Fotos (kein schmales Hochformat), keine Logos, Grafiken oder Daumen; groß und weit oben zuerst", () => {
     const ranked = rankCandidates([
       c({ url: "https://praxis.de/logo.png" }),
       c({ url: "https://praxis.de/team.svg" }),
@@ -134,10 +134,12 @@ describe("Hero-Foto: Regeln (rein)", () => {
     ]);
   });
 
-  it("nach dem Laden: Größe, Querformat, echtes Foto", () => {
+  it("nach dem Laden: Größe, Format, echtes Foto", () => {
     expect(qualityOk({ width: 1920, height: 1080, entropy: 7.4 })).toBeNull();
-    expect(qualityOk({ width: 800, height: 600, entropy: 7.4 })).toContain("zu klein");
-    expect(qualityOk({ width: 1200, height: 1200, entropy: 7.4 })).toBe("kein Querformat");
+    expect(qualityOk({ width: 800, height: 600, entropy: 7.4 })).toBeNull();
+    expect(qualityOk({ width: 900, height: 1100, entropy: 7.4 })).toBeNull(); // Porträt der Inhaberin
+    expect(qualityOk({ width: 700, height: 500, entropy: 7.4 })).toContain("zu klein");
+    expect(qualityOk({ width: 900, height: 1400, entropy: 7.4 })).toBe("falsches Format");
     expect(qualityOk({ width: 1920, height: 1080, entropy: 3.1 })).toBe("wirkt wie eine Grafik");
   });
 

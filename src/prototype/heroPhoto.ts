@@ -69,12 +69,15 @@ export interface PageImages {
   logos: LogoCandidate[];
 }
 
-// v2 (05.10.2026, mit Logo): ältere Ergebnisse ohne Logo werden neu geprüft.
-export const heroKey = (companyId: string) => `hero:v2:${companyId}`;
+// v3 (05.10.2026, lockerere Regeln, Prompt v4): ältere Ergebnisse werden neu geprüft.
+export const heroKey = (companyId: string) => `hero:v3:${companyId}`;
 
 // Viele Praxis-Seiten liefern Fotos um 900 bis 1200 px; im Vorschau-Bild (Laptop) reicht das unter dem Farbschleier.
-const MIN_WIDTH = 900;
-const MIN_HEIGHT = 480;
+// 05.10.2026: zu viele Praxen fielen raus. Der Farbschleier verzeiht etwas weniger Auflösung; Hochformat (Porträt der
+// Inhaberin) wird auf 16:10 zugeschnitten, solange es breit genug ist.
+const MIN_WIDTH = 800;
+const MIN_HEIGHT = 450;
+const MIN_RATIO = 0.75;
 const BAD_NAME =
   /(logo|icon|favicon|sprite|badge|siegel|zertifik|certif|award|qr|map|karte|maps|placeholder|dummy|banner-ad|button|arrow|pfeil|avatar|signature|unterschrift|partner|sponsor|kasse|krankenkasse)/i;
 
@@ -88,7 +91,7 @@ export function rankCandidates(cands: readonly ImageCandidate[], max = 6): Image
     if (/\.(svg|gif|ico)$/.test(path)) return false;
     if (BAD_NAME.test(path) || BAD_NAME.test(c.alt)) return false;
     if (c.width > 0 && (c.width < MIN_WIDTH || c.height < MIN_HEIGHT)) return false;
-    if (c.width > 0 && (c.width / c.height < 1.2 || c.width / c.height > 3)) return false;
+    if (c.width > 0 && (c.width / c.height < MIN_RATIO || c.width / c.height > 3)) return false;
     // Winzig angezeigte Bilder (Galerie-Daumen) sind selten gute Hero-Fotos; og:image hat keine Anzeige.
     if (c.kind !== "og" && c.shownWidth < 300) return false;
     return true;
@@ -109,7 +112,7 @@ export interface ImageStats {
 export function qualityOk(s: ImageStats): string | null {
   if (s.width < MIN_WIDTH || s.height < MIN_HEIGHT) return `zu klein (${s.width}×${s.height})`;
   const ratio = s.width / s.height;
-  if (ratio < 1.2 || ratio > 3) return "kein Querformat";
+  if (ratio < MIN_RATIO || ratio > 3) return "falsches Format";
   // Fotos liegen bei etwa 6,5 bis 7,5, helle, ruhige Räume etwas darunter; Grafiken und Text-Banner deutlich tiefer.
   if (s.entropy < 5.5) return "wirkt wie eine Grafik";
   return null;
@@ -272,6 +275,12 @@ export async function collectCandidates(
         const src = m && abs(m[1]);
         if (src) images.push({ url: src, width: 0, height: 0, shownWidth: r.width, shownHeight: r.height, top: r.top + scrollY, alt: "", kind: "bg" });
       }
+      // Video-Header: das Vorschaubild (poster) ist oft das beste Foto der Seite.
+      for (const v of document.querySelectorAll("video[poster]")) {
+        const r = v.getBoundingClientRect();
+        const src = abs(v.getAttribute("poster"));
+        if (src) images.push({ url: src, width: 0, height: 0, shownWidth: r.width, shownHeight: r.height, top: r.top + scrollY, alt: "", kind: "bg" });
+      }
       const og = document.querySelector('meta[property="og:image"]');
       const ogSrc = og && abs(og.getAttribute("content"));
       if (ogSrc) images.push({ url: ogSrc, width: 0, height: 0, shownWidth: 0, shownHeight: 0, top: 0, alt: "", kind: "og" });
@@ -299,7 +308,7 @@ export const heroOutputSchema = z.object({
 });
 export type HeroChoice = z.infer<typeof heroOutputSchema>;
 
-export const HERO_PROMPT_VERSION = "v3";
+export const HERO_PROMPT_VERSION = "v4";
 /** Nur ab dieser Note kommt das eigene Foto ins Bild, sonst das Stockfoto. */
 export const HERO_MIN_FIT = 4;
 
