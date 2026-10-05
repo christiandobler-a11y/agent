@@ -617,6 +617,14 @@ describeDb("Morgen-Paket mit Datenbank", () => {
       screenshotMobile: shot,
     });
     const noMail = await lead({ score: 70, email: "info@gibtsnicht.de", street: null });
+    // Zweiter Standort von "strong" (gleiches Impressum, eigene Mail): wird nicht angeschrieben.
+    const sibling = await lead({ score: 80 });
+    for (const c of [strong, sibling])
+      await insertWebsiteSnapshot(db(), {
+        companyId: c.id,
+        url: "https://x.de",
+        facts: { impressum: { register: "HRB 21103", vat_id: null, person: "Markus Ziegler" } },
+      });
     const old = await lead();
     await db().query("update companies set status = 'CONTACTED' where id = $1", [old.id]);
     await emailDraft(old, 6);
@@ -658,7 +666,8 @@ describeDb("Morgen-Paket mit Datenbank", () => {
       lettersDir: join(tmp, "letters"),
     });
     expect(result).toMatchObject({ followups: 1, letters: 1, emails: 2, stoppedByBudget: false });
-    expect(result.skipped.map((s) => s.name)).toEqual([noMail.name]);
+    expect(result.skipped.map((s) => s.name)).toEqual([sibling.name, noMail.name]);
+    expect(result.skipped[0]!.reason).toBe(`gleicher Betrieb wie ${strong.name} (anderer Standort)`);
     const items = await planItems(db(), "2026-10-05");
     expect(items.map((i) => [i.company_name, i.kind, i.channel])).toEqual([
       [old.name, "followup", "email"],

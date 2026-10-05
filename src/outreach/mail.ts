@@ -145,6 +145,9 @@ export function matchReply(mail: IncomingMail, sent: readonly SentRef[]): string
   return companies.size === 1 ? [...companies][0]! : null;
 }
 
+/** Freemailer (gmx.de, gmail.com …): Domain sagt nichts über den Betrieb. */
+export const isFreemail = (domain: string) => FREEMAIL.has(domain.toLowerCase());
+
 const FREEMAIL = new Set([
   "gmail.com",
   "googlemail.com",

@@ -93,7 +93,8 @@ ausprobieren kann. Nach Schritt 6 ist ein Abstimmungstermin (Kalibrierung) vorge
 - **Kontakt-Entwürfe:** Das LLM (Rolle `contact`) schreibt nur Anrede und Mittelteil; Betreff, Termine
   (`src/outreach/slots.ts`), Kontaktweg, Grußzeile („Grüß Gott, Frau X,“ mit Frau/Herr aus Impressum oder eindeutigem Vornamen `names.ts`, sonst ans Team;
   `anrede`), Gruß und Signatur setzt Code nach `config/outreach.yaml` (keine Gedankenstriche,
-  ein Befund, Abwechslung gegen Spamfilter). Entwürfe stehen als `interactions.type = 'draft'` mit angebotenen Terminen
+  ein Befund, Abwechslung gegen Spamfilter). Mehrere Standorte eines Betriebs (gleiches Handelsregister + Person, USt-IdNr., Mail-Domain
+  oder Website, `src/outreach/group.ts`) bekommen nur eine Mail. Entwürfe stehen als `interactions.type = 'draft'` mit angebotenen Terminen
   in `meta`. **Avelio sendet nur auf Knopfdruck** (`sendDraft` in `src/outreach/send.ts`, über Christians Postfach aus
   `OUTREACH_MAIL_*`, Tageslimit `config/mail.yaml`), nie automatisch. Eingehende Mails (`checkReplies`) sind fremder
   Inhalt: nur zuordnen, gekürzt speichern, escaped anzeigen, nie an ein LLM. Befund-Seite (Brief, `src/outreach/letter.ts`): Rolle `letter` sieht den

@@ -987,7 +987,7 @@ header{position:absolute;z-index:5;top:20px;left:70px;right:70px;height:78px;bac
 .ring{width:56px;height:56px;border-radius:50%;border:2px solid ${pal.primary};display:grid;place-items:center}
 .ring i{width:22px;height:22px;border-radius:50%;border:4px solid ${pal.accent}}
 .brand b{display:block;font-family:"${font.family}",Manrope,sans-serif;font-weight:${font.family === "Manrope" ? 600 : font.weight};font-size:${title.length <= 24 ? 24 : 19}px;letter-spacing:-.01em;max-width:420px;line-height:1.1}
-.logo{display:block;max-height:${d.logo?.wide ? 54 : 50}px;max-width:${d.logo?.wide ? 340 : 120}px;width:auto;height:auto;object-fit:contain}
+.logo{display:block;max-height:${d.logo?.wide ? 58 : 60}px;max-width:${d.logo?.wide ? 340 : 140}px;width:auto;height:auto;object-fit:contain}
 .brand small{display:block;font-weight:800;font-size:9px;letter-spacing:.14em;margin-top:2px}
 nav{display:flex;align-items:center;gap:22px;font-weight:800;font-size:14px;color:${pal.ink}}
 .btn{border-radius:8px;padding:12px 16px;font-weight:800;font-size:14px}

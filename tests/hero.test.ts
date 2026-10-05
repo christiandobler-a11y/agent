@@ -197,7 +197,16 @@ describeDb("Hero-Foto mit Datenbank", () => {
       ),
     );
     const answer = (wahl: number | null, passt: number, grund = "ruhig") => ({
-      output: { wahl, passt, motiv: "heller Raum", fokus_x: 40, fokus_y: 35, grund, logo_ok: true },
+      output: {
+        wahl,
+        passt,
+        motiv: "heller Raum",
+        fokus_x: 40,
+        fokus_y: 35,
+        grund,
+        logo_ok: true,
+        logo_mit_name: true,
+      },
       agentRunId: "r",
       costUsd: 0.01,
       model: "m",

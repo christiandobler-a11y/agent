@@ -60,6 +60,8 @@ export interface LogoCandidate {
   shownWidth: number;
   shownHeight: number;
   top: number;
+  /** Name, Alt-Text oder Klasse sagt "logo"/"brand" (sicherer als nur die Lage in der Kopfzeile). */
+  named?: boolean;
 }
 
 export interface PageImages {
@@ -181,12 +183,14 @@ export function rankLogos(cands: readonly LogoCandidate[]): LogoCandidate[] {
     .filter((c) => {
       if (!/^https?:\/\//i.test(c.url) || seen.has(c.url)) return false;
       seen.add(c.url);
-      if (c.top > 300 || c.shownHeight < 24 || c.shownWidth < 40) return false;
+      // Kopfzeilen sitzen manchmal unter einem Banner: bis 700 px von oben.
+      if (c.top > 700 || c.shownHeight < 24 || c.shownWidth < 40) return false;
       const svg = /\.svg(\?|$)/i.test(c.url);
       // Pixel-Logos: genug Auflösung, damit es im Bild nicht verschwimmt.
       return svg || c.height >= 60 || c.width >= 200;
     })
-    .slice(0, 2);
+    .sort((a, b) => Number(Boolean(b.named)) - Number(Boolean(a.named)) || a.top - b.top)
+    .slice(0, 3);
 }
 
 /** Logo laden und prüfen: als PNG mit 240 px Höhe; auf weißem Grund sichtbar (keine weißen Logos). */
@@ -207,6 +211,8 @@ export async function prepareLogo(buf: Buffer): Promise<{ png: Buffer; wide: boo
       weight += a;
     }
     if (weight === 0 || sum / weight > 0.86) return null; // weiß oder fast unsichtbar auf Weiß
+    // Logos sind flächig (wenige Farben); ein Foto in der Kopfzeile ist kein Logo.
+    if ((await sharp(buf).stats()).entropy > 6.3) return null;
     return { png, wide: (meta.width ?? 0) / (meta.height ?? 1) >= 2.4 };
   } catch {
     return null;
@@ -237,7 +243,10 @@ export async function collectCandidates(
       const abs = (u) => { try { return new URL(u, location.href).href } catch { return null } };
       const isLogo = (img) => {
         const own = [img.currentSrc || img.src, img.alt, img.className, img.id].join(" ");
-        if (/logo/i.test(own)) return true;
+        if (/logo|brand|signet|wortmarke/i.test(own)) return "named";
+        // Bild links oben in der Kopfzeile (viele Baukästen benennen das Logo nicht).
+        const r0 = img.getBoundingClientRect();
+        if (img.closest("header,nav,[class*=header i],[id*=header i]") && r0.left < 520 && r0.top + scrollY < 260 && r0.width >= r0.height * 1.2) return true;
         const a = img.closest("a");
         const home = a && (() => { try { const h = new URL(a.href, location.href); return h.origin === location.origin && (h.pathname === "/" || h.pathname === "/index.html") } catch { return false } })();
         const box = img.closest("[class*=logo i],[id*=logo i]");
@@ -252,7 +261,8 @@ export async function collectCandidates(
         const src = abs(placeholder && lazy ? lazy : raw);
         if (!src) continue;
         if (placeholder && lazy) { images.push({ url: src, width: 0, height: 0, shownWidth: r.width, shownHeight: r.height, top: r.top + scrollY, alt: img.alt || "", kind: "img" }); continue; }
-        if (isLogo(img)) logos.push({ url: src, width: img.naturalWidth, height: img.naturalHeight, shownWidth: r.width, shownHeight: r.height, top: r.top + scrollY });
+        const logoKind = isLogo(img);
+        if (logoKind) logos.push({ url: src, width: img.naturalWidth, height: img.naturalHeight, shownWidth: r.width, shownHeight: r.height, top: r.top + scrollY, named: logoKind === "named" });
         else images.push({ url: src, width: img.naturalWidth, height: img.naturalHeight, shownWidth: r.width, shownHeight: r.height, top: r.top + scrollY, alt: img.alt || "", kind: "img" });
       }
       for (const el of document.querySelectorAll("body *")) {
@@ -284,10 +294,12 @@ export const heroOutputSchema = z.object({
   grund: z.string().max(200),
   /** Ist "Logo" wirklich das gut lesbare Logo dieser Praxis (kein Partner, Siegel, Krankenkasse)? */
   logo_ok: z.boolean().default(false),
+  /** Steht der Praxisname lesbar im Logo? Dann ohne extra Namen daneben. */
+  logo_mit_name: z.boolean().default(false),
 });
 export type HeroChoice = z.infer<typeof heroOutputSchema>;
 
-export const HERO_PROMPT_VERSION = "v2";
+export const HERO_PROMPT_VERSION = "v3";
 /** Nur ab dieser Note kommt das eigene Foto ins Bild, sonst das Stockfoto. */
 export const HERO_MIN_FIT = 4;
 
@@ -387,7 +399,7 @@ export async function heroForCompany(deps: HeroDeps, company: Company): Promise<
   if (logo && choice.logo_ok) {
     const file = join(deps.dir, `${company.id}-logo.png`);
     await writeFile(file, logo.png);
-    savedLogo = { file, wide: logo.wide };
+    savedLogo = { file, wide: choice.logo_mit_name || logo.wide };
   }
   const picked = choice.wahl !== null ? loaded[choice.wahl - 1] : undefined;
   if (!picked || choice.passt < HERO_MIN_FIT)

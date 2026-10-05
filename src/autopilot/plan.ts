@@ -13,6 +13,7 @@ import type { MxCheck } from "../outreach/mx.js";
 import { buildPrototype, type PrototypeDeps } from "../prototype/run.js";
 import { teaserForCompany, usesTeaser, type TeaserDeps } from "../prototype/teaser.js";
 import { recentSeedProblem } from "../outreach/seed.js";
+import { GroupIndex, groupKeys, type Impressum } from "../outreach/group.js";
 
 /**
  * Morgen-Paket (Phase 2): Avelio bereitet nachts den Tagesplan vor. Zuerst fällige Nachfass-Mails, dann neue Leads
@@ -220,6 +221,44 @@ async function planLetter(
   return true;
 }
 
+/** Impressum der letzten erfolgreichen Website-Prüfung (Handelsregister, USt-IdNr., Person). */
+async function impressumOf(db: Db, companyId: string): Promise<Impressum | null> {
+  const { rows } = await db.query<{ imp: Impressum | null }>(
+    `select facts->'impressum' as imp from website_snapshots
+      where company_id = $1 and error is null order by fetched_at desc limit 1`,
+    [companyId],
+  );
+  return rows[0]?.imp ?? null;
+}
+
+/**
+ * Schon angeschriebene Betriebe und die heute geplanten: deren Schlüssel (groupKeys), damit kein zweiter Standort
+ * derselben Firma eine Mail bekommt.
+ */
+async function contactedGroups(db: Db, date: string): Promise<GroupIndex> {
+  const { rows } = await db.query<Company & { email: string | null }>(
+    `select c.*, (select i.meta->>'to' from interactions i
+                   where i.company_id = c.id and i.type = 'draft' and i.channel = 'email'
+                   order by (i.meta ? 'sent_at') desc, i.created_at desc limit 1) as email
+       from companies c
+      where exists (select 1 from interactions i where i.company_id = c.id and i.type = 'draft' and i.meta ? 'sent_at')
+         or exists (select 1 from outreach_plan p where p.company_id = c.id and p.plan_date = $1)`,
+    [date],
+  );
+  const index = new GroupIndex();
+  for (const c of rows)
+    index.add(
+      groupKeys({
+        websiteUrl: c.website_url,
+        email: c.email,
+        postalCode: c.postal_code,
+        impressum: await impressumOf(db, c.id),
+      }),
+      c.name,
+    );
+  return index;
+}
+
 /** Neue Kandidaten: vorgemerkt zuerst, dann qualifiziert nach Score; nie schon angeschrieben oder heute geplant. */
 async function candidates(
   db: Db,
@@ -337,11 +376,27 @@ export async function buildDailyPlan(deps: PlanDeps, by = "autopilot"): Promise<
     ).length;
     const branches = config.neue_kontakte.branchen ?? config.suche.branchen;
     const pool = Math.max(0, target - already) * 4 + (lettersLeft > 0 ? 300 : 0);
+    const groups = await contactedGroups(db, date);
     for (const company of await candidates(db, date, pool, branches)) {
       const mailsDone = result.emails + already >= target;
       if (mailsDone && lettersLeft <= 0) break;
       await isolated(company, result, async () => {
         const person = await recipient(db, company.id);
+        // Anderer Standort eines schon angeschriebenen oder heute geplanten Betriebs: auslassen (zählt nicht).
+        const keys = groupKeys({
+          websiteUrl: company.website_url,
+          email: person.email,
+          postalCode: company.postal_code,
+          impressum: await impressumOf(db, company.id),
+        });
+        const sibling = groups.match(keys);
+        if (sibling) {
+          result.skipped.push({
+            name: company.name,
+            reason: `gleicher Betrieb wie ${sibling} (anderer Standort)`,
+          });
+          return;
+        }
         const mailOk = person.email ? await deps.mx(person.email) : false;
         const hasAddress = Boolean(company.street && company.postal_code);
         const channel = chooseChannel({ hasAddress, mailOk }, lettersLeft);
@@ -376,6 +431,7 @@ export async function buildDailyPlan(deps: PlanDeps, by = "autopilot"): Promise<
         if (channel === "letter") {
           if (!(await planLetter(deps, company, date, by, "new", result))) return;
           lettersLeft--;
+          groups.add(keys, company.name);
         } else {
           const mail = await draftEmail(outreachDeps, company, by);
           if ("kind" in mail) {
@@ -390,6 +446,7 @@ export async function buildDailyPlan(deps: PlanDeps, by = "autopilot"): Promise<
             draftId: mail.draftId,
           });
           result.emails++;
+          groups.add(keys, company.name);
         }
       });
     }
