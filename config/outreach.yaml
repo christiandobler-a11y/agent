@@ -16,14 +16,16 @@ abmeldung:
 du_branchen: [fahrrad, gastro, friseur, kosmetik]
 
 # Warum eine gute Website für diese Branche zählt (04.10.2026, Christian): kein Angriff, sondern Tatsache. Viele
-# Praxen sind ausgebucht, "mehr Patienten" zieht also nicht. Das LLM nimmt genau einen Nutzen, der zum Befund passt.
+# Praxen sind ausgebucht, "mehr Patienten" zieht also nicht. 05.10.2026 (Christian, nach der ersten Abwesenheitsnotiz
+# "komplett ausgelastet, keine neuen Patienten"): weg vom Argument "Kunden gehen sonst zum Nächsten", hin zum Bild nach
+# außen und zu Bewerbern. Das LLM nimmt genau einen Nutzen, der zum Befund passt.
 branche_kontext:
   physiotherapie: >-
-    Patienten vergleichen Praxen heute zuerst bei Google und auf der Website, bevor sie anrufen; der erste Eindruck
-    sollte zur Qualität der Behandlung passen und gegenüber anderen Praxen in der Nähe bestehen. Viele Praxen sind
-    ausgelastet, mehr Patienten sind nicht das Ziel. Nutzen stattdessen: die passenden Patienten (Schwerpunkte,
-    Selbstzahler und Privatpatienten finden die Praxis), Bewerber (Physiotherapeuten sind gesucht und schauen sich
-    zuerst die Website an), weniger Anrufe mit immer gleichen Fragen an der Anmeldung.
+    Die Website ist die Visitenkarte der Praxis nach außen: Wer sie anschaut, soll gleich sehen, wie gut und modern dort
+    gearbeitet wird. Viele Praxen sind ausgelastet und nehmen keine neuen Patienten auf, um mehr Patienten geht es also
+    nicht. Nutzen stattdessen: Bewerber (Physiotherapeuten sind gesucht und schauen sich zuerst die Website an, bevor
+    sie sich bewerben), das Bild bei überweisenden Ärzten und bei Patienten, die die Praxis weiterempfehlen, ein
+    Auftritt, der zur Qualität der Behandlung passt, und weniger Anrufe mit immer gleichen Fragen an der Anmeldung.
 
 # Termin bestätigen (04.10.2026): Lead antwortet, Christian tippt den genannten Termin an, Avelio schreibt die
 # Bestätigung (mit Kalender-Einladung) im selben Verlauf; gesendet wird per Knopf. Mit OUTREACH_MEETING_URL in der

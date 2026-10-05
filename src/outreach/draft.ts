@@ -20,7 +20,7 @@ import { personFromCompanyName, personInCompanyName, salutationFromFirstName } f
  * nichts; Christian sendet selbst.
  */
 
-export const CONTACT_PROMPT_VERSION = "v6";
+export const CONTACT_PROMPT_VERSION = "v7";
 
 export const contactOutputSchema = z.object({
   absatz: z.string().min(40).max(1000),
