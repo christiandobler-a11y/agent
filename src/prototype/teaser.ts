@@ -11,7 +11,7 @@ import type { DbClient } from "../db/client.js";
 import type { Company } from "../db/companies.js";
 import { latestAudit, latestPlacesSnapshot } from "../db/leads.js";
 import { seedOf } from "../outreach/slots.js";
-import { choosePalette, derivePalette, warmth, type HeroPalette } from "./colors.js";
+import { choosePalette, derivePalette, opaquePixels, warmth, type HeroPalette } from "./colors.js";
 import type { HeroResult } from "./heroPhoto.js";
 import type { PlaceDetails } from "./placeDetails.js";
 
@@ -1214,6 +1214,32 @@ export const teaserLookKey = (companyId: string) => `teaser-look:${companyId}`;
 export const teaserLook = (db: DbClient, companyId: string) =>
   getState<TeaserLook>(db, teaserLookKey(companyId));
 
+/** Farbwelt und Wärme einer Bilddatei (Foto oder Logo mit Transparenz). */
+async function fileColors(
+  file: string,
+  transparent = false,
+): Promise<{ palette: HeroPalette | null; warmth: number } | null> {
+  try {
+    if (transparent) {
+      const { data } = await sharp(file)
+        .resize(64, 64, { fit: "inside" })
+        .ensureAlpha()
+        .raw()
+        .toBuffer({ resolveWithObject: true });
+      const px = opaquePixels(data);
+      return { palette: derivePalette(px), warmth: warmth(px) };
+    }
+    const { data } = await sharp(file)
+      .resize(48, 48, { fit: "cover" })
+      .removeAlpha()
+      .raw()
+      .toBuffer({ resolveWithObject: true });
+    return { palette: derivePalette(data), warmth: warmth(data) };
+  } catch {
+    return null;
+  }
+}
+
 /**
  * Farben der bisherigen Website (Screenshot der Startseite): Markenfarben aus Kopfzeile, Knöpfen, Flächen, und wie
  * warm die Seite wirkt. Ohne Screenshot `null`.
@@ -1280,12 +1306,17 @@ export async function teaserForCompany(db: DbClient, t: TeaserDeps, company: Com
       }),
     );
   // Farbliche Nähe zur Praxis (05.10.2026): Logo, eigenes Foto, bisherige Website, sonst warm oder Standard.
+  // Farben bei jedem Bild frisch aus den gespeicherten Dateien (geänderte Farbregeln greifen ohne neue Prüfung).
   const site = await websiteColors(db, company.id);
+  const photoColors = own ? await fileColors(own.file!) : null;
+  const logoColors = hero?.logo && existsSync(hero.logo.file) ? await fileColors(hero.logo.file, true) : null;
   const choice = choosePalette({
-    logo: hero?.logoPalette ?? null,
-    photo: own?.palette ?? null,
+    ownPhoto: Boolean(own),
+    logo: logoColors?.palette ?? null,
+    photo: photoColors?.palette ?? null,
     website: site?.palette ?? null,
-    warmth: own?.warmth ?? site?.warmth ?? null,
+    photoWarmth: photoColors?.warmth ?? null,
+    websiteWarmth: site?.warmth ?? null,
   });
   // Was das Bild zeigt (Foto und Farben), für die spätere Auswertung je Mail (outreach/draft.ts → meta.teaser_look).
   const pal = paletteOf({ palette: t.palette ?? null, colors: choice.palette });

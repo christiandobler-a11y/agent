@@ -148,8 +148,11 @@ function darkenForWhite(h: number, s: number, l: number, min = 4.6): Rgb {
 /** Haut, Holz, Beige: Orange-Braun-Töne ohne große Leuchtkraft. */
 export const isSkinOrWood = ([h, s]: readonly [number, number, number]) => h >= 12 && h <= 50 && s < 0.65;
 
-/** Gelb bis Gelbgrün (Farbton etwa 45 bis 80 Grad). */
-export const isYellowish = ([h]: readonly [number, number, number]) => h >= 45 && h <= 80;
+/**
+ * Orange bis Gelbgrün (Farbton etwa 15 bis 80 Grad): abgedunkelt für weiße Schrift werden daraus Braun und Oliv
+ * (05.10.2026, RM Physio: Orange der alten Website wurde zu Braun). Solche Töne nur als Akzent.
+ */
+export const isAccentOnlyHue = ([h]: readonly [number, number, number]) => h >= 15 && h <= 80;
 
 export function paletteFromClusters(cs: readonly Cluster[]): HeroPalette | null {
   const colorful = cs
@@ -159,9 +162,9 @@ export function paletteFromClusters(cs: readonly Cluster[]): HeroPalette | null 
   if (colorful.length === 0) return null;
   const rank = (a: (typeof colorful)[number], b: (typeof colorful)[number]) =>
     b.weight * b.hsl[1] - a.weight * a.hsl[1];
-  // Gelb bis Gelbgrün wird abgedunkelt oliv und trüb: taugt nur als Akzent. Dann Anthrazit als Hauptfarbe (wie das
+  // Orange bis Gelbgrün wird abgedunkelt braun oder oliv: nur als Akzent. Dann Anthrazit als Hauptfarbe (wie das
   // Elementa-Vorbild: Dunkelblau-Grau + Gelb).
-  const main = colorful.filter((c) => !isYellowish(c.hsl)).sort(rank)[0] ?? null;
+  const main = colorful.filter((c) => !isAccentOnlyHue(c.hsl)).sort(rank)[0] ?? null;
   const [h, s0] = main ? main.hsl : [215, 0.18];
   const s = main ? Math.max(0.35, Math.min(0.7, s0)) : 0.18;
   const primary = main ? darkenForWhite(h, s, main.hsl[2]) : fromHsl(215, 0.18, 0.2);
@@ -236,18 +239,28 @@ export function opaquePixels(rgba: ArrayLike<number>, minAlpha = 200): number[] 
 export type ColorSource = "logo" | "foto" | "website" | "warm" | "standard";
 
 /**
- * Welche Farbwelt passt zur Praxis? Reihenfolge: Logo (ihre Markenfarbe), eigenes Foto, bisherige Website; ohne
- * farbige Quelle die warme Farbwelt, wenn Foto oder Website warm wirken, sonst die Standardfarbe (`null`). Rein.
+ * Welche Farbwelt passt zur Praxis? Mit eigenem Foto im Bild bestimmt das Foto die Stimmung (05.10.2026, Christian:
+ * Born hat einen warmen Raum, die alte Website ist türkis: die Seite muss zum Foto passen, sonst beißt es sich):
+ * Farben aus dem Foto, sonst warm, wenn das Foto warm ist, erst dann Logo und Website. Ohne eigenes Foto: Logo (ihre
+ * Markenfarbe), bisherige Website, warm, Standard (`null`). Rein.
  */
 export function choosePalette(s: {
   logo?: HeroPalette | null;
   photo?: HeroPalette | null;
   website?: HeroPalette | null;
-  warmth?: number | null;
+  /** Wärme des eigenen Fotos (nur wenn eins im Bild ist). */
+  photoWarmth?: number | null;
+  /** Wärme der bisherigen Website. */
+  websiteWarmth?: number | null;
+  ownPhoto?: boolean;
 }): { palette: HeroPalette | null; source: ColorSource } {
+  const warm = (w: number | null | undefined) => (w ?? 0) > WARM_THRESHOLD;
+  if (s.ownPhoto) {
+    if (s.photo) return { palette: s.photo, source: "foto" };
+    if (warm(s.photoWarmth)) return { palette: WARM_PALETTE, source: "warm" };
+  }
   if (s.logo) return { palette: s.logo, source: "logo" };
-  if (s.photo) return { palette: s.photo, source: "foto" };
   if (s.website) return { palette: s.website, source: "website" };
-  if ((s.warmth ?? 0) > WARM_THRESHOLD) return { palette: WARM_PALETTE, source: "warm" };
+  if (warm(s.ownPhoto ? s.photoWarmth : s.websiteWarmth)) return { palette: WARM_PALETTE, source: "warm" };
   return { palette: null, source: "standard" };
 }

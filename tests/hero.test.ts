@@ -75,6 +75,19 @@ describe("Farbwelt aus dem Foto (rein)", () => {
     expect(ha).toBeLessThan(55);
   });
 
+  it("Orange wird Akzent, nie braune Hauptfarbe (RM Physio)", () => {
+    const p = derivePalette(
+      pixels([
+        [[232, 98, 52], 0.3], // Orange der alten Website
+        [[245, 245, 245], 0.7],
+      ]),
+    )!;
+    expect(toHsl(rgbOf(p.primary))[1]).toBeLessThan(0.25); // Anthrazit, kein Braun
+    const [ha] = toHsl(rgbOf(p.accent));
+    expect(ha).toBeGreaterThan(10);
+    expect(ha).toBeLessThan(25);
+  });
+
   it("Gelb wird Akzent, nie trübe Hauptfarbe (dann Anthrazit)", () => {
     const p = derivePalette(
       pixels([
@@ -90,7 +103,7 @@ describe("Farbwelt aus dem Foto (rein)", () => {
     expect(ha).toBeLessThan(60);
   });
 
-  it("Farbquelle: Logo vor Foto vor Website, sonst warm oder Standard", () => {
+  it("Farbquelle: mit eigenem Foto zählt das Foto, sonst Logo, Website, warm, Standard", () => {
     const blue = derivePalette(
       pixels([
         [[40, 120, 160], 0.6],
@@ -103,18 +116,24 @@ describe("Farbwelt aus dem Foto (rein)", () => {
         [[240, 240, 240], 0.4],
       ]),
     )!;
-    expect(choosePalette({ logo: green, photo: blue }).source).toBe("logo");
-    expect(choosePalette({ photo: blue, website: green }).source).toBe("foto");
-    expect(choosePalette({ website: green }).palette).toBe(green);
-    // Holz und Beige, nichts Farbiges: warme Farbwelt statt kühlem Standard.
     const wood = pixels([
       [[180, 130, 90], 0.5],
       [[235, 220, 200], 0.5],
     ]);
     expect(warmth(wood)).toBeGreaterThan(WARM_THRESHOLD);
-    expect(choosePalette({ warmth: warmth(wood) })).toEqual({ palette: WARM_PALETTE, source: "warm" });
+    // Eigenes Foto im Bild: Foto vor Logo; warmes Foto ohne Farbe schlägt die türkise alte Website (Born).
+    expect(choosePalette({ ownPhoto: true, photo: blue, logo: green }).source).toBe("foto");
+    expect(choosePalette({ ownPhoto: true, photoWarmth: warmth(wood), website: blue })).toEqual({
+      palette: WARM_PALETTE,
+      source: "warm",
+    });
+    expect(choosePalette({ ownPhoto: true, photoWarmth: -0.2, website: blue }).source).toBe("website");
+    // Ohne eigenes Foto: Logo, dann Website, dann warm.
+    expect(choosePalette({ logo: green, website: blue }).source).toBe("logo");
+    expect(choosePalette({ website: green }).palette).toBe(green);
+    expect(choosePalette({ websiteWarmth: warmth(wood) }).source).toBe("warm");
     expect(warmth(pixels([[[60, 120, 200], 1]]))).toBeLessThan(0);
-    expect(choosePalette({ warmth: -0.1 })).toEqual({ palette: null, source: "standard" });
+    expect(choosePalette({ websiteWarmth: -0.1 })).toEqual({ palette: null, source: "standard" });
     expect(contrast(rgbOf(WARM_PALETTE.primary), WHITE)).toBeGreaterThanOrEqual(4.5);
     expect(opaquePixels([1, 2, 3, 255, 9, 9, 9, 0])).toEqual([1, 2, 3]);
   });
@@ -318,8 +337,8 @@ describeDb("Hero-Foto mit Datenbank", () => {
     expect(html).toContain(pathToFileURL(r.logo!.file).href);
     expect(await teaserLook(db(), company.id)).toMatchObject({
       foto: "praxis",
-      farbe: "logo", // Logo hat Vorrang vor dem Foto
-      primary: r.logoPalette!.primary,
+      farbe: "foto", // eigenes Foto im Bild: das Foto bestimmt die Farben
+      primary: r.palette!.primary,
     });
 
     // Kein passendes Foto: Stockfoto, Ergebnis gemerkt.
