@@ -287,10 +287,12 @@ export function createBot(options: BotOptions): AvelioBot {
       await ctx.reply("Die Berater sind hier nicht eingerichtet.");
       return;
     }
-    const started = await startAdvisor(pipeline, `telegram:${ctx.chat.id}`);
+    // "/berater <Frage>": diese Runde mit Fokus, z. B. "Ist der Anruf-Erstkontakt rechtlich ok?"
+    const focus = ctx.match.trim();
+    const started = await startAdvisor(pipeline, `telegram:${ctx.chat.id}`, focus || null);
     await ctx.reply(
       started
-        ? "🧠 Die Berater legen los: Zahlen ansehen, im Netz recherchieren, Vorschläge entwerfen und gegenprüfen. Dauert ein paar Minuten, ich melde mich ☕"
+        ? `🧠 Die Berater legen los${focus ? " mit deiner Frage" : ""}: Zahlen ansehen, im Netz recherchieren, Vorschläge entwerfen und gegenprüfen. Dauert ein paar Minuten, ich melde mich ☕`
         : "🧠 Die Berater sitzen schon dran, der Bericht kommt gleich.",
     );
   });
@@ -304,9 +306,11 @@ export function createBot(options: BotOptions): AvelioBot {
   });
   bot.command(["vorschlaege", "vorschläge"], async (ctx) => {
     const list = await suggestionsByStatus(pipeline.db, ["umsetzen", "spaeter"]);
-    await ctx.reply(suggestionList(list), {
+    const { text, keyboard } = suggestionList(list);
+    await ctx.reply(text, {
       parse_mode: "HTML",
       link_preview_options: { is_disabled: true },
+      ...(keyboard.length > 0 ? { reply_markup: { inline_keyboard: keyboard } } : {}),
     });
   });
 
@@ -838,9 +842,17 @@ export function createBot(options: BotOptions): AvelioBot {
         return;
       }
       await ctx.answerCallbackQuery({ text: DECISION_TEXT[advice.status].slice(0, 190) });
+      // Liste aus /vorschlaege (Knöpfe für mehrere Vorschläge): nur die Zeile dieses Vorschlags entfernen.
+      const rows = ctx.callbackQuery.message?.reply_markup?.inline_keyboard ?? [];
+      const others = rows.filter(
+        (r) => !r.some((b) => "callback_data" in b && b.callback_data.endsWith(advice.id)),
+      );
+      const isList = others.some((r) =>
+        r.some((b) => "callback_data" in b && b.callback_data.startsWith("av:")),
+      );
       await ctx
         .editMessageReplyMarkup({
-          reply_markup: { inline_keyboard: decisionKeyboard(advice.id, advice.status) },
+          reply_markup: { inline_keyboard: isList ? others : decisionKeyboard(advice.id, advice.status) },
         })
         .catch(() => undefined);
       await ctx.reply(`${escapeHtml(done.title)}\n${DECISION_TEXT[advice.status]}`, { parse_mode: "HTML" });

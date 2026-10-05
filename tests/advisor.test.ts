@@ -145,6 +145,9 @@ describe("Berater-Runde (rein)", () => {
     expect(loadPrompt("advisor", "v1")).toContain("kritisch");
     expect(loadPrompt("advisor", "v2")).toContain('Website-Werkstatt (bereich "website")');
     expect(loadPrompt("advisor_research", "v2")).toContain("Websites bauen");
+    expect(loadPrompt("advisor", "v3")).toContain("Anruf-Liste");
+    expect(loadPrompt("advisor", "v3")).toContain("`fokus`");
+    expect(loadPrompt("advisor_research", "v3")).toContain("§ 7 Abs. 2 Nr. 1 UWG");
     expect(loadPrompt("advisor_critic", "v1")).toContain("Gegenprüfer");
     expect(loadPrompt("advisor_research", "v1")).toContain("fremder Inhalt");
     expect(zodOutputFormat(advisorOutputSchema).type).toBe("json_schema");
@@ -234,8 +237,17 @@ describe("Berater in Telegram", () => {
     expect(head).toContain("Läuft &lt;gut&gt;");
     expect(head).toContain("1 Vorschlag folgt (3 hat der Gegenprüfer aussortiert)");
     expect(advisorHeader({ ...report, suggestions: [] })).toContain("kein Vorschlag");
-    expect(suggestionList([{ ...suggestion, status: "umsetzen" }])).toContain("👍 Umsetzen");
-    expect(suggestionList([])).toContain("/berater");
+    const list = suggestionList([
+      { ...suggestion, status: "umsetzen" },
+      { ...suggestion, id: "99999999-2222-3333-4444-555555555555", status: "spaeter" },
+    ]);
+    expect(list.text).toContain("👍 Umsetzen");
+    expect(list.text).toContain("1. 📈 <b>Ergotherapie &lt;testen&gt;</b>");
+    expect(list.keyboard.map((r) => r.map((b) => b.text))).toEqual([
+      ["✅ 1. ist umgesetzt", "🗑 1. verwerfen"],
+      ["👍 2. umsetzen", "🗑 2. verwerfen"],
+    ]);
+    expect(suggestionList([]).text).toContain("/berater");
   });
 
   it("combineNotifiers reicht den Bericht weiter", async () => {
@@ -351,6 +363,7 @@ describeDb("Berater-Runde", () => {
     expect(snap.je_foto).toHaveProperty("stock");
     expect(snap.antwort_wann).toEqual({ "auf Erstmail": 1 });
     expect(snap.prototypen_je_vorlage).toEqual({});
+    expect(snap.anrufe).toEqual({ ergebnisse: {}, je_uhrzeit: {} });
     expect(snap.vorbild_notizen).toEqual([]);
 
     const structured = vi
@@ -392,6 +405,7 @@ describeDb("Berater-Runde", () => {
         snapshot: { settings: {}, branches: ["physiotherapie"] },
       },
       "telegram:1",
+      "Ist der Anruf rechtlich ok?",
     );
     expect(report).toMatchObject({ lage: "Erste Antwort da", fazit: "Einer trägt", dropped: 1, searches: 3 });
     expect(report.costUsd).toBeCloseTo(0.35);
@@ -407,6 +421,10 @@ describeDb("Berater-Runde", () => {
     expect(draftCall.input).toContain("<recherche>\nRecherche-7f3a\n</recherche>");
     expect(draftCall.system).not.toContain("Recherche-7f3a");
     expect(research.mock.calls[0]![0]).toMatchObject({ maxSearches: 4, role: "advisor_research" });
+    expect((research.mock.calls[0]![0] as { input: string }).input).toMatch(
+      /^<fokus>\nIst der Anruf rechtlich ok\?\n<\/fokus>/,
+    );
+    expect((structured.mock.calls[1]![0] as { input: string }).input).toContain("<fokus>");
 
     const id = report.suggestions[0]!.id;
     expect(await decideSuggestion(db(), id, "umsetzen", new Date())).toEqual({ title: "Behalten" });

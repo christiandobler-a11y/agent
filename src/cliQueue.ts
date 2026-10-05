@@ -193,7 +193,7 @@ export async function coverage(argv: string[]): Promise<number> {
   }
 }
 
-/** Berater-Runde direkt ausführen (ohne Queue): `avelio berater [--ohne-suche]`. Speichert und gibt den Bericht aus. */
+/** Berater-Runde direkt ausführen (ohne Queue): `avelio berater [--ohne-suche] [--fokus "Frage"]`. Speichert und gibt den Bericht aus. */
 export async function advisor(argv: string[]): Promise<number> {
   const app = await createApp();
   try {
@@ -201,7 +201,8 @@ export async function advisor(argv: string[]): Promise<number> {
     if (!base) throw new Error("Berater nicht eingerichtet");
     const deps = base.deps();
     if (argv.includes("--ohne-suche")) deps.config = { ...deps.config, websuchen: 0 };
-    const r = await runAdvisor(deps, "cli");
+    const i = argv.indexOf("--fokus");
+    const r = await runAdvisor(deps, "cli", i >= 0 ? (argv[i + 1] ?? null) : null);
     console.log(`LAGE: ${r.lage}`);
     if (r.rueckblick) console.log(`RÜCKBLICK: ${r.rueckblick}`);
     console.log(`GEGENPRÜFER: ${r.fazit} (${r.dropped} verworfen)\n`);

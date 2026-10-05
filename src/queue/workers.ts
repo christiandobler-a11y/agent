@@ -174,24 +174,28 @@ export async function startWorkers(ctx: PipelineContext): Promise<void> {
     const result = await runPlanJob(ctx);
     if (result) console.log(JSON.stringify({ level: "info", msg: "Morgen-Paket vorbereitet", ...result }));
   });
-  await ctx.boss.work<{ trigger?: string }>(ADVISOR_QUEUE, { pollingIntervalSeconds: 10 }, async ([job]) => {
-    if (job?.data.trigger === FIND_TRIGGER) {
-      await runFindJob(ctx);
-      return;
-    }
-    const report = await runAdvisorJob(ctx, job?.data.trigger ?? "woche");
-    if (report)
-      console.log(
-        JSON.stringify({
-          level: "info",
-          msg: "Berater-Runde fertig",
-          vorschlaege: report.suggestions.length,
-          verworfen: report.dropped,
-          suchen: report.searches,
-          cost_usd: Math.round(report.costUsd * 1000) / 1000,
-        }),
-      );
-  });
+  await ctx.boss.work<{ trigger?: string; focus?: string }>(
+    ADVISOR_QUEUE,
+    { pollingIntervalSeconds: 10 },
+    async ([job]) => {
+      if (job?.data.trigger === FIND_TRIGGER) {
+        await runFindJob(ctx);
+        return;
+      }
+      const report = await runAdvisorJob(ctx, job?.data.trigger ?? "woche", job?.data.focus);
+      if (report)
+        console.log(
+          JSON.stringify({
+            level: "info",
+            msg: "Berater-Runde fertig",
+            vorschlaege: report.suggestions.length,
+            verworfen: report.dropped,
+            suchen: report.searches,
+            cost_usd: Math.round(report.costUsd * 1000) / 1000,
+          }),
+        );
+    },
+  );
   await ctx.boss.work(SWEEP_QUEUE, { pollingIntervalSeconds: 10 }, async () => {
     await sweep(ctx);
   });

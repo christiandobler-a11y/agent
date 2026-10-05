@@ -92,19 +92,38 @@ export const DECISION_TEXT: Record<SuggestionStatus, string> = {
   erledigt: "✅ Als umgesetzt vermerkt. Die Berater prüfen in den nächsten Runden, ob es etwas bringt.",
 };
 
-/** Übersicht für /vorschlaege: was umgesetzt werden soll und was auf später liegt. */
-export function suggestionList(list: readonly AdvisorSuggestion[]): string {
-  if (list.length === 0) return "Gerade liegt nichts an. Mit /berater startest du eine neue Runde.";
+/** Übersicht für /vorschlaege: was umgesetzt werden soll und was auf später liegt, nummeriert, mit Knöpfen. */
+export function suggestionList(list: readonly AdvisorSuggestion[]): {
+  text: string;
+  keyboard: InlineKeyboardButton[][];
+} {
+  if (list.length === 0)
+    return { text: "Gerade liegt nichts an. Mit /berater startest du eine neue Runde.", keyboard: [] };
+  const keyboard: InlineKeyboardButton[][] = [];
+  let n = 0;
   const group = (status: string, title: string) => {
     const items = list.filter((s) => s.status === status);
     if (items.length === 0) return [];
     return [
       `<b>${title}</b>`,
-      ...items.map(
-        (s) => `• ${AREA[s.area].split(" ")[0]} <b>${escapeHtml(s.title)}</b>: ${escapeHtml(s.proposal)}`,
-      ),
+      ...items.map((s) => {
+        n++;
+        keyboard.push(
+          status === "umsetzen"
+            ? [
+                { text: `✅ ${n}. ist umgesetzt`, callback_data: advisorCallback("erledigt", s.id) },
+                { text: `🗑 ${n}. verwerfen`, callback_data: advisorCallback("verworfen", s.id) },
+              ]
+            : [
+                { text: `👍 ${n}. umsetzen`, callback_data: advisorCallback("umsetzen", s.id) },
+                { text: `🗑 ${n}. verwerfen`, callback_data: advisorCallback("verworfen", s.id) },
+              ],
+        );
+        return `${n}. ${AREA[s.area].split(" ")[0]} <b>${escapeHtml(s.title)}</b>: ${escapeHtml(s.proposal)}`;
+      }),
       "",
     ];
   };
-  return [...group("umsetzen", "👍 Umsetzen"), ...group("spaeter", "💬 Später")].join("\n").trim();
+  const text = [...group("umsetzen", "👍 Umsetzen"), ...group("spaeter", "💬 Später")].join("\n").trim();
+  return { text, keyboard };
 }

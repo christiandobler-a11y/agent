@@ -18,8 +18,9 @@ import { buildSnapshot, type Snapshot, type SnapshotDeps } from "./snapshot.js";
  */
 
 // v2 (06.10.2026): dritte Rolle "Website-Werkstatt" (Vorschau-Bild, Prototyp, fertige Kunden-Website).
-export const ADVISOR_RESEARCH_PROMPT = "v2";
-export const ADVISOR_PROMPT = "v2";
+// v3 (06.10.2026): Ablauf ohne Kaltmails (Anruf-Liste, Ja → Mail, sonst Brief) und optionaler Fokus von Christian.
+export const ADVISOR_RESEARCH_PROMPT = "v3";
+export const ADVISOR_PROMPT = "v3";
 export const ADVISOR_CRITIC_PROMPT = "v1";
 
 const WEEKDAYS = ["sonntag", "montag", "dienstag", "mittwoch", "donnerstag", "freitag", "samstag"] as const;
@@ -167,7 +168,13 @@ function userInput(parts: Record<string, unknown>): string {
     .join("\n\n");
 }
 
-export async function runAdvisor(deps: AdvisorDeps, trigger: string): Promise<AdvisorReport> {
+export async function runAdvisor(
+  deps: AdvisorDeps,
+  trigger: string,
+  /** Konkrete Frage von Christian für diese Runde (/berater <Frage>). */
+  focus?: string | null,
+): Promise<AdvisorReport> {
+  const fokus = focus?.trim() ? { fokus: focus.trim().slice(0, 1000) } : {};
   const { db, llm, config } = deps;
   const snap: Snapshot = await buildSnapshot({ db, now: deps.now(), ...deps.snapshot });
 
@@ -178,7 +185,7 @@ export async function runAdvisor(deps: AdvisorDeps, trigger: string): Promise<Ad
       role: "advisor_research",
       promptVersion: ADVISOR_RESEARCH_PROMPT,
       system: loadPrompt("advisor_research", ADVISOR_RESEARCH_PROMPT),
-      input: userInput({ lagebild: snap }),
+      input: userInput({ ...fokus, lagebild: snap }),
       maxSearches: config.websuchen,
       inputSummary: `Berater-Recherche (${trigger})`,
     });
@@ -190,7 +197,7 @@ export async function runAdvisor(deps: AdvisorDeps, trigger: string): Promise<Ad
     role: "advisor",
     promptVersion: ADVISOR_PROMPT,
     system: loadPrompt("advisor", ADVISOR_PROMPT),
-    input: userInput({ lagebild: snap, recherche: research.text }),
+    input: userInput({ ...fokus, lagebild: snap, recherche: research.text }),
     schema: advisorOutputSchema,
     inputSummary: `Berater-Entwürfe (${trigger})`,
   });
@@ -203,6 +210,7 @@ export async function runAdvisor(deps: AdvisorDeps, trigger: string): Promise<Ad
       promptVersion: ADVISOR_CRITIC_PROMPT,
       system: loadPrompt("advisor_critic", ADVISOR_CRITIC_PROMPT),
       input: userInput({
+        ...fokus,
         lagebild: snap,
         entwuerfe: drafts.output.vorschlaege.map((d, i) => ({ nr: i + 1, ...d })),
       }),

@@ -117,6 +117,8 @@ export interface Snapshot {
   abdeckung: CoverageLine[];
   kosten_28_tage_usd: Record<string, number>;
   einstellungen: Record<string, unknown>;
+  /** Anruf-Liste: Ergebnisse insgesamt und nach Uhrzeit (Christian telefoniert gegen 8 Uhr und mittags). */
+  anrufe: { ergebnisse: Record<string, number>; je_uhrzeit: Record<string, Record<string, number>> };
   /** Websites: gebaute Prototypen je Vorlage und Christians Notizen zu Vorbild-Websites (neueste zuerst). */
   prototypen_je_vorlage: Record<string, number>;
   vorbild_notizen: { branche: string | null; name: string; notiz: string }[];
@@ -237,6 +239,18 @@ export async function buildSnapshot(deps: SnapshotDeps): Promise<Snapshot> {
       group by service, operation`,
     [new Date(now.getTime() - 28 * 86_400_000)],
   );
+  const { rows: calls } = await db.query<{ call: string; hour: number; n: number }>(
+    `select meta->>'call' as call, extract(hour from created_at at time zone 'Europe/Berlin')::int as hour,
+            count(*)::int as n
+       from interactions where type = 'note' and meta ? 'call' group by 1, 2`,
+  );
+  const callTotals: Record<string, number> = {};
+  const callByHour: Record<string, Record<string, number>> = {};
+  for (const c of calls) {
+    callTotals[c.call] = (callTotals[c.call] ?? 0) + c.n;
+    const h = `${String(c.hour).padStart(2, "0")} Uhr`;
+    callByHour[h] = { ...(callByHour[h] ?? {}), [c.call]: (callByHour[h]?.[c.call] ?? 0) + c.n };
+  }
   const { rows: protos } = await db.query<{ template: string; n: number }>(
     "select template, count(distinct company_id)::int as n from prototypes group by template order by n desc",
   );
@@ -277,6 +291,7 @@ export async function buildSnapshot(deps: SnapshotDeps): Promise<Snapshot> {
     abdeckung: deps.coverage ? await deps.coverage().catch(() => []) : [],
     kosten_28_tage_usd: Object.fromEntries(costs.map((c) => [c.k, Math.round(c.usd * 100) / 100])),
     einstellungen: deps.settings,
+    anrufe: { ergebnisse: callTotals, je_uhrzeit: callByHour },
     prototypen_je_vorlage: Object.fromEntries(protos.map((p) => [p.template, p.n])),
     vorbild_notizen: notes.map((n) => ({ branche: n.branch_key, name: n.name, notiz: n.note.slice(0, 300) })),
     fruehere_vorschlaege: past.map((p) => ({

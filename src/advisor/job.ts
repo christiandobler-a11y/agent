@@ -70,16 +70,28 @@ export async function runFindJob(ctx: PipelineContext): Promise<string | null> {
 }
 
 /** Runde einreihen (Sweep oder /berater). Läuft schon eine, kommt keine zweite dazu. */
-export async function startAdvisor(ctx: PipelineContext, trigger: string): Promise<boolean> {
-  const id = await ctx.boss.send(ADVISOR_QUEUE, { trigger }, { singletonKey: "advisor" });
+export async function startAdvisor(
+  ctx: PipelineContext,
+  trigger: string,
+  focus?: string | null,
+): Promise<boolean> {
+  const id = await ctx.boss.send(
+    ADVISOR_QUEUE,
+    { trigger, ...(focus?.trim() ? { focus: focus.trim() } : {}) },
+    { singletonKey: "advisor" },
+  );
   return id !== null;
 }
 
 /** Job: Runde ausführen und den Bericht melden. Fehler meldet sie als kurze Info statt still zu scheitern. */
-export async function runAdvisorJob(ctx: PipelineContext, trigger: string): Promise<AdvisorReport | null> {
+export async function runAdvisorJob(
+  ctx: PipelineContext,
+  trigger: string,
+  focus?: string | null,
+): Promise<AdvisorReport | null> {
   if (!ctx.advisor) return null;
   try {
-    const report = await runAdvisor(ctx.advisor.deps(), trigger);
+    const report = await runAdvisor(ctx.advisor.deps(), trigger, focus);
     await ctx.notifier.advisorReport?.(report);
     return report;
   } catch (err) {
