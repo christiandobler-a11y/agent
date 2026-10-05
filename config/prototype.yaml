@@ -49,7 +49,7 @@ teaser:
   # (nie Fotos von Patienten). Ca. 2 Cent je Praxis, einmal je Praxis.
   google_fotos: true
   # Ohne eigenes Foto (05.10.2026): stock = Stockfoto, flaechen = nur Farbflächen in der Praxisfarbe (kein fremdes Foto)
-  ohne_foto: stock
+  ohne_foto: flaechen # 05.10.2026 Christian: Farbflächen statt Stockfoto
   # Schrift der Überschriften (05.10.2026, zum Ausprobieren): manrope (klar), fraunces (warme Serifen), dmserif
   # (elegant), outfit (rund), jakarta (kräftig), sora (markant)
   schrift: fraunces # 05.10.2026 Christian: Bild 2 von 7 (Fraunces, warme Serifen)

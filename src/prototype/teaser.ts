@@ -1197,7 +1197,7 @@ export interface TeaserDeps {
 
 /** Foto und Farben eines gebauten Vorschau-Bildes. */
 export interface TeaserLook {
-  foto: "praxis" | "stock";
+  foto: "praxis" | "stock" | "flaechen";
   /** Bei eigenem Foto: Website oder Google-Profil. */
   quelle?: "website" | "google" | null;
   motiv: string | null;
@@ -1290,7 +1290,7 @@ export async function teaserForCompany(db: DbClient, t: TeaserDeps, company: Com
   // Was das Bild zeigt (Foto und Farben), für die spätere Auswertung je Mail (outreach/draft.ts → meta.teaser_look).
   const pal = paletteOf({ palette: t.palette ?? null, colors: choice.palette });
   await setState(db, teaserLookKey(company.id), {
-    foto: own ? "praxis" : "stock",
+    foto: own ? "praxis" : t.withoutPhoto === "flaechen" ? "flaechen" : "stock",
     quelle: own?.quelle ?? null,
     motiv: own?.motiv ?? null,
     logo: Boolean(hero?.logo),
