@@ -101,8 +101,29 @@ function fakeMailbox() {
 const idOf = (box: { address: string }, n: number) =>
   `${(box as unknown as { prefix: string }).prefix}${n}@example.de`;
 
-const config = (over: Partial<AutopilotConfig["neue_kontakte"]> = {}): AutopilotConfig => {
+/**
+ * Die Tests decken den Mail-Ablauf ab (Stand vor dem 06.10.2026: Erstkontakt per Mail, Stufen 20/30/45, einmal
+ * nachfassen); der Brief-Modus hat eigene Tests.
+ */
+const mailConfig = (): AutopilotConfig => {
   const c = loadAutopilotConfig();
+  return {
+    ...c,
+    erstkontakt: "mail",
+    neue_kontakte: {
+      ...c.neue_kontakte,
+      stufen: [
+        { ab_tag: 0, pro_tag: 20 },
+        { ab_tag: 7, pro_tag: 30 },
+        { ab_tag: 14, pro_tag: 45 },
+      ],
+    },
+    nachfassen: { ...c.nachfassen, hoechstens: 1 },
+  };
+};
+
+const config = (over: Partial<AutopilotConfig["neue_kontakte"]> = {}): AutopilotConfig => {
+  const c = mailConfig();
   return { ...c, neue_kontakte: { ...c.neue_kontakte, ...over } };
 };
 
@@ -800,7 +821,7 @@ describeDb("Morgen-Paket mit Datenbank", () => {
       now: () => now,
       notifier: { planReady },
       autopilot: {
-        config: { ...loadAutopilotConfig(), suche: { ...loadAutopilotConfig().suche, aktiv: false } },
+        config: { ...mailConfig(), suche: { ...mailConfig().suche, aktiv: false } },
         planDeps: () => ({}),
       },
     } as unknown as PipelineContext;
@@ -968,7 +989,7 @@ describeDb("Morgen-Paket mit Datenbank", () => {
   it("Nachtsuche: nächste offene Kombination, eine je Nacht, nie zwei gleichzeitig", async () => {
     const send = vi.fn(() => Promise.resolve("job"));
     let now = new Date("2026-10-05T18:00:00Z"); // 20:00 Berlin, noch nicht dran
-    const base = loadAutopilotConfig();
+    const base = mailConfig();
     const ctx = {
       db: db(),
       boss: { send },
@@ -1053,6 +1074,65 @@ describeDb("Morgen-Paket mit Datenbank", () => {
     expect(result.emails).toBe(1);
     expect(result.skipped).toEqual([{ name: bad.name, reason: "Fehler: Modell überlastet" }]);
     expect((await planItems(db(), "2026-10-05")).map((i) => i.company_id)).toEqual([good.id]);
+  });
+
+  it("Brief-Modus: neue Leads bekommen Briefe statt Mails, die Stufen zählen Briefe", async () => {
+    await db().query("update companies set status = 'LOST'");
+    await db().query("delete from outreach_plan");
+    const tmp = mkdtempSync(join(tmpdir(), "avelio-brief-"));
+    const shot = join(tmp, "desktop.jpg");
+    await sharp({ create: { width: 1440, height: 1800, channels: 3, background: "#fff" } })
+      .jpeg()
+      .toFile(shot);
+    const a = await lead({ score: 90 });
+    const b = await lead({ score: 85 });
+    const c = await lead({ score: 80 });
+    const noAddress = await lead({ score: 95, street: null });
+    for (const x of [a, b, c, noAddress])
+      await insertWebsiteSnapshot(db(), {
+        companyId: x.id,
+        url: `https://${x.id}.de`,
+        screenshotDesktop: shot,
+        screenshotMobile: shot,
+      });
+    const structured = vi.fn(() =>
+      Promise.resolve({
+        output: { markierungen: [], zeilen: "Ihre Seite ist mir aufgefallen.", popup_im_bild: false },
+        agentRunId: "r",
+        costUsd: 0,
+        model: "m",
+      }),
+    );
+    const llm = { structured } as unknown as LlmGateway;
+    const mx = vi.fn(() => Promise.resolve(true));
+    const result = await buildDailyPlan({
+      db: db(),
+      now: () => NOW,
+      config: { ...config({ stufen: [{ ab_tag: 0, pro_tag: 2 }] }), erstkontakt: "brief" },
+      letter: {
+        db: db(),
+        llm,
+        outreach: loadOutreachConfig(),
+        branches: {},
+        now: () => NOW,
+        contact: { whatsapp: null, phone: null },
+        render: () => Promise.resolve({ pdf: Buffer.from("%PDF"), png: Buffer.from("png") }),
+        desktopScreenPx: 900,
+      },
+      prototype: null,
+      mx,
+      lettersDir: tmp,
+    });
+    expect(result.emails).toBe(0);
+    expect(result.letters).toBe(2);
+    expect(result.skipped).toEqual([{ name: noAddress.name, reason: "keine Anschrift für den Brief" }]);
+    const items = await planItems(db(), "2026-10-05");
+    expect(items.map((i) => [i.company_id, i.channel, i.kind])).toEqual([
+      [a.id, "letter", "new"],
+      [b.id, "letter", "new"],
+    ]);
+    // Keine MX-Prüfung, keine Mail
+    expect(mx).not.toHaveBeenCalled();
   });
 
   it("Nachtsuche überspringt eine Kombination nach zwei Fehlschlägen", async () => {

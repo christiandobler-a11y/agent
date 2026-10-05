@@ -6,13 +6,15 @@ zeiten:
   mittags: "12:00" # kurzer Zwischenstand ("Mahlzeit, Chef!"), 04.10.2026 Christians Wunsch
   abends: "19:00" # kurze Bilanz des Tages
 
-# 04.10.2026 (Christian: mehr als 15, aber nicht im Spam landen): Die neue Adresse wird langsam aufgewärmt.
-# Stufen nach Tagen seit der ersten gesendeten Mail; Spamfilter gewöhnen sich an den Absender.
+# 06.10.2026 (Christian): Erstkontakt per Brief statt Kaltmail (§ 7 UWG: Werbe-Mails ohne Einwilligung sind auch an
+# Firmen unzulässig, Werbebriefe nicht). Mails nur noch an Praxen, die sich selbst gemeldet haben.
+erstkontakt: brief
+# Neue Kontakte je Werktag (im Brief-Modus: Briefe), Stufen nach Tagen seit dem ersten eingeworfenen Brief.
+# 06.10.2026: Start mit 5 Briefen am Tag, nach zwei Wochen 10, wenn Öffnungen und Antworten kommen.
 neue_kontakte:
   stufen:
-    - { ab_tag: 0, pro_tag: 20 }
-    - { ab_tag: 7, pro_tag: 30 }
-    - { ab_tag: 14, pro_tag: 45 }
+    - { ab_tag: 0, pro_tag: 5 }
+    - { ab_tag: 14, pro_tag: 10 }
   nur_werktags: true # Mo bis Fr; am Wochenende nur Nachfassen
   # Nur Leads dieser Branchen (04.10.2026: Fokus Physio). [] = alle Branchen. Von Christian vorgemerkte Leads
   # ("bereit für Kontakt") kommen immer dran.
@@ -36,7 +38,7 @@ prototyp_fuer_neue: true
 
 nachfassen:
   nach_tagen: 5 # nach der ersten Mail ohne Antwort
-  hoechstens: 1 # einmal nachfassen, danach Ruhe
+  hoechstens: 0 # 06.10.2026: keine Nachfass-Mails mehr an Kaltkontakte (§ 7 UWG); vorher 1
 
 # Nachtsuche (03.10.2026, Christians Wunsch: "der sucht das alles von alleine, ist er mit dem einen durch, geht er ans
 # nächste"): Ab `ab` startet Avelio die nächste noch nicht vollständig abgesuchte Kombination aus Region × Branche

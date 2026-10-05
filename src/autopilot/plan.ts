@@ -56,6 +56,12 @@ export const autopilotConfigSchema = z.object({
     nachfassen_nach_tagen: z.number().int().min(1).default(7),
   }),
   prototyp_fuer_neue: z.boolean(),
+  /**
+   * Erstkontakt (06.10.2026, Christian): "brief" = neue Leads bekommen einen Brief (Befund-Seite mit Vorschau-Bild und
+   * QR-Code zur Vorschau-Seite) statt einer Kaltmail; die Stufen in `neue_kontakte` zählen dann Briefe je Werktag.
+   * Grund: Werbe-Mails ohne Einwilligung sind nach § 7 UWG auch an Firmen unzulässig, Werbebriefe nicht.
+   */
+  erstkontakt: z.enum(["mail", "brief"]).default("mail"),
   nachfassen: z.object({ nach_tagen: z.number().int().min(1), hoechstens: z.number().int().min(0) }),
   suche: z
     .object({
@@ -186,6 +192,15 @@ async function firstSentAt(db: Db, from: string | null | undefined): Promise<Dat
       where type = 'draft' and channel = 'email' and meta ? 'sent_at'
         and ($1::text is null or lower(meta->>'from') = lower($1))`,
     [from ?? null],
+  );
+  return rows[0]?.first ?? null;
+}
+
+/** Erster als eingeworfen markierter neuer Brief (Stufen im Brief-Modus zählen ab da). */
+async function firstLetterAt(db: Db): Promise<Date | null> {
+  const { rows } = await db.query<{ first: Date | null }>(
+    `select min(done_at) as first from outreach_plan
+      where channel = 'letter' and kind = 'new' and status = 'done'`,
   );
   return rows[0]?.first ?? null;
 }
@@ -353,6 +368,7 @@ export async function buildDailyPlan(deps: PlanDeps, by = "autopilot"): Promise<
       }
     }
 
+    const letterMode = config.erstkontakt === "brief";
     // 1b. Brief als zweites Nachfassen für sehr gute Leads ohne Antwort (Christian, 04.10.2026). Briefe gesammelt
     // nur am Brief-Tag (05.10.2026).
     const letterDay = berlinWeekday(now) === config.briefe.tag;
@@ -369,13 +385,15 @@ export async function buildDailyPlan(deps: PlanDeps, by = "autopilot"): Promise<
       });
     }
 
-    // 2. Neue Leads.
-    const bounces = await recentBounces(db, now, config.neue_kontakte.bremse.tage);
-    const spamSeen = await recentSeedProblem(db, now);
+    // 2. Neue Leads. Im Brief-Modus zählen die Stufen Briefe; Bremsen für Unzustellbare und Spam gelten nur für Mails.
+    const bounces = letterMode
+      ? { sent: 0, bounced: 0 }
+      : await recentBounces(db, now, config.neue_kontakte.bremse.tage);
+    const spamSeen = letterMode ? false : await recentSeedProblem(db, now);
     const { count: target, braked } = dailyNewCount(
       config,
       now,
-      await firstSentAt(db, deps.senderAddress),
+      letterMode ? await firstLetterAt(db) : await firstSentAt(db, deps.senderAddress),
       bounces,
       spamSeen,
     );
@@ -387,15 +405,17 @@ export async function buildDailyPlan(deps: PlanDeps, by = "autopilot"): Promise<
       );
     // Nur neue Mails zählen zum Tagesziel; Briefe kommen gesammelt am Brief-Tag dazu. Wer ausfällt (keine Mail,
     // Fehler) oder aussortiert wurde, wird durch den nächsten Kandidaten ersetzt (/nachlegen baut erneut).
+    const newChannel = letterMode ? "letter" : "email";
     const already = (await planItems(db, date)).filter(
-      (i) => i.kind === "new" && i.channel === "email" && i.status !== "dropped",
+      (i) => i.kind === "new" && i.channel === newChannel && i.status !== "dropped",
     ).length;
+    let newLetters = 0;
     const branches = config.neue_kontakte.branchen ?? config.suche.branchen;
-    const pool = Math.max(0, target - already) * 4 + (lettersLeft > 0 ? 300 : 0);
+    const pool = Math.max(0, target - already) * 4 + (lettersLeft > 0 && !letterMode ? 300 : 0);
     const groups = await contactedGroups(db, date);
     for (const company of await candidates(db, date, pool, branches, config.neue_kontakte.heimat)) {
-      const mailsDone = result.emails + already >= target;
-      if (mailsDone && lettersLeft <= 0) break;
+      const mailsDone = (letterMode ? newLetters : result.emails) + already >= target;
+      if (mailsDone && (letterMode || lettersLeft <= 0)) break;
       await isolated(company, result, async () => {
         const person = await recipient(db, company.id);
         // Anderer Standort eines schon angeschriebenen oder heute geplanten Betriebs: auslassen (zählt nicht).
@@ -413,9 +433,13 @@ export async function buildDailyPlan(deps: PlanDeps, by = "autopilot"): Promise<
           });
           return;
         }
-        const mailOk = person.email ? await deps.mx(person.email) : false;
         const hasAddress = Boolean(company.street && company.postal_code);
-        const channel = chooseChannel({ hasAddress, mailOk }, lettersLeft);
+        if (letterMode && !hasAddress) {
+          result.skipped.push({ name: company.name, reason: "keine Anschrift für den Brief" });
+          return;
+        }
+        const mailOk = !letterMode && person.email ? await deps.mx(person.email) : false;
+        const channel = letterMode ? "letter" : chooseChannel({ hasAddress, mailOk }, lettersLeft);
         if (!channel) {
           if (!mailsDone)
             result.skipped.push({
@@ -428,14 +452,23 @@ export async function buildDailyPlan(deps: PlanDeps, by = "autopilot"): Promise<
         }
         // Tagesziel erreicht: nur noch Briefe sammeln (am Brief-Tag).
         if (channel === "email" && mailsDone) return;
-        if (usesTeaser(deps.teaser, company)) {
+        const teaser = usesTeaser(deps.teaser, company);
+        if (teaser) {
           try {
             await teaserForCompany(db, deps.teaser!, company);
             result.prototypes++;
           } catch (err) {
             result.warnings.push(`Vorschau-Bild ${company.name}: ${String(err).slice(0, 120)}`);
           }
-        } else if (deps.prototype && config.prototyp_fuer_neue && company.segment !== "NO_WEBSITE") {
+        }
+        // Prototyp (Vorschau-Seite): ohne Vorschau-Bild immer, im Brief-Modus auch dazu, damit der QR-Code im Brief
+        // auf eine eigene Seite der Praxis führt.
+        if (
+          (!teaser || letterMode) &&
+          deps.prototype &&
+          config.prototyp_fuer_neue &&
+          company.segment !== "NO_WEBSITE"
+        ) {
           try {
             const p = await buildPrototype(deps.prototype, company, by);
             if (!("kind" in p)) result.prototypes++;
@@ -446,7 +479,8 @@ export async function buildDailyPlan(deps: PlanDeps, by = "autopilot"): Promise<
         }
         if (channel === "letter") {
           if (!(await planLetter(deps, company, date, by, "new", result))) return;
-          lettersLeft--;
+          if (letterMode) newLetters++;
+          else lettersLeft--;
           groups.add(keys, company.name);
         } else {
           const mail = await draftEmail(outreachDeps, company, by);

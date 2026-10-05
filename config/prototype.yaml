@@ -53,7 +53,9 @@ teaser:
   eigenes_foto: true
   # Zweite Quelle (05.10.2026, Christian): Fotos aus dem Google-Profil, nur die von der Praxis selbst hochgeladenen
   # (nie Fotos von Patienten). Ca. 2 Cent je Praxis, einmal je Praxis.
-  google_fotos: true
+  # 06.10.2026: aus. Die Places-Bedingungen erlauben die Fotos nur zur Anzeige mit Urhebervermerk, nicht in
+  # eigenen Entwürfen und Briefen; im Zweifel wäre der API-Schlüssel (Lead-Suche) in Gefahr.
+  google_fotos: false
   # Ohne eigenes Foto (05.10.2026): stock = Stockfoto, flaechen = nur Farbflächen in der Praxisfarbe (kein fremdes Foto)
   ohne_foto: stock # 05.10.2026 Christian: Farbflächen kommen gegen echte Fotos nicht an, lieber ein Stockfoto
   # Schrift der Überschriften (05.10.2026, zum Ausprobieren): manrope (klar), fraunces (warme Serifen), dmserif

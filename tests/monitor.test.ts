@@ -51,7 +51,18 @@ describe("Kontrollmail und Zahlen (rein)", () => {
   });
 
   it("Spam bremst: eine Stufe zurück, auf der ersten Stufe halbiert", () => {
-    const c = loadAutopilotConfig();
+    const base = loadAutopilotConfig();
+    const c = {
+      ...base,
+      neue_kontakte: {
+        ...base.neue_kontakte,
+        stufen: [
+          { ab_tag: 0, pro_tag: 20 },
+          { ab_tag: 7, pro_tag: 30 },
+          { ab_tag: 14, pro_tag: 45 },
+        ],
+      },
+    };
     const monday = new Date("2026-10-05T06:00:00Z");
     expect(dailyNewCount(c, monday, null, undefined, true)).toEqual({ count: 10, braked: true });
     expect(dailyNewCount(c, monday, new Date("2026-09-01T06:00:00Z"), undefined, true).count).toBe(30);

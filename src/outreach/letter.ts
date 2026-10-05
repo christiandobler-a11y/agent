@@ -205,16 +205,17 @@ export async function draftLetter(
   const seed = seedOf(company.id);
   const previous = prior[0]?.meta?.zeilen ?? null;
 
-  // Nachher: Kopfbereich des letzten Prototyps, falls es einen gibt.
-  // Sonst das einheitliche Vorschau-Bild (ohne QR-Code, es gibt keine Seite dazu).
-  const after =
-    (deps.prototype ? await prototypeHero(db, company.id, deps.prototype) : null) ??
-    (deps.teaserDir && teaserExists(deps.teaserDir, company.id)
-      ? await printImage(teaserPath(deps.teaserDir, company.id)).then(
-          (dataUri) => ({ dataUri, url: null, teaser: true }),
-          () => null,
-        )
-      : null);
+  // Nachher: das einheitliche Vorschau-Bild, sonst der Kopfbereich des letzten Prototyps.
+  // 06.10.2026 (Brief als Erstkontakt): Gibt es beides, zeigt der Brief das Vorschau-Bild und der QR-Code führt
+  // zur Vorschau-Seite des Prototyps.
+  const proto = deps.prototype ? await prototypeHero(db, company.id, deps.prototype) : null;
+  const teaserImage =
+    deps.teaserDir && teaserExists(deps.teaserDir, company.id)
+      ? await printImage(teaserPath(deps.teaserDir, company.id)).catch(() => null)
+      : null;
+  const after = teaserImage
+    ? { dataUri: teaserImage, url: proto?.url ?? null, teaser: true as const }
+    : proto;
 
   const branch = company.branch_key ? deps.branches[company.branch_key] : undefined;
   const data = {
