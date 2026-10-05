@@ -615,9 +615,24 @@ export function probeText(r: {
   sentTo: string | null;
   costUsd: number;
   warnings: string[];
+  look?: {
+    foto: string;
+    motiv: string | null;
+    farbe: string;
+    logo: boolean;
+    schrift: string;
+    grund: string | null;
+  } | null;
 }): string {
+  const l = r.look;
+  const look = l
+    ? l.foto === "praxis"
+      ? `📷 Eigenes Foto der Praxis${l.motiv ? ` (${escapeHtml(l.motiv)})` : ""}, Farben ${l.farbe === "aus_foto" ? "aus dem Foto" : escapeHtml(l.farbe)}${l.logo ? ", Logo ✓" : ""} · Schrift ${escapeHtml(l.schrift)}`
+      : `📷 Stockfoto, weil: ${escapeHtml(l.grund ?? "?")}${l.logo ? " · Logo ✓" : ""} · Schrift ${escapeHtml(l.schrift)}`
+    : null;
   return [
     `🧪 <b>Probelauf</b> · ${escapeHtml(r.company.name)}`,
+    ...(look ? [look] : []),
     r.sentTo
       ? `📬 Die Probe ging an <code>${escapeHtml(r.sentTo)}</code> (Betreff mit „[Probe]“). Schau sie dir in deiner Mail-App an.`
       : "📭 Postfach nicht eingerichtet: die Mail steht nur hier (App-Passwort, DEPLOY.md Abschnitt 12).",

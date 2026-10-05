@@ -48,13 +48,31 @@ export interface HeroResult {
   /** Farbwelt aus dem Foto; fehlt sie (farbloses Foto), gilt die Standardfarbe. */
   palette?: HeroPalette | null;
   reason?: string;
+  /** Logo der Praxis (PNG, unabhängig vom Foto); `wide` = Schriftzug, der den Namen schon enthält. */
+  logo?: { file: string; wide: boolean } | null;
   checkedAt: string;
 }
 
-export const heroKey = (companyId: string) => `hero:${companyId}`;
+export interface LogoCandidate {
+  url: string;
+  width: number;
+  height: number;
+  shownWidth: number;
+  shownHeight: number;
+  top: number;
+}
 
-const MIN_WIDTH = 1000;
-const MIN_HEIGHT = 520;
+export interface PageImages {
+  images: ImageCandidate[];
+  logos: LogoCandidate[];
+}
+
+// v2 (05.10.2026, mit Logo): ältere Ergebnisse ohne Logo werden neu geprüft.
+export const heroKey = (companyId: string) => `hero:v2:${companyId}`;
+
+// Viele Praxis-Seiten liefern Fotos um 900 bis 1200 px; im Vorschau-Bild (Laptop) reicht das unter dem Farbschleier.
+const MIN_WIDTH = 900;
+const MIN_HEIGHT = 480;
 const BAD_NAME =
   /(logo|icon|favicon|sprite|badge|siegel|zertifik|certif|award|qr|map|karte|maps|placeholder|dummy|banner-ad|button|arrow|pfeil|avatar|signature|unterschrift|partner|sponsor|kasse|krankenkasse)/i;
 
@@ -130,12 +148,25 @@ export function isPrivateIp(ip: string): boolean {
   );
 }
 
-async function download(url: string, fetchFn: typeof fetch): Promise<Buffer | null> {
-  if (!(await isPublicUrl(url))) return null;
-  const res = await fetchFn(url, { signal: AbortSignal.timeout(15_000), redirect: "follow" }).catch(
-    () => null,
-  );
-  if (!res?.ok || !/^image\/(jpeg|jpg|png|webp|avif)/i.test(res.headers.get("content-type") ?? ""))
+async function download(url: string, fetchFn: typeof fetch, allowSvg = false): Promise<Buffer | null> {
+  // Weiterleitungen selbst folgen und jede Adresse prüfen (sonst könnte eine fremde Seite auf interne Adressen zeigen).
+  let target = url;
+  let res: Response | null = null;
+  for (let hop = 0; hop < 4; hop++) {
+    if (!(await isPublicUrl(target))) return null;
+    res = await fetchFn(target, { signal: AbortSignal.timeout(15_000), redirect: "manual" }).catch(
+      () => null,
+    );
+    const next = res && res.status >= 300 && res.status < 400 ? res.headers.get("location") : null;
+    if (!next) break;
+    target = new URL(next, target).href;
+    res = null;
+  }
+  const type = res?.headers.get("content-type") ?? "";
+  if (
+    !res?.ok ||
+    !(/^image\/(jpeg|jpg|png|webp|avif)/i.test(type) || (allowSvg && /^image\/svg\+xml/i.test(type)))
+  )
     return null;
   const len = Number(res.headers.get("content-length") ?? 0);
   if (len > 12_000_000) return null;
@@ -143,9 +174,55 @@ async function download(url: string, fetchFn: typeof fetch): Promise<Buffer | nu
   return buf.length > 12_000_000 ? null : buf;
 }
 
-/** Große Bilder der Startseite einsammeln (läuft im Browser der Praxis-Seite). */
-export async function collectCandidates(url: string, executablePath?: string): Promise<ImageCandidate[]> {
-  const browser = await chromium.launch(executablePath ? { executablePath } : {});
+/** Logo-Kandidaten (rein): oben auf der Seite, nicht winzig; das erste ist meist das richtige (Kopfzeile). */
+export function rankLogos(cands: readonly LogoCandidate[]): LogoCandidate[] {
+  const seen = new Set<string>();
+  return cands
+    .filter((c) => {
+      if (!/^https?:\/\//i.test(c.url) || seen.has(c.url)) return false;
+      seen.add(c.url);
+      if (c.top > 300 || c.shownHeight < 24 || c.shownWidth < 40) return false;
+      const svg = /\.svg(\?|$)/i.test(c.url);
+      // Pixel-Logos: genug Auflösung, damit es im Bild nicht verschwimmt.
+      return svg || c.height >= 60 || c.width >= 200;
+    })
+    .slice(0, 2);
+}
+
+/** Logo laden und prüfen: als PNG mit 240 px Höhe; auf weißem Grund sichtbar (keine weißen Logos). */
+export async function prepareLogo(buf: Buffer): Promise<{ png: Buffer; wide: boolean } | null> {
+  try {
+    const png = await sharp(buf, { density: 300 })
+      .trim()
+      .resize({ height: 240, withoutEnlargement: false })
+      .png()
+      .toBuffer();
+    const meta = await sharp(png).metadata();
+    const { data, info } = await sharp(png).ensureAlpha().raw().toBuffer({ resolveWithObject: true });
+    let sum = 0;
+    let weight = 0;
+    for (let i = 0; i < data.length; i += info.channels) {
+      const a = data[i + 3]! / 255;
+      sum += a * ((0.2126 * data[i]! + 0.7152 * data[i + 1]! + 0.0722 * data[i + 2]!) / 255);
+      weight += a;
+    }
+    if (weight === 0 || sum / weight > 0.86) return null; // weiß oder fast unsichtbar auf Weiß
+    return { png, wide: (meta.width ?? 0) / (meta.height ?? 1) >= 2.4 };
+  } catch {
+    return null;
+  }
+}
+
+/** Große Bilder und das Logo der Startseite einsammeln (läuft im Browser der Praxis-Seite). */
+export async function collectCandidates(
+  url: string,
+  executablePath?: string,
+  proxy?: string,
+): Promise<PageImages> {
+  const browser = await chromium.launch({
+    ...(executablePath ? { executablePath } : {}),
+    ...(proxy ? { proxy: { server: proxy } } : {}),
+  });
   try {
     const page = await browser.newPage({ viewport: { width: 1440, height: 900 } });
     await page.goto(url, { waitUntil: "load", timeout: 30_000 });
@@ -155,24 +232,40 @@ export async function collectCandidates(url: string, executablePath?: string): P
     await page.evaluate("window.scrollTo(0, 0)");
     await page.waitForTimeout(400);
     return await page.evaluate(`(() => {
-      const out = [];
+      const images = [];
+      const logos = [];
       const abs = (u) => { try { return new URL(u, location.href).href } catch { return null } };
+      const isLogo = (img) => {
+        const own = [img.currentSrc || img.src, img.alt, img.className, img.id].join(" ");
+        if (/logo/i.test(own)) return true;
+        const a = img.closest("a");
+        const home = a && (() => { try { const h = new URL(a.href, location.href); return h.origin === location.origin && (h.pathname === "/" || h.pathname === "/index.html") } catch { return false } })();
+        const box = img.closest("[class*=logo i],[id*=logo i]");
+        return Boolean(box) || Boolean(home && img.closest("header,nav,[class*=header i]"));
+      };
       for (const img of document.images) {
         const r = img.getBoundingClientRect();
-        const src = abs(img.currentSrc || img.src);
-        if (src) out.push({ url: src, width: img.naturalWidth, height: img.naturalHeight, shownWidth: r.width, shownHeight: r.height, top: r.top + scrollY, alt: img.alt || "", kind: "img" });
+        // Lazy-Loading (WordPress u. a.): echtes Bild steht in data-src/data-lazy-src/data-srcset, src ist ein Platzhalter.
+        const lazy = img.dataset.src || img.dataset.lazySrc || img.dataset.original || ((img.dataset.srcset || img.dataset.lazySrcset || "").split(",").map((x) => x.trim().split(" ")[0]).filter(Boolean).pop());
+        const raw = img.currentSrc || img.src;
+        const placeholder = !raw || raw.startsWith("data:");
+        const src = abs(placeholder && lazy ? lazy : raw);
+        if (!src) continue;
+        if (placeholder && lazy) { images.push({ url: src, width: 0, height: 0, shownWidth: r.width, shownHeight: r.height, top: r.top + scrollY, alt: img.alt || "", kind: "img" }); continue; }
+        if (isLogo(img)) logos.push({ url: src, width: img.naturalWidth, height: img.naturalHeight, shownWidth: r.width, shownHeight: r.height, top: r.top + scrollY });
+        else images.push({ url: src, width: img.naturalWidth, height: img.naturalHeight, shownWidth: r.width, shownHeight: r.height, top: r.top + scrollY, alt: img.alt || "", kind: "img" });
       }
       for (const el of document.querySelectorAll("body *")) {
         const r = el.getBoundingClientRect();
         if (r.width < 600 || r.height < 250 || r.top + scrollY > 2200) continue;
         const m = /url\\(["']?([^"')]+)["']?\\)/.exec(getComputedStyle(el).backgroundImage || "");
         const src = m && abs(m[1]);
-        if (src) out.push({ url: src, width: 0, height: 0, shownWidth: r.width, shownHeight: r.height, top: r.top + scrollY, alt: "", kind: "bg" });
+        if (src) images.push({ url: src, width: 0, height: 0, shownWidth: r.width, shownHeight: r.height, top: r.top + scrollY, alt: "", kind: "bg" });
       }
       const og = document.querySelector('meta[property="og:image"]');
       const ogSrc = og && abs(og.getAttribute("content"));
-      if (ogSrc) out.push({ url: ogSrc, width: 0, height: 0, shownWidth: 0, shownHeight: 0, top: 0, alt: "", kind: "og" });
-      return out;
+      if (ogSrc) images.push({ url: ogSrc, width: 0, height: 0, shownWidth: 0, shownHeight: 0, top: 0, alt: "", kind: "og" });
+      return { images, logos };
     })()`);
   } finally {
     await browser.close();
@@ -180,7 +273,7 @@ export async function collectCandidates(url: string, executablePath?: string): P
 }
 
 export const heroOutputSchema = z.object({
-  /** Nummer des gewählten Bildes (1 bis n) oder null, wenn keins taugt. */
+  /** Nummer des gewählten Fotos (1 bis n) oder null, wenn keins taugt. */
   wahl: z.number().int().min(1).nullable(),
   /** 1 bis 5: wie gut passt es als Hero einer modernen Praxis-Website? */
   passt: z.number().int().min(1).max(5),
@@ -189,10 +282,12 @@ export const heroOutputSchema = z.object({
   fokus_x: z.number().min(0).max(100),
   fokus_y: z.number().min(0).max(100),
   grund: z.string().max(200),
+  /** Ist "Logo" wirklich das gut lesbare Logo dieser Praxis (kein Partner, Siegel, Krankenkasse)? */
+  logo_ok: z.boolean().default(false),
 });
 export type HeroChoice = z.infer<typeof heroOutputSchema>;
 
-export const HERO_PROMPT_VERSION = "v1";
+export const HERO_PROMPT_VERSION = "v2";
 /** Nur ab dieser Note kommt das eigene Foto ins Bild, sonst das Stockfoto. */
 export const HERO_MIN_FIT = 4;
 
@@ -201,35 +296,34 @@ export interface HeroDeps {
   llm: LlmGateway;
   dir: string;
   fetch?: typeof fetch;
-  collect?: (url: string) => Promise<ImageCandidate[]>;
+  collect?: (url: string) => Promise<PageImages>;
   now?: () => Date;
 }
 
-/** Hero-Foto einer Firma (aus dem Speicher oder neu bestimmt). Fehler führen nie zum Abbruch: dann ohne Foto. */
+/** Hero-Foto und Logo einer Firma (aus dem Speicher oder neu bestimmt). Fehler führen nie zum Abbruch: dann ohne. */
 export async function heroForCompany(deps: HeroDeps, company: Company): Promise<HeroResult> {
   const cached = await getState<HeroResult>(deps.db, heroKey(company.id));
   if (cached) return cached;
   const now = (deps.now ?? (() => new Date()))().toISOString();
-  const none = async (reason: string): Promise<HeroResult> => {
-    const r: HeroResult = { status: "none", reason, checkedAt: now };
+  const save = async (r: HeroResult): Promise<HeroResult> => {
     await setState(deps.db, heroKey(company.id), r);
     return r;
   };
+  const none = (reason: string) => save({ status: "none", reason, checkedAt: now });
   if (!company.website_url) return none("keine Website");
   const fetchFn = deps.fetch ?? fetch;
-  let cands: ImageCandidate[];
+  let page: PageImages;
   try {
     const url = /^https?:\/\//i.test(company.website_url)
       ? company.website_url
       : `https://${company.website_url}`;
-    cands = rankCandidates(
-      await (deps.collect ?? ((u) => collectCandidates(u, process.env.CHROMIUM_PATH)))(url),
-    );
+    page = await (deps.collect ?? ((u) => collectCandidates(u, process.env.CHROMIUM_PATH)))(url);
   } catch (err) {
-    return none(`Seite nicht ladbar: ${String(err).slice(0, 80)}`);
+    // Nicht merken: beim nächsten Mal neu versuchen (Seite kurz down, Zeitüberschreitung).
+    return { status: "none", reason: `Seite nicht ladbar: ${String(err).slice(0, 80)}`, checkedAt: now };
   }
   const loaded: { cand: ImageCandidate; buf: Buffer; thumb: string }[] = [];
-  for (const cand of cands) {
+  for (const cand of rankCandidates(page.images)) {
     if (loaded.length >= 4) break;
     const buf = await download(cand.url, fetchFn).catch(() => null);
     if (!buf) continue;
@@ -245,14 +339,23 @@ export async function heroForCompany(deps: HeroDeps, company: Company): Promise<
       // kein lesbares Bild
     }
   }
-  if (loaded.length === 0) return none("kein großes, echtes Foto auf der Startseite");
+  let logo: { png: Buffer; wide: boolean } | null = null;
+  for (const cand of rankLogos(page.logos)) {
+    const buf = await download(cand.url, fetchFn, true).catch(() => null);
+    logo = buf ? await prepareLogo(buf) : null;
+    if (logo) break;
+  }
+  if (loaded.length === 0 && !logo) return none("kein großes, echtes Foto und kein Logo auf der Startseite");
 
   const { output: choice } = await deps.llm.structured({
     role: "hero",
     promptVersion: HERO_PROMPT_VERSION,
     system: loadPrompt("hero", HERO_PROMPT_VERSION),
     input: [
-      { type: "text", text: `Betrieb: Physiotherapie-Praxis. ${loaded.length} Fotos von ihrer Website:` },
+      {
+        type: "text",
+        text: `Betrieb: Physiotherapie-Praxis. ${loaded.length} Foto(s) von ihrer Website${logo ? " und ein mögliches Logo" : ", kein Logo"}:`,
+      },
       ...loaded.flatMap((l, i) => [
         { type: "text" as const, text: `Bild ${i + 1}:` },
         {
@@ -260,15 +363,41 @@ export async function heroForCompany(deps: HeroDeps, company: Company): Promise<
           source: { type: "base64" as const, media_type: "image/jpeg" as const, data: l.thumb },
         },
       ]),
+      ...(logo
+        ? [
+            { type: "text" as const, text: "Logo:" },
+            {
+              type: "image" as const,
+              source: {
+                type: "base64" as const,
+                media_type: "image/png" as const,
+                data: logo.png.toString("base64"),
+              },
+            },
+          ]
+        : []),
     ],
     schema: heroOutputSchema,
     companyId: company.id,
-    inputSummary: `Hero-Foto ${company.name} (${loaded.length} Kandidaten)`,
+    inputSummary: `Hero-Foto ${company.name} (${loaded.length} Kandidaten${logo ? ", Logo" : ""})`,
   });
-  const picked = choice.wahl !== null ? loaded[choice.wahl - 1] : undefined;
-  if (!picked || choice.passt < HERO_MIN_FIT) return none(`kein passendes Foto (${choice.grund})`);
 
   await mkdir(deps.dir, { recursive: true });
+  let savedLogo: HeroResult["logo"] = null;
+  if (logo && choice.logo_ok) {
+    const file = join(deps.dir, `${company.id}-logo.png`);
+    await writeFile(file, logo.png);
+    savedLogo = { file, wide: logo.wide };
+  }
+  const picked = choice.wahl !== null ? loaded[choice.wahl - 1] : undefined;
+  if (!picked || choice.passt < HERO_MIN_FIT)
+    return save({
+      status: "none",
+      reason: loaded.length === 0 ? "kein großes, echtes Foto" : `kein passendes Foto (${choice.grund})`,
+      logo: savedLogo,
+      checkedAt: now,
+    });
+
   const file = join(deps.dir, `${company.id}.jpg`);
   await writeFile(
     file,
@@ -283,18 +412,15 @@ export async function heroForCompany(deps: HeroDeps, company: Company): Promise<
     .resize(48, 48, { fit: "cover" })
     .removeAlpha()
     .raw()
-    .toBuffer({
-      resolveWithObject: true,
-    });
-  const result: HeroResult = {
+    .toBuffer({ resolveWithObject: true });
+  return save({
     status: "ok",
     file,
     url: picked.cand.url,
     position: `${Math.round(choice.fokus_x)}% ${Math.round(choice.fokus_y)}%`,
     motiv: choice.motiv,
     palette: derivePalette(px),
+    logo: savedLogo,
     checkedAt: now,
-  };
-  await setState(deps.db, heroKey(company.id), result);
-  return result;
+  });
 }

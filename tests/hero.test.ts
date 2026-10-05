@@ -63,6 +63,21 @@ describe("Farbwelt aus dem Foto (rein)", () => {
     expect(ha).toBeLessThan(55);
   });
 
+  it("Gelb wird Akzent, nie trübe Hauptfarbe (dann Anthrazit)", () => {
+    const p = derivePalette(
+      pixels([
+        [[225, 200, 40], 0.4], // gelbes Band
+        [[240, 240, 235], 0.6],
+      ]),
+    )!;
+    const [hp, sp] = toHsl(rgbOf(p.primary));
+    expect(sp).toBeLessThan(0.25); // Anthrazit
+    expect(hp).toBeGreaterThan(200);
+    const [ha] = toHsl(rgbOf(p.accent));
+    expect(ha).toBeGreaterThan(45);
+    expect(ha).toBeLessThan(60);
+  });
+
   it("Farbloses Foto oder nur Haut und Holz: keine eigene Farbwelt", () => {
     expect(
       derivePalette(
@@ -161,11 +176,28 @@ describeDb("Hero-Foto mit Datenbank", () => {
     const photo = await sharp(noise, { raw: { width: 1600, height: 900, channels: 3 } })
       .jpeg()
       .toBuffer();
-    const fetchFn = vi.fn(() =>
-      Promise.resolve(new Response(new Uint8Array(photo), { headers: { "content-type": "image/jpeg" } })),
+    // Logo: dunkler Schriftzug auf transparentem Grund, breit.
+    const logoPng = await sharp({
+      create: { width: 600, height: 150, channels: 4, background: { r: 0, g: 0, b: 0, alpha: 0 } },
+    })
+      .composite([
+        {
+          input: Buffer.from(
+            '<svg xmlns="http://www.w3.org/2000/svg" width="600" height="150"><rect x="20" y="40" width="560" height="70" fill="#1b4f72"/></svg>',
+          ),
+        },
+      ])
+      .png()
+      .toBuffer();
+    const fetchFn = vi.fn((url: string) =>
+      Promise.resolve(
+        url.endsWith("logo.png")
+          ? new Response(new Uint8Array(logoPng), { headers: { "content-type": "image/png" } })
+          : new Response(new Uint8Array(photo), { headers: { "content-type": "image/jpeg" } }),
+      ),
     );
     const answer = (wahl: number | null, passt: number, grund = "ruhig") => ({
-      output: { wahl, passt, motiv: "heller Raum", fokus_x: 40, fokus_y: 35, grund },
+      output: { wahl, passt, motiv: "heller Raum", fokus_x: 40, fokus_y: 35, grund, logo_ok: true },
       agentRunId: "r",
       costUsd: 0.01,
       model: "m",
@@ -179,22 +211,36 @@ describeDb("Hero-Foto mit Datenbank", () => {
       // Öffentliche IP direkt, damit der Test keine DNS-Abfrage braucht.
       fetch: fetchFn as unknown as typeof fetch,
       collect: () =>
-        Promise.resolve([
-          {
-            url: "https://93.184.216.34/hero.jpg",
-            width: 1600,
-            height: 900,
-            shownWidth: 1440,
-            shownHeight: 700,
-            top: 0,
-            alt: "",
-            kind: "img" as const,
-          },
-        ]),
+        Promise.resolve({
+          images: [
+            {
+              url: "https://93.184.216.34/hero.jpg",
+              width: 1600,
+              height: 900,
+              shownWidth: 1440,
+              shownHeight: 700,
+              top: 0,
+              alt: "",
+              kind: "img" as const,
+            },
+          ],
+          logos: [
+            {
+              url: "https://93.184.216.34/logo.png",
+              width: 600,
+              height: 150,
+              shownWidth: 240,
+              shownHeight: 60,
+              top: 20,
+            },
+          ],
+        }),
     };
     const r = await heroForCompany(deps, company);
     expect(r).toMatchObject({ status: "ok", position: "40% 35%", motiv: "heller Raum" });
     expect(existsSync(r.file!)).toBe(true);
+    expect(r.logo).toMatchObject({ wide: true });
+    expect(existsSync(r.logo!.file)).toBe(true);
     expect(toHsl(rgbOf(r.palette!.primary))[0]).toBeGreaterThan(180);
     // Einmal je Firma: zweiter Aufruf aus dem Speicher.
     await heroForCompany(deps, company);
@@ -217,6 +263,7 @@ describeDb("Hero-Foto mit Datenbank", () => {
       company,
     );
     expect(html).toContain(pathToFileURL(r.file!).href);
+    expect(html).toContain(pathToFileURL(r.logo!.file).href);
     expect(await teaserLook(db(), company.id)).toMatchObject({
       foto: "praxis",
       farbe: "aus_foto",

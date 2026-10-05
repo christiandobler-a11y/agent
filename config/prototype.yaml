@@ -45,4 +45,7 @@ teaser:
   # Praxis, einmal je Praxis). Die Farben der Seite kommen dann aus dem Foto (src/prototype/colors.ts). Passt keins,
   # bleiben Stockfoto und `farbe`.
   eigenes_foto: true
+  # Schrift der Überschriften (05.10.2026, zum Ausprobieren): manrope (klar), fraunces (warme Serifen), dmserif
+  # (elegant), outfit (rund), jakarta (kräftig), sora (markant)
+  schrift: manrope
   foto_dir: data/heroes

@@ -52,6 +52,8 @@ const configSchema = z.object({
       google_details: z.boolean().default(false),
       // Eigenes Foto von der Website der Praxis als Hero, Farben daraus (heroPhoto.ts, ca. 1 Cent je Praxis).
       eigenes_foto: z.boolean().default(false),
+      // Schrift der Überschriften: manrope, fraunces, dmserif, outfit, jakarta, sora (TEASER_FONTS).
+      schrift: z.string().default("manrope"),
       foto_dir: z.string().default("data/heroes"),
     })
     .default({
@@ -63,6 +65,7 @@ const configSchema = z.object({
       farbe: "petrol",
       google_details: false,
       eigenes_foto: false,
+      schrift: "manrope",
       foto_dir: "data/heroes",
     }),
 });

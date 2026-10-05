@@ -46,6 +46,10 @@ export interface TeaserData {
   hero?: { file: string; position: string } | null;
   /** Farbwelt aus dem eigenen Foto (colors.ts); hat Vorrang vor `palette`. */
   colors?: HeroPalette | null;
+  /** Logo der Praxis (PNG, von ihrer Website); `wide` = Schriftzug mit Namen, dann ohne extra Namen daneben. */
+  logo?: { file: string; wide: boolean } | null;
+  /** Schrift für Überschriften (TEASER_FONTS), Standard manrope. */
+  font?: string | null;
 }
 
 /**
@@ -201,7 +205,57 @@ const FONT_FILES = {
   "Manrope 400": "@fontsource/manrope/files/manrope-latin-400-normal.woff2",
   "Manrope 600": "@fontsource/manrope/files/manrope-latin-600-normal.woff2",
   "Manrope 800": "@fontsource/manrope/files/manrope-latin-800-normal.woff2",
+  "Fraunces 600": "@fontsource/fraunces/files/fraunces-latin-600-normal.woff2",
+  "DM Serif Display 400": "@fontsource/dm-serif-display/files/dm-serif-display-latin-400-normal.woff2",
+  "Outfit 500": "@fontsource/outfit/files/outfit-latin-500-normal.woff2",
+  "Outfit 700": "@fontsource/outfit/files/outfit-latin-700-normal.woff2",
+  "Plus Jakarta Sans 500": "@fontsource/plus-jakarta-sans/files/plus-jakarta-sans-latin-500-normal.woff2",
+  "Plus Jakarta Sans 800": "@fontsource/plus-jakarta-sans/files/plus-jakarta-sans-latin-800-normal.woff2",
+  "Sora 700": "@fontsource/sora/files/sora-latin-700-normal.woff2",
 } as const;
+type FontKey = keyof typeof FONT_FILES;
+
+/**
+ * Schrift für Überschriften und Praxisname (05.10.2026, Christian: "nicht nur der schlichte cleane, ausprobieren was
+ * noch passt"; config/prototype.yaml → teaser.schrift). Fließtext bleibt Manrope. `scale` gleicht unterschiedlich
+ * breite Schriften aus, damit lange Namen in die Zeile passen.
+ */
+export const TEASER_FONTS = {
+  manrope: { family: "Manrope", key: "Manrope 800", weight: 800, scale: 1, label: "Manrope (klar, modern)" },
+  fraunces: {
+    family: "Fraunces",
+    key: "Fraunces 600",
+    weight: 600,
+    scale: 1.02,
+    label: "Fraunces (warme Serifen)",
+  },
+  dmserif: {
+    family: "DM Serif Display",
+    key: "DM Serif Display 400",
+    weight: 400,
+    scale: 1.1,
+    label: "DM Serif Display (elegant, klassisch)",
+  },
+  outfit: {
+    family: "Outfit",
+    key: "Outfit 700",
+    weight: 700,
+    scale: 1.04,
+    label: "Outfit (rund, freundlich)",
+  },
+  jakarta: {
+    family: "Plus Jakarta Sans",
+    key: "Plus Jakarta Sans 800",
+    weight: 800,
+    scale: 0.98,
+    label: "Plus Jakarta Sans (kräftig, zeitgemäß)",
+  },
+  sora: { family: "Sora", key: "Sora 700", weight: 700, scale: 0.92, label: "Sora (technisch, markant)" },
+} satisfies Record<string, { family: string; key: FontKey; weight: number; scale: number; label: string }>;
+export type TeaserFont = keyof typeof TEASER_FONTS;
+const fontOf = (d: Pick<TeaserData, "font">) =>
+  (TEASER_FONTS as Record<string, (typeof TEASER_FONTS)[TeaserFont]>)[d.font ?? "manrope"] ??
+  TEASER_FONTS.manrope;
 
 export function physioAssetDir(): string {
   return fileURLToPath(new URL("../../assets/teaser/physio/", import.meta.url));
@@ -209,7 +263,7 @@ export function physioAssetDir(): string {
 
 export interface TeaserAssets {
   /** file://-Adressen (für Chromium) bzw. beliebige URLs (Tests). */
-  font: (key: keyof typeof FONT_FILES) => string;
+  font: (key: FontKey) => string;
   photo: (file: string) => string;
 }
 
@@ -742,6 +796,8 @@ interface RestTheme {
   shapeDark?: string;
   bg?: string;
   soft?: string;
+  /** Überschriften-Schrift (statt Barlow Condensed), z. B. aus TEASER_FONTS. */
+  font?: { family: string; key: FontKey; weight: number } | null;
 }
 const VITAL_THEME: RestTheme = { primary: "#1f5f68", accent: "#e46a1c", ink: "#24515a", stub: "photo" };
 const ELEMENTA_THEME: RestTheme = { primary: "#1f2633", accent: "#c48a00", ink: "#1f2633", stub: "shapes" };
@@ -759,6 +815,7 @@ function renderVitalRest(d: TeaserData, assets: TeaserAssets, theme: RestTheme =
       ["Barlow Condensed", "Barlow Condensed 600", 600],
       ["Manrope", "Manrope 600", 600],
       ["Manrope", "Manrope 800", 800],
+      ...(theme.font ? [[theme.font.family, theme.font.key, theme.font.weight] as const] : []),
     ] as const
   )
     .map(
@@ -766,6 +823,12 @@ function renderVitalRest(d: TeaserData, assets: TeaserAssets, theme: RestTheme =
         `@font-face{font-family:"${family}";src:url("${assets.font(key)}") format("woff2");font-weight:${weight}}`,
     )
     .join("\n");
+  // Andere Überschriften-Schrift: Barlow Condensed ist schmal, breitere Schriften etwas kleiner.
+  const headFont = theme.font
+    ? `h2,.tile b,.brand b,.stats b,.hero span,.review.score b{font-family:"${theme.font.family}",Manrope,sans-serif;font-weight:${theme.font.weight};letter-spacing:0;text-transform:none}
+h2{font-size:25px}.tile b{font-size:14px}.brand b{font-size:${title.length <= 18 ? 14 : 12}px}.stats b{font-size:25px}.hero span{font-size:20px}.review.score b{font-size:18px}`
+    : "";
+  const logo = d.logo ? pathToFileURL(d.logo.file).href : null;
   const tiles = services
     .map(
       (x) =>
@@ -841,10 +904,16 @@ h2{font-family:"Barlow Condensed",sans-serif;font-weight:600;font-size:30px;colo
 .stats div{text-align:center}
 .stats b{display:block;font-family:"Barlow Condensed",sans-serif;font-weight:600;font-size:30px;line-height:1;color:var(--petrol)}
 .stats small{display:block;margin-top:3px;font-weight:600;font-size:10px;color:#6c8a90}
+.mlogo{display:block;max-height:${d.logo?.wide ? 30 : 30}px;max-width:${d.logo?.wide ? 210 : 60}px;width:auto;height:auto;object-fit:contain}
+${headFont}
 </style></head>
 <body>
 <div class="status"></div>
-<header><div class="brand"><span class="mark">${esc(monogram(title))}</span><b>${esc(title)}</b></div><span class="burger"></span></header>
+<header><div class="brand">${
+    logo
+      ? `<img class="mlogo" src="${logo}" alt="">${d.logo!.wide ? "" : `<b>${esc(title)}</b>`}`
+      : `<span class="mark">${esc(monogram(title))}</span><b>${esc(title)}</b>`
+  }</div><span class="burger"></span></header>
 <div class="hero">${
     showPhoto
       ? `<img src="${photo.src}" alt="">`
@@ -879,13 +948,17 @@ function renderElementa(d: TeaserData, assets: TeaserAssets): string {
   const pal = paletteOf(d);
   const { title } = teaserName(d.name, d.city);
   const photo = heroImage(d, assets);
+  const font = fontOf(d);
   const city = d.city?.trim() || null;
   const good = d.rating !== null && d.rating >= 4.3 && (d.reviewCount ?? 0) >= 5;
+  // Schwerpunkte der Praxis (nur echte aus dem Audit, keine Standard-Liste) als kleine Chips unter dem Namen.
+  const focus = (d.services?.length ?? 0) >= 2 ? teaserServices(d.services, 3) : [];
   const fonts = (
     [
       ["Manrope", "Manrope 400", 400],
       ["Manrope", "Manrope 600", 600],
       ["Manrope", "Manrope 800", 800],
+      ...(font.family === "Manrope" ? [] : [[font.family, font.key, font.weight] as const]),
     ] as const
   )
     .map(
@@ -893,7 +966,8 @@ function renderElementa(d: TeaserData, assets: TeaserAssets): string {
         `@font-face{font-family:"${family}";src:url("${assets.font(key)}") format("woff2");font-weight:${weight}}`,
     )
     .join("\n");
-  const size = title.length <= 22 ? 76 : title.length <= 34 ? 62 : 50;
+  const size = Math.round((title.length <= 22 ? 76 : title.length <= 34 ? 62 : 50) / font.scale);
+  const logo = d.logo ? pathToFileURL(d.logo.file).href : null;
   const address = [d.street, city]
     .filter(Boolean)
     .map((x) => esc(x!))
@@ -912,14 +986,17 @@ header{position:absolute;z-index:5;top:20px;left:70px;right:70px;height:78px;bac
 .brand{display:flex;align-items:center;gap:12px}
 .ring{width:56px;height:56px;border-radius:50%;border:2px solid ${pal.primary};display:grid;place-items:center}
 .ring i{width:22px;height:22px;border-radius:50%;border:4px solid ${pal.accent}}
-.brand b{display:block;font-weight:600;font-size:${title.length <= 24 ? 24 : 19}px;letter-spacing:-.01em;max-width:420px;line-height:1.1}
+.brand b{display:block;font-family:"${font.family}",Manrope,sans-serif;font-weight:${font.family === "Manrope" ? 600 : font.weight};font-size:${title.length <= 24 ? 24 : 19}px;letter-spacing:-.01em;max-width:420px;line-height:1.1}
+.logo{display:block;max-height:${d.logo?.wide ? 54 : 50}px;max-width:${d.logo?.wide ? 340 : 120}px;width:auto;height:auto;object-fit:contain}
 .brand small{display:block;font-weight:800;font-size:9px;letter-spacing:.14em;margin-top:2px}
 nav{display:flex;align-items:center;gap:22px;font-weight:800;font-size:14px;color:${pal.ink}}
 .btn{border-radius:8px;padding:12px 16px;font-weight:800;font-size:14px}
 .dark{background:${pal.primary};color:#fff}.yellow{background:${pal.accent};color:${pal.onAccent ?? "#fff"}}
-.center{position:absolute;z-index:4;left:0;right:0;top:250px;text-align:center;color:#fff}
-h1{font-weight:800;font-size:${size}px;line-height:1.08;letter-spacing:-.01em;max-width:1050px;margin:0 auto}
-h2{font-weight:800;font-size:${Math.round(size * 0.62)}px;margin-top:6px}
+.center{position:absolute;z-index:4;left:0;right:0;top:${focus.length > 0 ? 226 : 250}px;text-align:center;color:#fff}
+h1{font-family:"${font.family}",Manrope,sans-serif;font-weight:${font.weight};font-size:${size}px;line-height:1.08;letter-spacing:-.01em;max-width:1050px;margin:0 auto}
+h2{font-family:"${font.family}",Manrope,sans-serif;font-weight:${font.weight};font-size:${Math.round(size * 0.62)}px;margin-top:6px}
+.chips{display:flex;justify-content:center;gap:10px;margin-top:22px}
+.chips span{border:1px solid rgba(255,255,255,.55);background:rgba(255,255,255,.12);border-radius:999px;padding:8px 18px;font-weight:600;font-size:16px}
 .row{display:flex;justify-content:center;gap:10px;margin-top:40px}
 .big{width:272px;height:52px;border-radius:8px;display:grid;place-items:center;font-weight:800;font-size:17px}
 .big.y{background:${pal.accent};color:${pal.onAccent ?? "#fff"}}.big.w{background:#fff;color:${pal.ink}}
@@ -939,12 +1016,17 @@ h2{font-weight:800;font-size:${Math.round(size * 0.62)}px;margin-top:6px}
   <path d="M1440 720V900H1010Z" fill="${pal.accent}"/>
 </svg>
 <header>
-  <div class="brand"><span class="ring"><i></i></span><span><b>${esc(title)}</b><small>PHYSIOTHERAPIE</small></span></div>
+  <div class="brand">${
+    logo
+      ? `<img class="logo" src="${logo}" alt="">${d.logo!.wide ? "" : `<span><b>${esc(title)}</b><small>PHYSIOTHERAPIE</small></span>`}`
+      : `<span class="ring"><i></i></span><span><b>${esc(title)}</b><small>PHYSIOTHERAPIE</small></span>`
+  }</div>
   <nav><span>Leistungen</span><span>Praxis</span><span>Team</span><span>Kontakt</span><span class="btn dark">Rezept einreichen</span><span class="btn yellow">Termin vereinbaren</span></nav>
 </header>
 <div class="center">
   <h1>${esc(title)}</h1>
   ${/physio/i.test(title) && !city ? "" : `<h2>${/physio/i.test(title) ? "" : "Physiotherapie "}${city ? `in ${esc(city)}` : ""}</h2>`}
+  ${focus.length > 0 ? `<div class="chips">${focus.map((x) => `<span>${esc(x)}</span>`).join("")}</div>` : ""}
   <div class="row"><span class="big y">Jetzt Termin vereinbaren</span><span class="big w">Öffnungszeiten</span></div>
   ${good ? `<div class="rate">${googleLine(d.rating!, d.reviewCount!, pal.ink)}</div>` : ""}
   <div class="meta">${address ? `<div>${PIN} ${address}</div>` : ""}${d.phone ? `<div>${PHONE_ICON} ${esc(d.phone)}</div>` : ""}</div>
@@ -988,6 +1070,7 @@ export function renderTeaserMockup(
                   shapeAccent: paletteOf(d).accent,
                   shapeDark: paletteOf(d).primary,
                   veil: paletteOf(d).veil,
+                  font: d.font && d.font !== "manrope" ? fontOf(d) : null,
                   ...(paletteOf(d).bg ? { bg: paletteOf(d).bg } : {}),
                   ...(paletteOf(d).soft ? { soft: paletteOf(d).soft } : {}),
                 }
@@ -1100,12 +1183,18 @@ export interface TeaserDeps {
   details?: ((company: Company) => Promise<PlaceDetails | null>) | null;
   /** Eigenes Hero-Foto der Praxis samt Farbwelt (heroPhoto.ts); fehlt es oder passt keins, Stockfoto und `palette`. */
   hero?: ((company: Company) => Promise<HeroResult | null>) | null;
+  /** Schrift für Überschriften (TEASER_FONTS). */
+  font?: string | null;
 }
 
 /** Foto und Farben eines gebauten Vorschau-Bildes. */
 export interface TeaserLook {
   foto: "praxis" | "stock";
   motiv: string | null;
+  logo: boolean;
+  schrift: string;
+  /** Warum kein eigenes Foto (nur beim Stockfoto). */
+  grund: string | null;
   /** Name der Farbwelt oder "aus_foto". */
   farbe: string;
   primary: string;
@@ -1128,13 +1217,33 @@ export async function teaserForCompany(db: DbClient, t: TeaserDeps, company: Com
     (x): x is string => typeof x === "string",
   );
   const details = t.details ? await t.details(company).catch(() => null) : null;
-  const hero = t.hero ? await t.hero(company).catch(() => null) : null;
+  const hero: HeroResult | null = t.hero
+    ? await t.hero(company).catch((err: unknown): HeroResult => ({
+        status: "none" as const,
+        reason: `Fehler: ${String(err).slice(0, 100)}`,
+        checkedAt: new Date().toISOString(),
+      }))
+    : null;
   const own = hero?.status === "ok" && hero.file && existsSync(hero.file) ? hero : null;
+  if (hero)
+    console.log(
+      JSON.stringify({
+        level: "info",
+        msg: "Hero-Foto",
+        company: company.id,
+        status: own ? "eigenes" : "stock",
+        reason: own ? null : hero.reason,
+        logo: Boolean(hero.logo),
+      }),
+    );
   // Was das Bild zeigt (Foto und Farben), für die spätere Auswertung je Mail (outreach/draft.ts → meta.teaser_look).
   const pal = paletteOf({ palette: t.palette ?? null, colors: own?.palette ?? null });
   await setState(db, teaserLookKey(company.id), {
     foto: own ? "praxis" : "stock",
     motiv: own?.motiv ?? null,
+    logo: Boolean(hero?.logo),
+    schrift: t.font ?? "manrope",
+    grund: own ? null : t.hero ? (hero?.reason ?? "Prüfung fehlgeschlagen") : "eigenes Foto ausgeschaltet",
     farbe: own?.palette ? "aus_foto" : (t.palette ?? "petrol"),
     primary: pal.primary,
     accent: pal.accent,
@@ -1156,6 +1265,8 @@ export async function teaserForCompany(db: DbClient, t: TeaserDeps, company: Com
       palette: t.palette ?? null,
       hero: own ? { file: own.file!, position: own.position ?? "50% 50%" } : null,
       colors: own?.palette ?? null,
+      logo: hero?.logo && existsSync(hero.logo.file) ? hero.logo : null,
+      font: t.font ?? null,
     },
     t.shoot,
     t.style,

@@ -1,6 +1,12 @@
 import type { Db } from "../db/client.js";
 import type { Company } from "../db/companies.js";
-import { teaserForCompany, usesTeaser, type TeaserDeps } from "../prototype/teaser.js";
+import {
+  teaserForCompany,
+  teaserLook,
+  usesTeaser,
+  type TeaserDeps,
+  type TeaserLook,
+} from "../prototype/teaser.js";
 import { draftEmail, type OutreachDeps } from "./draft.js";
 import type { Mailbox } from "./mail.js";
 import { withTeaser } from "./send.js";
@@ -27,6 +33,8 @@ export interface ProbeResult {
   subject: string;
   body: string;
   teaser: string | null;
+  /** Foto, Farben, Logo des Vorschau-Bildes (und warum kein eigenes Foto). */
+  look: TeaserLook | null;
   /** Wohin die Probe ging (`null` = Postfach nicht eingerichtet, nur in Telegram gezeigt). */
   sentTo: string | null;
   costUsd: number;
@@ -85,6 +93,7 @@ export async function runProbe(
     subject: draft.subject,
     body: draft.body,
     teaser,
+    look: teaser ? await teaserLook(deps.db, company.id) : null,
     sentTo,
     costUsd: draft.costUsd,
     warnings: draft.warnings,

@@ -148,20 +148,27 @@ function darkenForWhite(h: number, s: number, l: number, min = 4.6): Rgb {
 /** Haut, Holz, Beige: Orange-Braun-Töne ohne große Leuchtkraft. */
 export const isSkinOrWood = ([h, s]: readonly [number, number, number]) => h >= 12 && h <= 50 && s < 0.65;
 
+/** Gelb bis Gelbgrün (Farbton etwa 45 bis 80 Grad). */
+export const isYellowish = ([h]: readonly [number, number, number]) => h >= 45 && h <= 80;
+
 export function paletteFromClusters(cs: readonly Cluster[]): HeroPalette | null {
   const colorful = cs
     .map((c) => ({ ...c, hsl: toHsl(c.color) }))
     .filter((c) => c.hsl[1] >= 0.18 && c.hsl[2] >= 0.1 && c.hsl[2] <= 0.85 && c.weight >= 0.03)
     .filter((c) => !isSkinOrWood(c.hsl));
   if (colorful.length === 0) return null;
-  const main = [...colorful].sort((a, b) => b.weight * b.hsl[1] - a.weight * a.hsl[1])[0]!;
-  const [h, s0] = main.hsl;
-  const s = Math.max(0.35, Math.min(0.7, s0));
-  const primary = darkenForWhite(h, s, main.hsl[2]);
+  const rank = (a: (typeof colorful)[number], b: (typeof colorful)[number]) =>
+    b.weight * b.hsl[1] - a.weight * a.hsl[1];
+  // Gelb bis Gelbgrün wird abgedunkelt oliv und trüb: taugt nur als Akzent. Dann Anthrazit als Hauptfarbe (wie das
+  // Elementa-Vorbild: Dunkelblau-Grau + Gelb).
+  const main = colorful.filter((c) => !isYellowish(c.hsl)).sort(rank)[0] ?? null;
+  const [h, s0] = main ? main.hsl : [215, 0.18];
+  const s = main ? Math.max(0.35, Math.min(0.7, s0)) : 0.18;
+  const primary = main ? darkenForWhite(h, s, main.hsl[2]) : fromHsl(215, 0.18, 0.2);
 
   const other = colorful
-    .filter((c) => c !== main && hueDistance(c.hsl[0], h) >= 30 && c.hsl[1] >= 0.25)
-    .sort((a, b) => b.weight * b.hsl[1] - a.weight * a.hsl[1])[0];
+    .filter((c) => c !== main && (!main || hueDistance(c.hsl[0], h) >= 30) && c.hsl[1] >= 0.25)
+    .sort(rank)[0];
   const accent = other
     ? fromHsl(
         other.hsl[0],
