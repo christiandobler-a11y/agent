@@ -25,6 +25,8 @@ import { queuePlanMails } from "../outreach/queue.js";
 import { sendDraft } from "../outreach/send.js";
 import { gameState } from "../game/xp.js";
 import { callbackData, escapeHtml, websiteButton } from "./format.js";
+import { teaserPath } from "../prototype/teaser.js";
+import { missedCalls, parseConsentInput, recordCall } from "../outreach/call.js";
 import { levelLine, reportProgress, xpSuffix } from "./game.js";
 
 /**
@@ -35,10 +37,40 @@ import { levelLine, reportProgress, xpSuffix } from "./game.js";
 export type PlanCallback =
   | { kind: "next" }
   | { kind: "restore" }
-  | { kind: "send" | "redo" | "later" | "drop" | "done" | "undo"; id: string };
+  | {
+      kind:
+        | "send"
+        | "redo"
+        | "later"
+        | "drop"
+        | "done"
+        | "undo"
+        // Anruf-Liste: Ja (Mail erwünscht), lieber Post, nicht erreicht, kein Interesse; Adresse aus dem Impressum
+        // bzw. andere Adresse eintippen.
+        | "yes"
+        | "post"
+        | "missed"
+        | "nope"
+        | "impressum"
+        | "other";
+      id: string;
+    };
 
 const UUID = "[0-9a-f-]{36}";
-const CODES = { send: "ps", redo: "pr", later: "pz", drop: "pd", done: "pm", undo: "pu" } as const;
+const CODES = {
+  send: "ps",
+  redo: "pr",
+  later: "pz",
+  drop: "pd",
+  done: "pm",
+  undo: "pu",
+  yes: "py",
+  post: "pp",
+  missed: "pn",
+  nope: "px",
+  impressum: "pa",
+  other: "pe",
+} as const;
 
 export function planCallback(c: PlanCallback): string {
   if (c.kind === "next") return "pl:n";
@@ -49,7 +81,7 @@ export function planCallback(c: PlanCallback): string {
 export function parsePlanCallback(data: string): PlanCallback | null {
   if (data === "pl:n") return { kind: "next" };
   if (data === "pl:u") return { kind: "restore" };
-  const m = new RegExp(`^(ps|pr|pz|pd|pm|pu):(${UUID})$`).exec(data);
+  const m = new RegExp(`^(${Object.values(CODES).join("|")}):(${UUID})$`).exec(data);
   if (!m) return null;
   const kind = Object.entries(CODES).find(([, v]) => v === m[1])![0] as Exclude<
     PlanCallback["kind"],
@@ -74,12 +106,13 @@ export function planHeaderText(
   const line = (emoji: string, label: string, c: { done: number; total: number }) =>
     c.total > 0 ? `${emoji} ${label}: <b>${c.done}/${c.total}</b>${c.done === c.total ? " ✅" : ""}` : null;
   const lines = [
+    line("📞", "Anrufe", counts.phone),
     line("📧", "Neue Mails", counts.email),
     line("🖨️", "Befund-Seiten", counts.letter),
     line("🔁", "Nachfassen", counts.followup),
   ].filter(Boolean);
-  const total = counts.email.total + counts.letter.total + counts.followup.total;
-  const done = counts.email.done + counts.letter.done + counts.followup.done;
+  const total = counts.phone.total + counts.email.total + counts.letter.total + counts.followup.total;
+  const done = counts.phone.done + counts.email.done + counts.letter.done + counts.followup.done;
   const title = `☀️ <b>Morgen-Paket</b> · ${escapeHtml(WEEKDAY.format(new Date(`${date}T12:00:00Z`)))}`;
   const nightBlock = night.length > 0 ? ["", "🌙 <b>Heute Nacht:</b>", ...night.map(escapeHtml)] : [];
   const gameBlock = game ? ["", game] : [];
@@ -105,6 +138,8 @@ export function planHeaderKeyboard(
   later = 0,
 ): InlineKeyboardButton[][] {
   const open =
+    counts.phone.total -
+    counts.phone.done +
     counts.email.total -
     counts.email.done +
     counts.letter.total -
@@ -133,6 +168,16 @@ interface DraftRow {
     pdf?: string;
     png?: string;
     envelope?: string[];
+    // Anruf-Liste (src/outreach/call.ts)
+    phone?: string;
+    person?: string | null;
+    email?: string | null;
+    befund?: string | null;
+    bewertung?: string | null;
+    opener?: string;
+    pitch?: string;
+    hook?: string | null;
+    objections?: string[];
   };
 }
 
@@ -198,6 +243,46 @@ export function planLetterCard(
       ...[websiteButton(item.website_url)].filter((b) => b !== null).map((b) => [b]),
     ],
   };
+}
+
+export function planCallCard(
+  item: PlanItemWithCompany,
+  draft: DraftRow,
+  pos: { n: number; total: number },
+): { text: string; keyboard: InlineKeyboardButton[][] } {
+  const m = draft.meta;
+  const text = [
+    `📞 Anruf <b>${pos.n}/${pos.total}</b> · <b>${escapeHtml(item.company_name)}</b>${item.current_score !== null ? ` (${item.current_score})` : ""}`,
+    `☎️ <b>${escapeHtml(m.phone ?? "?")}</b>`,
+    ...(m.person ? [`👤 ${escapeHtml(m.person)}`] : []),
+    ...(m.bewertung ? [`⭐ ${escapeHtml(m.bewertung)}`] : []),
+    ...(m.befund ? [`🔎 ${escapeHtml(m.befund)}`] : []),
+    "",
+    `🗣 <i>${escapeHtml(m.opener ?? "")}</i>`,
+    `<blockquote>${escapeHtml(m.pitch ?? "")}</blockquote>`,
+    ...(m.objections && m.objections.length > 0
+      ? [
+          `<blockquote expandable>${escapeHtml([...(m.hook ? [m.hook, ""] : []), ...m.objections.map((o) => `• ${o}`)].join("\n"))}</blockquote>`,
+        ]
+      : []),
+  ].join("\n");
+  const keyboard: InlineKeyboardButton[][] = [
+    [
+      { text: "✅ Ja, Mail erwünscht", callback_data: planCallback({ kind: "yes", id: item.id }) },
+      { text: "📮 Lieber per Post", callback_data: planCallback({ kind: "post", id: item.id }) },
+    ],
+    [
+      { text: "📵 Nicht erreicht", callback_data: planCallback({ kind: "missed", id: item.id }) },
+      { text: "❌ Kein Interesse", callback_data: planCallback({ kind: "nope", id: item.id }) },
+    ],
+  ];
+  const extra: InlineKeyboardButton[] = [];
+  const site = websiteButton(item.website_url);
+  if (site) extra.push(site);
+  extra.push({ text: "🗂 Lead", callback_data: callbackData("c", item.company_id) });
+  keyboard.push(extra);
+  keyboard.push([{ text: "▶️ Nächste ansehen", callback_data: planCallback({ kind: "next" }) }]);
+  return { text, keyboard };
 }
 
 export interface PlanBotDeps {
@@ -309,7 +394,18 @@ export async function sendNextCard(
     await setPlanStatus(deps.db, next.id, "later", deps.now());
     return sendNextCard(api, chatId, deps, next.position);
   }
-  if (next.channel === "letter") {
+  if (next.channel === "phone") {
+    const card = planCallCard(next, draft, pos);
+    // Das Vorschau-Bild, von dem am Telefon die Rede ist.
+    const teaser = deps.outreach.teaserDir ? teaserPath(deps.outreach.teaserDir, next.company_id) : null;
+    if (teaser && existsSync(teaser))
+      await api.sendPhoto(chatId, new InputFile(teaser), { disable_notification: true });
+    await api.sendMessage(chatId, card.text, {
+      parse_mode: "HTML",
+      link_preview_options: { is_disabled: true },
+      reply_markup: { inline_keyboard: card.keyboard },
+    });
+  } else if (next.channel === "letter") {
     const card = planLetterCard(next, draft, pos);
     if (draft.meta.pdf && existsSync(draft.meta.pdf)) {
       await api.sendDocument(chatId, new InputFile(draft.meta.pdf), {
@@ -560,6 +656,15 @@ export async function handlePlanCallback(ctx: Context, deps: PlanBotDeps, by: st
     await ctx.answerCallbackQuery({ text: "Schon erledigt" });
     return true;
   }
+  if (
+    cb.kind === "yes" ||
+    cb.kind === "post" ||
+    cb.kind === "missed" ||
+    cb.kind === "nope" ||
+    cb.kind === "impressum" ||
+    cb.kind === "other"
+  )
+    return handleCallOutcome(ctx, deps, item, cb.kind, by);
 
   if (cb.kind === "send") {
     if (!deps.mailbox || !item.draft_id) {
@@ -662,5 +767,174 @@ export async function handlePlanCallback(ctx: Context, deps: PlanBotDeps, by: st
   }
   await refreshHeader(ctx.api, db, item.plan_date, deps.mailbox !== null);
   await showNext(ctx, deps);
+  return true;
+}
+
+const consentKey = (chatId: number) => `call-consent:${chatId}`;
+
+/** Ergebnis eines Anrufs aus der Karte. */
+async function handleCallOutcome(
+  ctx: Context,
+  deps: PlanBotDeps,
+  item: PlanItemWithCompany,
+  kind: "yes" | "post" | "missed" | "nope" | "impressum" | "other",
+  by: string,
+): Promise<boolean> {
+  const { db } = deps;
+  const now = deps.now();
+  const draft = await draftOf(db, item.draft_id);
+  const known = draft?.meta.email ?? null;
+  if (kind === "yes") {
+    await ctx.answerCallbackQuery({ text: "Super! 🎉" });
+    await closeCard(ctx, "✅ Ja! Wohin soll der Entwurf? ↓");
+    if (known) {
+      await ctx.reply(`📧 Entwurf für <b>${escapeHtml(item.company_name)}</b> an welche Adresse?`, {
+        parse_mode: "HTML",
+        reply_markup: {
+          inline_keyboard: [
+            [{ text: `📧 ${known}`, callback_data: planCallback({ kind: "impressum", id: item.id }) }],
+            [
+              {
+                text: "✏️ Andere Adresse / Name",
+                callback_data: planCallback({ kind: "other", id: item.id }),
+              },
+            ],
+          ],
+        },
+      });
+      return true;
+    }
+    return askConsentInput(ctx, deps, item);
+  }
+  if (kind === "other") {
+    await ctx.answerCallbackQuery();
+    return askConsentInput(ctx, deps, item);
+  }
+  if (kind === "impressum") {
+    if (!known) {
+      await ctx.answerCallbackQuery({ text: "Keine Adresse bekannt" });
+      return askConsentInput(ctx, deps, item);
+    }
+    await ctx.answerCallbackQuery({ text: "Schreibe die Mail …" });
+    await ctx.editMessageReplyMarkup({ reply_markup: { inline_keyboard: [] } }).catch(() => undefined);
+    await finishConsent(ctx, deps, item, { email: known, name: null, salutation: null }, by);
+    return true;
+  }
+  if (kind === "post") {
+    await recordCall(db, item.company_id, "brief", { by, now });
+    await setPlanStatus(db, item.id, "done", now);
+    await ctx.answerCallbackQuery({ text: "Kommt per Brief" });
+    await closeCard(ctx, "📮 Lieber per Post: Der Brief liegt im nächsten Morgen-Paket");
+  } else if (kind === "nope") {
+    await recordCall(db, item.company_id, "kein_interesse", { by, now });
+    await setPlanStatus(db, item.id, "done", now);
+    await ctx.answerCallbackQuery({ text: "Alles klar, kommt nie wieder" });
+    await closeCard(ctx, "❌ Kein Interesse. Abgehakt, die Praxis kommt nicht wieder");
+  } else {
+    await recordCall(db, item.company_id, "nicht_erreicht", { by, now });
+    const n = await missedCalls(db, item.company_id);
+    const max = deps.outreach.outreach.anruf?.versuche ?? 3;
+    if (n >= max) {
+      await setPlanStatus(db, item.id, "done", now);
+      await ctx.answerCallbackQuery({ text: `${n}× nicht erreicht, kommt per Brief` });
+      await closeCard(ctx, `📵 ${n}× nicht erreicht: Der Brief liegt im nächsten Morgen-Paket`);
+    } else {
+      await setPlanStatus(db, item.id, "later", now);
+      await ctx.answerCallbackQuery({ text: `Nicht erreicht (${n}/${max})` });
+      await closeCard(ctx, `📵 Nicht erreicht (${n}/${max}), kommt am nächsten Werktag wieder`, [
+        [{ text: "↩️ Heute nochmal versuchen", callback_data: planCallback({ kind: "undo", id: item.id }) }],
+      ]);
+    }
+  }
+  await refreshHeader(ctx.api, db, item.plan_date, deps.mailbox !== null);
+  await showNext(ctx, deps);
+  return true;
+}
+
+async function askConsentInput(ctx: Context, deps: PlanBotDeps, item: PlanItemWithCompany): Promise<boolean> {
+  if (!ctx.chat) return true;
+  await setState(deps.db, consentKey(ctx.chat.id), { itemId: item.id, at: deps.now().toISOString() });
+  await ctx.reply(
+    `✏️ Schreib mir die Mail-Adresse für <b>${escapeHtml(item.company_name)}</b>, gern mit Namen, z. B. „Frau Huber huber@praxis.de“.`,
+    { parse_mode: "HTML" },
+  );
+  return true;
+}
+
+/** Nach dem Ja: Einwilligung festhalten, Mail mit Entwurf schreiben und zum Senden zeigen. */
+async function finishConsent(
+  ctx: Context,
+  deps: PlanBotDeps,
+  item: PlanItemWithCompany,
+  who: { email: string; name: string | null; salutation: "Herr" | "Frau" | null },
+  by: string,
+): Promise<void> {
+  const { db } = deps;
+  const now = deps.now();
+  const person = who.name ? `${who.salutation ?? ""} ${who.name}`.trim() : null;
+  await recordCall(db, item.company_id, "ja", { by, now, to: who.email, person });
+  await setPlanStatus(db, item.id, "done", now);
+  const { rows } = await db.query<Company>("select * from companies where id = $1", [item.company_id]);
+  const company = rows[0]!;
+  await ctx.replyWithChatAction("typing").catch(() => undefined);
+  const mail = await draftEmail(deps.outreach, company, by, {
+    to: who.email,
+    name: who.name,
+    salutation: who.salutation,
+  }).catch(() => null);
+  if (!mail || "kind" in mail) {
+    await ctx.reply(
+      "Die Mail hat gerade nicht geklappt. Öffne den Lead und schreib sie über „✉️ Mail-Entwurf“.",
+    );
+    return;
+  }
+  if (mail.teaser && existsSync(mail.teaser))
+    await ctx.replyWithPhoto(new InputFile(mail.teaser), { disable_notification: true });
+  await ctx.reply(
+    [
+      `📧 <b>Mail an ${escapeHtml(company.name)}</b> (Einwilligung am Telefon ist vermerkt)`,
+      `<b>An:</b> <code>${escapeHtml(who.email)}</code>`,
+      `<b>Betreff:</b> ${escapeHtml(mail.subject)}`,
+      "",
+      `<blockquote expandable>${escapeHtml(mail.body)}</blockquote>`,
+    ].join("\n"),
+    {
+      parse_mode: "HTML",
+      link_preview_options: { is_disabled: true },
+      reply_markup: {
+        inline_keyboard: deps.mailbox
+          ? [[{ text: "📤 Jetzt senden", callback_data: `sd:${mail.draftId}` }]]
+          : [],
+      },
+    },
+  );
+  const p = await progress(ctx, deps);
+  if (p) await refreshHeader(ctx.api, db, item.plan_date, deps.mailbox !== null);
+}
+
+/**
+ * Freitext nach "✏️ Andere Adresse": Adresse (und Name) übernehmen. `false`, wenn gerade keine Adresse erwartet wird.
+ */
+export async function handleCallText(ctx: Context, deps: PlanBotDeps, by: string): Promise<boolean> {
+  const chatId = ctx.chat?.id;
+  const text = ctx.message?.text;
+  if (chatId === undefined || !text) return false;
+  const pending = await getState<{ itemId: string; at: string } | null>(deps.db, consentKey(chatId));
+  if (!pending || deps.now().getTime() - Date.parse(pending.at) > 30 * 60_000) return false;
+  const parsed = parseConsentInput(text);
+  if (!parsed.email) {
+    await ctx.reply("Da finde ich keine Mail-Adresse. Nochmal bitte, z. B. „Frau Huber huber@praxis.de“.");
+    return true;
+  }
+  await setState(deps.db, consentKey(chatId), null);
+  const item = await planItem(deps.db, pending.itemId);
+  if (!item) return true;
+  await finishConsent(
+    ctx,
+    deps,
+    item,
+    { email: parsed.email, name: parsed.name, salutation: parsed.salutation },
+    by,
+  );
   return true;
 }

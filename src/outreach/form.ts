@@ -37,3 +37,8 @@ export function subjectFor(subject: string, form: Form): string {
 export function lowerFirst(text: string): string {
   return /^(Sie|Ihnen|Ihr)\b/.test(text) ? text : text.charAt(0).toLowerCase() + text.slice(1);
 }
+
+/** Satzanfang groß (eigener Absatz nach dem Gesprächs-Satz). */
+export function upperFirst(text: string): string {
+  return text.charAt(0).toUpperCase() + text.slice(1);
+}

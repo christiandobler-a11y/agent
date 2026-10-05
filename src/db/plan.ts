@@ -3,7 +3,7 @@ import type { DbClient } from "./client.js";
 /** Tagesplan des Morgen-Pakets (migrations/013). */
 
 export type PlanKind = "new" | "followup";
-export type PlanChannel = "email" | "letter";
+export type PlanChannel = "email" | "letter" | "phone";
 export type PlanStatus = "ready" | "queued" | "done" | "later" | "dropped";
 
 export interface PlanItem {
@@ -71,6 +71,7 @@ export async function setPlanDraft(db: DbClient, id: string, draftId: string): P
 }
 
 export interface PlanCounts {
+  phone: { done: number; total: number };
   email: { done: number; total: number };
   letter: { done: number; total: number };
   followup: { done: number; total: number };
@@ -83,6 +84,7 @@ export function countPlan(items: readonly PlanItem[]): PlanCounts {
     return { done: all.filter((i) => i.status === "done").length, total: all.length };
   };
   return {
+    phone: bucket((i) => i.channel === "phone"),
     email: bucket((i) => i.kind === "new" && i.channel === "email"),
     letter: bucket((i) => i.kind === "new" && i.channel === "letter"),
     followup: bucket((i) => i.kind === "followup"),

@@ -274,6 +274,23 @@ describeDb("E-Mail-Entwurf (Datenbank)", () => {
     },
   });
 
+  it("Nach dem Ja am Telefon: an die genannte Adresse, Bezug aufs Gespräch, kein Satz zur Herkunft der Adresse", async () => {
+    const c = await lead("Physio Telefon", "physiotherapie", "Elisabeth Kagerer");
+    const { llm } = fakeLlm("Mir ist Ihre Praxis bei Google aufgefallen, 4,8 Sterne sind richtig stark.");
+    const d = await draftEmail(deps(llm), c, "test", {
+      to: "huber@praxis.de",
+      name: "Huber",
+      salutation: "Frau",
+    });
+    if ("kind" in d) throw new Error("kein Entwurf");
+    expect(d.to).toBe("huber@praxis.de");
+    expect(d.body).toMatch(
+      /^Grüß Gott, Frau Huber,\n\ndanke für das nette Gespräch eben! Wie besprochen schicke ich Ihnen hier meinen Entwurf für Ihre Startseite\.\n\nMir ist Ihre Praxis/,
+    );
+    expect(d.body).not.toContain("aus dem Impressum");
+    expect(d.body).toContain("Eine kurze Antwort genügt, dann melde ich mich nicht mehr.");
+  });
+
   it("Sie-Form: kurz, Code setzt Betreff mit Praxisname, zwei Termine, Gruß und Signatur; kein WhatsApp-Link", async () => {
     const c = await lead("Physio Kagerer", "physiotherapie", "Elisabeth Kagerer");
     const { llm, structured } = fakeLlm(

@@ -32,6 +32,19 @@ export const outreachConfigSchema = z.object({
     .default(null),
   datenschutz_link: z.object({ sie: z.string(), du: z.string() }).nullable().default(null),
   du_branchen: z.array(z.string()).default([]),
+  // Anruf-Liste (src/outreach/call.ts): Gesprächsleitfaden und erster Satz der Mail nach dem Ja.
+  anruf: z
+    .object({
+      empfang_person: z.string(),
+      empfang_team: z.string(),
+      pitch: z.string(),
+      aufhaenger: z.string(),
+      einwaende: z.array(z.string()),
+      nach_anruf: z.object({ sie: z.string(), du: z.string() }),
+      versuche: z.number().int().min(1).default(3),
+    })
+    .nullable()
+    .default(null),
   // Termin-Bestätigung per Knopf (src/outreach/confirm.ts); {termin} und {ablauf} setzt der Code.
   bestaetigung: z
     .object({

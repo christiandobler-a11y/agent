@@ -105,6 +105,11 @@ ausprobieren kann. Nach Schritt 6 ist ein Abstimmungstermin (Kalibrierung) vorge
   Inhalt: nur zuordnen, gekürzt speichern, escaped anzeigen, nie an ein LLM. Befund-Seite (Brief, `src/outreach/letter.ts`): Rolle `letter` sieht den
   Desktop-Screenshot und liefert nur Markierungen (Prozent-Rechtecke), Notizen und Zeilen; Layout (`letterPage.ts`, rein),
   QR-Code und Kontaktdaten setzt Code, Chromium druckt das PDF (`letterPdf.ts`).
+- **Erstkontakt ohne Kaltmail** (06.10.2026, § 7 UWG): `autopilot.yaml → erstkontakt: anruf`. Praxen mit Nummer kommen
+  als Anruf-Karte ins Morgen-Paket (Leitfaden `outreach.yaml → anruf`, `src/outreach/call.ts`); „Ja“ ist die
+  Einwilligung (Notiz mit `meta.call = 'ja'` und `consent`), erst dann schreibt `draftEmail(…, afterCall)` die Mail.
+  „Lieber per Post“ oder `versuche`× nicht erreicht → Brief im nächsten Paket (`dueCallLetters`), „Kein Interesse“ →
+  LOST. Ohne Nummer gleich ein Brief. Nie Kaltmails an Leads ohne Einwilligung.
 - **Morgen-Paket** (`src/autopilot/`, `config/autopilot.yaml`, Tabelle `outreach_plan`): Sweep stößt um `vorbereiten`
   den Job `daily-plan` an (Nachfassen, dann neue Leads: Prototyp und Mail; Befund-Seiten gesammelt nur am Brief-Tag `briefe.tag`, zählen nicht zum Tagesziel), meldet ab `morgens` in
   Telegram von selbst (Kopf mit Nachtbericht und gleich die erste Karte, `sendMorning`; `/heute` holt es erneut),

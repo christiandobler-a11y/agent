@@ -6,15 +6,16 @@ zeiten:
   mittags: "12:00" # kurzer Zwischenstand ("Mahlzeit, Chef!"), 04.10.2026 Christians Wunsch
   abends: "19:00" # kurze Bilanz des Tages
 
-# 06.10.2026 (Christian): Erstkontakt per Brief statt Kaltmail (§ 7 UWG: Werbe-Mails ohne Einwilligung sind auch an
-# Firmen unzulässig, Werbebriefe nicht). Mails nur noch an Praxen, die sich selbst gemeldet haben.
-erstkontakt: brief
-# Neue Kontakte je Werktag (im Brief-Modus: Briefe), Stufen nach Tagen seit dem ersten eingeworfenen Brief.
-# 06.10.2026: Start mit 5 Briefen am Tag, nach zwei Wochen 10, wenn Öffnungen und Antworten kommen.
+# 06.10.2026 (Christian): kein Erstkontakt per Kaltmail mehr (§ 7 UWG: Werbe-Mails ohne Einwilligung sind auch an
+# Firmen unzulässig). "anruf": Praxen mit Telefonnummer kommen auf die Anruf-Liste (Ja → Mail mit Einwilligung,
+# lieber Post oder 3× nicht erreicht → Brief), ohne Nummer gleich ein Brief. "brief": nur Briefe. "mail": wie vorher.
+erstkontakt: anruf
+# Neue Kontakte je Werktag (Anrufe und Briefe zusammen), Stufen nach Tagen seit dem ersten erledigten Anruf.
+# 06.10.2026: 15 Anrufe am Tag (gut eine Stunde), nach zwei Wochen 25.
 neue_kontakte:
   stufen:
-    - { ab_tag: 0, pro_tag: 5 }
-    - { ab_tag: 14, pro_tag: 10 }
+    - { ab_tag: 0, pro_tag: 15 }
+    - { ab_tag: 14, pro_tag: 25 }
   nur_werktags: true # Mo bis Fr; am Wochenende nur Nachfassen
   # Nur Leads dieser Branchen (04.10.2026: Fokus Physio). [] = alle Branchen. Von Christian vorgemerkte Leads
   # ("bereit für Kontakt") kommen immer dran.

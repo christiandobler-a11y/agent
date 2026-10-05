@@ -8,6 +8,7 @@ import { addPlanItem, planItems } from "../db/plan.js";
 import { BudgetExceededError } from "../llm/budget.js";
 import { draftEmail, recipient, type OutreachDeps } from "../outreach/draft.js";
 import { createFollowUpDraft, dueFollowUps, dueLetterFollowUps } from "../outreach/followup.js";
+import { dueCallLetters, prepareCall } from "../outreach/call.js";
 import { draftLetter, type LetterDeps } from "../outreach/letter.js";
 import type { MxCheck } from "../outreach/mx.js";
 import { buildPrototype, type PrototypeDeps } from "../prototype/run.js";
@@ -60,8 +61,10 @@ export const autopilotConfigSchema = z.object({
    * Erstkontakt (06.10.2026, Christian): "brief" = neue Leads bekommen einen Brief (Befund-Seite mit Vorschau-Bild und
    * QR-Code zur Vorschau-Seite) statt einer Kaltmail; die Stufen in `neue_kontakte` zählen dann Briefe je Werktag.
    * Grund: Werbe-Mails ohne Einwilligung sind nach § 7 UWG auch an Firmen unzulässig, Werbebriefe nicht.
+   * "anruf" (06.10.2026): Praxen mit Telefonnummer kommen auf die Anruf-Liste (Ja → Mail mit Einwilligung, sonst
+   * Brief), ohne Nummer gleich ein Brief; die Stufen zählen dann Anrufe und Briefe zusammen.
    */
-  erstkontakt: z.enum(["mail", "brief"]).default("mail"),
+  erstkontakt: z.enum(["mail", "brief", "anruf"]).default("mail"),
   nachfassen: z.object({ nach_tagen: z.number().int().min(1), hoechstens: z.number().int().min(0) }),
   suche: z
     .object({
@@ -99,6 +102,8 @@ export interface PlanBuildResult {
   letters: number;
   prototypes: number;
   skipped: { name: string; reason: string }[];
+  /** Anruf-Liste: vorbereitete Anrufe (fehlt bei älteren Ergebnissen). */
+  calls?: number;
   stoppedByBudget: boolean;
   warnings: string[];
 }
@@ -196,11 +201,17 @@ async function firstSentAt(db: Db, from: string | null | undefined): Promise<Dat
   return rows[0]?.first ?? null;
 }
 
-/** Erster als eingeworfen markierter neuer Brief (Stufen im Brief-Modus zählen ab da). */
-async function firstLetterAt(db: Db): Promise<Date | null> {
+async function hasPrototype(db: Db, companyId: string): Promise<boolean> {
+  const { rows } = await db.query("select 1 from prototypes where company_id = $1 limit 1", [companyId]);
+  return rows.length > 0;
+}
+
+/** Erster erledigter neuer Kontakt auf diesem Weg (Stufen im Brief- bzw. Anruf-Modus zählen ab da). */
+async function firstContactAt(db: Db, channel: "letter" | "phone"): Promise<Date | null> {
   const { rows } = await db.query<{ first: Date | null }>(
     `select min(done_at) as first from outreach_plan
-      where channel = 'letter' and kind = 'new' and status = 'done'`,
+      where channel = $1 and kind = 'new' and status = 'done'`,
+    [channel],
   );
   return rows[0]?.first ?? null;
 }
@@ -285,6 +296,8 @@ export async function candidates(
   limit: number,
   branches: readonly string[],
   home?: { lat: number; lng: number; umkreis_km: number },
+  /** Anruf-Liste: so oft nicht erreicht, dann nicht mehr anrufen (kommt als Brief, siehe dueCallLetters). */
+  callAttempts = 3,
 ): Promise<Company[]> {
   // Von Christian vorgemerkte (READY_FOR_CONTACT) immer, sonst nur die Fokus-Branchen (leer = alle).
   const { rows } = await db.query<Company>(
@@ -295,6 +308,11 @@ export async function candidates(
                          where p.company_id = c.id and (p.plan_date = $1 or p.status in ('done', 'dropped')))
         and not exists (select 1 from interactions i
                          where i.company_id = c.id and i.type = 'draft' and i.meta ? 'sent_at')
+        -- Schon angerufen: Ja, lieber Brief oder kein Interesse; oder zu oft nicht erreicht.
+        and not exists (select 1 from interactions n where n.company_id = c.id
+                         and n.meta->>'call' in ('ja', 'brief', 'kein_interesse'))
+        and (select count(*) from interactions n
+              where n.company_id = c.id and n.meta->>'call' = 'nicht_erreicht') < $7
       order by (c.status = 'READY_FOR_CONTACT') desc,
                -- Im Umkreis zuerst (Entfernung näherungsweise, reicht für ein paar Dutzend Kilometer).
                (c.lat is not null and $4::float is not null
@@ -302,7 +320,7 @@ export async function candidates(
                                   + power(cos(radians($4::float)) * (c.lng::float - $5::float), 2)) <= $6::float) desc,
                c.current_score desc nulls last
       limit $2`,
-    [date, limit, branches, home?.lat ?? null, home?.lng ?? null, home?.umkreis_km ?? null],
+    [date, limit, branches, home?.lat ?? null, home?.lng ?? null, home?.umkreis_km ?? null, callAttempts],
   );
   return rows;
 }
@@ -369,6 +387,8 @@ export async function buildDailyPlan(deps: PlanDeps, by = "autopilot"): Promise<
     }
 
     const letterMode = config.erstkontakt === "brief";
+    const callMode = config.erstkontakt === "anruf";
+    const offline = letterMode || callMode;
     // 1b. Brief als zweites Nachfassen für sehr gute Leads ohne Antwort (Christian, 04.10.2026). Briefe gesammelt
     // nur am Brief-Tag (05.10.2026).
     const letterDay = berlinWeekday(now) === config.briefe.tag;
@@ -386,17 +406,26 @@ export async function buildDailyPlan(deps: PlanDeps, by = "autopilot"): Promise<
     }
 
     // 2. Neue Leads. Im Brief-Modus zählen die Stufen Briefe; Bremsen für Unzustellbare und Spam gelten nur für Mails.
-    const bounces = letterMode
+    const bounces = offline
       ? { sent: 0, bounced: 0 }
       : await recentBounces(db, now, config.neue_kontakte.bremse.tage);
-    const spamSeen = letterMode ? false : await recentSeedProblem(db, now);
+    const spamSeen = offline ? false : await recentSeedProblem(db, now);
     const { count: target, braked } = dailyNewCount(
       config,
       now,
-      letterMode ? await firstLetterAt(db) : await firstSentAt(db, deps.senderAddress),
+      offline
+        ? await firstContactAt(db, callMode ? "phone" : "letter")
+        : await firstSentAt(db, deps.senderAddress),
       bounces,
       spamSeen,
     );
+    // 1c. Anruf-Modus: Brief für Praxen, die lieber Post wollten oder mehrfach nicht erreicht wurden.
+    const attempts = outreachDeps.outreach.anruf?.versuche ?? 3;
+    if (callMode)
+      for (const company of await dueCallLetters(db, attempts, 10))
+        await isolated(company, result, async () => {
+          await planLetter(deps, company, date, by, "followup", result);
+        });
     if (braked)
       result.warnings.push(
         spamSeen
@@ -405,17 +434,17 @@ export async function buildDailyPlan(deps: PlanDeps, by = "autopilot"): Promise<
       );
     // Nur neue Mails zählen zum Tagesziel; Briefe kommen gesammelt am Brief-Tag dazu. Wer ausfällt (keine Mail,
     // Fehler) oder aussortiert wurde, wird durch den nächsten Kandidaten ersetzt (/nachlegen baut erneut).
-    const newChannel = letterMode ? "letter" : "email";
+    const newChannels = callMode ? ["phone", "letter"] : [letterMode ? "letter" : "email"];
     const already = (await planItems(db, date)).filter(
-      (i) => i.kind === "new" && i.channel === newChannel && i.status !== "dropped",
+      (i) => i.kind === "new" && newChannels.includes(i.channel) && i.status !== "dropped",
     ).length;
     let newLetters = 0;
     const branches = config.neue_kontakte.branchen ?? config.suche.branchen;
-    const pool = Math.max(0, target - already) * 4 + (lettersLeft > 0 && !letterMode ? 300 : 0);
+    const pool = Math.max(0, target - already) * 4 + (lettersLeft > 0 && !offline ? 300 : 0);
     const groups = await contactedGroups(db, date);
-    for (const company of await candidates(db, date, pool, branches, config.neue_kontakte.heimat)) {
-      const mailsDone = (letterMode ? newLetters : result.emails) + already >= target;
-      if (mailsDone && (letterMode || lettersLeft <= 0)) break;
+    for (const company of await candidates(db, date, pool, branches, config.neue_kontakte.heimat, attempts)) {
+      const mailsDone = (offline ? newLetters : result.emails) + already >= target;
+      if (mailsDone && (offline || lettersLeft <= 0)) break;
       await isolated(company, result, async () => {
         const person = await recipient(db, company.id);
         // Anderer Standort eines schon angeschriebenen oder heute geplanten Betriebs: auslassen (zählt nicht).
@@ -434,12 +463,20 @@ export async function buildDailyPlan(deps: PlanDeps, by = "autopilot"): Promise<
           return;
         }
         const hasAddress = Boolean(company.street && company.postal_code);
-        if (letterMode && !hasAddress) {
-          result.skipped.push({ name: company.name, reason: "keine Anschrift für den Brief" });
+        const canCall = callMode && Boolean(company.phone) && outreachDeps.outreach.anruf !== null;
+        if (offline && !canCall && !hasAddress) {
+          result.skipped.push({
+            name: company.name,
+            reason: callMode ? "keine Telefonnummer und keine Anschrift" : "keine Anschrift für den Brief",
+          });
           return;
         }
-        const mailOk = !letterMode && person.email ? await deps.mx(person.email) : false;
-        const channel = letterMode ? "letter" : chooseChannel({ hasAddress, mailOk }, lettersLeft);
+        const mailOk = !offline && person.email ? await deps.mx(person.email) : false;
+        const channel: "email" | "letter" | "phone" | null = canCall
+          ? "phone"
+          : offline
+            ? "letter"
+            : chooseChannel({ hasAddress, mailOk }, lettersLeft);
         if (!channel) {
           if (!mailsDone)
             result.skipped.push({
@@ -464,10 +501,11 @@ export async function buildDailyPlan(deps: PlanDeps, by = "autopilot"): Promise<
         // Prototyp (Vorschau-Seite): ohne Vorschau-Bild immer, im Brief-Modus auch dazu, damit der QR-Code im Brief
         // auf eine eigene Seite der Praxis führt.
         if (
-          (!teaser || letterMode) &&
+          (!teaser || offline) &&
           deps.prototype &&
           config.prototyp_fuer_neue &&
-          company.segment !== "NO_WEBSITE"
+          company.segment !== "NO_WEBSITE" &&
+          !(offline && (await hasPrototype(db, company.id)))
         ) {
           try {
             const p = await buildPrototype(deps.prototype, company, by);
@@ -477,9 +515,24 @@ export async function buildDailyPlan(deps: PlanDeps, by = "autopilot"): Promise<
             result.warnings.push(`Prototyp ${company.name}: ${String(err).slice(0, 120)}`);
           }
         }
-        if (channel === "letter") {
+        if (channel === "phone") {
+          const call = await prepareCall(db, outreachDeps.outreach, company, by, now);
+          if (!call) return;
+          if (
+            await addPlanItem(db, {
+              date,
+              companyId: company.id,
+              kind: "new",
+              channel: "phone",
+              draftId: call.draftId,
+            })
+          )
+            result.calls = (result.calls ?? 0) + 1;
+          newLetters++;
+          groups.add(keys, company.name);
+        } else if (channel === "letter") {
           if (!(await planLetter(deps, company, date, by, "new", result))) return;
-          if (letterMode) newLetters++;
+          if (offline) newLetters++;
           else lettersLeft--;
           groups.add(keys, company.name);
         } else {

@@ -212,6 +212,7 @@ describe("Morgen-Paket (rein)", () => {
       item({ kind: "followup", status: "done" }),
     ]);
     expect(counts).toEqual({
+      phone: { done: 0, total: 0 },
       email: { done: 1, total: 2 },
       letter: { done: 0, total: 1 },
       followup: { done: 1, total: 1 },

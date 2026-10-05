@@ -28,6 +28,7 @@ import { draftLetter, type LetterDeps } from "../outreach/letter.js";
 import { loadMailConfig, type MailConfig, type Mailbox } from "../outreach/mail.js";
 import { berlinDate, buildDailyPlan, loadAutopilotConfig } from "../autopilot/plan.js";
 import {
+  handleCallText,
   handlePlanCallback,
   sendMorningPackage,
   sendNextCard,
@@ -908,6 +909,9 @@ export function createBot(options: BotOptions): AvelioBot {
   });
 
   bot.on("message:text", async (ctx) => {
+    // Nach "✏️ Andere Adresse" auf einer Anruf-Karte: Adresse und Name für die Mail mit Einwilligung.
+    const plan = planDeps();
+    if (plan && (await handleCallText(ctx, plan, by(ctx.chat.id)))) return;
     const pending = await getState<{ companyId: string; at: string } | null>(
       pipeline.db,
       inspoKey(ctx.chat.id),

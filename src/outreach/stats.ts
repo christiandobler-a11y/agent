@@ -17,6 +17,9 @@ export interface OutreachStats {
   /** Firmen, die einmal auf "interessiert" standen (Termin bestätigt o. Ä.). */
   interested: number;
   won: number;
+  /** Anruf-Liste: erreichte Praxen (Ja, Post, kein Interesse) und davon Ja zur Mail. */
+  calls?: number;
+  callYes?: number;
   /** Ausgaben insgesamt (LLM + Google), in $. */
   costUsd: number;
 }
@@ -34,6 +37,10 @@ export async function outreachStats(db: Db): Promise<OutreachStats> {
        (select count(distinct company_id)::int from interactions where type = 'status' and to_status = 'INTERESTED')
           as "interested",
        (select count(distinct company_id)::int from interactions where type = 'status' and to_status = 'WON') as "won",
+       (select count(distinct company_id)::int from interactions
+          where type = 'note' and meta->>'call' in ('ja', 'brief', 'kein_interesse')) as "calls",
+       (select count(distinct company_id)::int from interactions where type = 'note' and meta->>'call' = 'ja')
+          as "callYes",
        (select coalesce(sum(cost_usd), 0)::float from agent_runs)
          + (select coalesce(sum(cost_usd), 0)::float from api_usage) as "costUsd"`,
   );
@@ -49,6 +56,11 @@ export function statsText(s: OutreachStats, title = "📊 Zahlen bisher"): strin
   return [
     title,
     "",
+    ...(s.calls
+      ? [
+          `📞 Anrufe erreicht: ${s.calls}, davon Ja zur Mail: ${s.callYes ?? 0} (${pct(s.callYes ?? 0, s.calls)})`,
+        ]
+      : []),
     `📧 Neue Mails: ${s.sent} (+ ${s.followUps} Nachfass-Mails)`,
     `↩️ Unzustellbar: ${s.bounced} (${pct(s.bounced, s.sent)})`,
     `💬 Antworten: ${s.replied} (${pct(s.replied, s.sent)})`,

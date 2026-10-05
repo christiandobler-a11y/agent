@@ -9,7 +9,7 @@ import { RUBRIC_CRITERIA, RUBRIC_LABELS, type Finding } from "../pipeline/audit/
 import type { Branches } from "../pipeline/research/branches.js";
 import type { OutreachConfig } from "./config.js";
 import { proposeSlots, seedOf } from "./slots.js";
-import { duToIhr, lowerFirst, subjectFor, type Form } from "./form.js";
+import { duToIhr, lowerFirst, subjectFor, upperFirst, type Form } from "./form.js";
 import { closingNotice, senderSignature, type SenderContact } from "./signature.js";
 import { teaserExists, teaserLook, teaserName, teaserPath } from "../prototype/teaser.js";
 import { personFromCompanyName, personInCompanyName, salutationFromFirstName } from "./names.js";
@@ -53,6 +53,8 @@ export interface EmailDraft {
   costUsd: number;
   warnings: string[];
   draftId: string;
+  /** Vorschau-Bild in der Mail (Pfad), sonst null. */
+  teaser: string | null;
 }
 
 const SEVERITY = { high: 0, medium: 1, low: 2 } as const;
@@ -242,6 +244,11 @@ export async function draftEmail(
   deps: OutreachDeps,
   company: Company,
   by: string,
+  /**
+   * Mail nach dem Ja am Telefon (06.10.2026, src/outreach/call.ts): an diese Adresse, mit genanntem Ansprechpartner,
+   * erster Satz bezieht sich auf das Gespräch, kein Satz zur Herkunft der Adresse.
+   */
+  afterCall?: { to: string; name: string | null; salutation: "Herr" | "Frau" | null },
 ): Promise<EmailDraft | { kind: "no_audit" }> {
   const { db, outreach: o } = deps;
   const now = deps.now();
@@ -256,7 +263,11 @@ export async function draftEmail(
   if (!audit && company.segment !== "NO_WEBSITE") return { kind: "no_audit" };
 
   const places = await latestPlacesSnapshot(db, company.id);
-  const { email, emailSource, name: impressumName, salutation } = await recipient(db, company.id);
+  const found = await recipient(db, company.id);
+  const email = afterCall?.to ?? found.email;
+  const emailSource = afterCall ? null : found.emailSource;
+  const impressumName = afterCall?.name ?? found.name;
+  const salutation = afterCall?.name ? afterCall.salutation : found.salutation;
   // Kein Name im Impressum: vielleicht steht die Inhaberin im Firmennamen; sonst Team-Anrede mit Bitte um Weiterleitung.
   const name = impressumName ?? personFromCompanyName(company.name);
   const duBranch = company.branch_key !== null && o.du_branchen.includes(company.branch_key);
@@ -356,8 +367,9 @@ export async function draftEmail(
     : { rows: [] };
   const previewUrl = proto[0] && deps.previewBaseUrl ? `${deps.previewBaseUrl}/${proto[0].slug}/` : null;
   // Ohne Vorschau-Link: das einheitliche Vorschau-Bild, falls es eins gibt (steht in der Mail unter dem Satz).
+  // Nach dem Ja am Telefon zeigt die Mail das Bild, von dem die Rede war, und dazu den Link zur Vorschau-Seite.
   const teaser =
-    !previewUrl && deps.teaserDir && teaserExists(deps.teaserDir, company.id)
+    (!previewUrl || afterCall) && deps.teaserDir && teaserExists(deps.teaserDir, company.id)
       ? teaserPath(deps.teaserDir, company.id)
       : null;
   // Ablauf "vorschau" (05.10.2026, Christian: volle Praxen nehmen sich keinen Video-Call): keine Termine in der
@@ -365,11 +377,11 @@ export async function draftEmail(
   const offerPreview = k.ablauf === "vorschau" && Boolean(teaser) && !previewUrl;
   const slots = offerPreview ? null : proposed;
   const slotSentence = slots ? (form === "ihr" ? duToIhr(slots.sentence) : slots.sentence) : null;
-  const draftSentence = previewUrl
+  const linkSentence = previewUrl
     ? inForm(k.entwurf_satz, k.entwurf_satz_du).replace("{link}", previewUrl)
-    : teaser
-      ? inForm(k.bild_satz, k.bild_satz_du)
-      : null;
+    : null;
+  const imageSentence = teaser ? inForm(k.bild_satz, k.bild_satz_du) : null;
+  // Das Bild steht in der Mail unter seinem Satz (teaser_after); gibt es auch eine Vorschau-Seite, folgt ihr Link.
   const prepared = offerPreview
     ? inForm(pick(k.vorschau_angebot, seed, 7, variant), pick(k.vorschau_angebot_du, seed, 7, variant))
     : previewUrl || teaser
@@ -401,10 +413,12 @@ export async function draftEmail(
 
   // 04.10.2026 (mit Christian): kurz, Bild früh, genau eine Bitte (Termin), Weiterleiten als P.S.; mit Entwurfs-Link
   // bleibt der Antwort-Hinweis, ohne Link keine weitere Aufforderung (auch kein WhatsApp-Link in der Erstmail).
+  const called = afterCall && o.anruf ? inForm(o.anruf.nach_anruf.sie, o.anruf.nach_anruf.du) : null;
   const body = [
     salutationLine(form, { name: impressumName, salutation }, company.name, team?.anrede, o.anrede),
-    lowerFirst(clean.text),
-    ...(draftSentence ? [draftSentence] : []),
+    ...(called ? [lowerFirst(called), upperFirst(clean.text)] : [lowerFirst(clean.text)]),
+    ...(imageSentence ? [imageSentence] : []),
+    ...(linkSentence ? [linkSentence] : []),
     [prepared, slotSentence].filter(Boolean).join(" "),
     ...(previewUrl ? [cta] : []),
     `${greeting}\n${signature}`,
@@ -427,10 +441,11 @@ export async function draftEmail(
       to: email,
       slots: slots?.slots ?? [],
       prompt: CONTACT_PROMPT_VERSION,
+      ...(afterCall ? { nach_anruf: true } : {}),
       variant,
       preview_url: previewUrl,
       ...(teaser
-        ? { teaser, teaser_after: draftSentence, teaser_look: await teaserLook(db, company.id) }
+        ? { teaser, teaser_after: imageSentence, teaser_look: await teaserLook(db, company.id) }
         : {}),
     },
     by,
@@ -448,5 +463,6 @@ export async function draftEmail(
     costUsd: Math.round(cost * 1000) / 1000,
     warnings,
     draftId: draft.id,
+    teaser,
   };
 }

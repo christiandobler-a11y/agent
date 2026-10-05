@@ -24,6 +24,33 @@ datenschutz_link:
 abmeldung:
   sie: Sie möchten keine weiteren Nachrichten von mir? Eine kurze Antwort genügt, dann melde ich mich nicht mehr.
   du: Du möchtest keine weiteren Nachrichten von mir? Eine kurze Antwort genügt, dann melde ich mich nicht mehr.
+# Anruf-Liste (06.10.2026, Christian: "einen Standardsatz, den ich kurz und knackig runterrattern kann"). Ziel des
+# Anrufs ist nur das Ja zur Mail mit dem Entwurf; danach ist die Mail erlaubt (Einwilligung). Jedes Nein sofort
+# akzeptieren, nie zweimal anrufen. {person} = "Frau Huber" aus dem Impressum, {befund} = stärkster Befund.
+anruf:
+  empfang_person: Grüß Gott, Christian Dobler hier. Ist {person} kurz zu sprechen?
+  empfang_team: Grüß Gott, Christian Dobler hier. Wer kümmert sich bei Ihnen um die Website? Ist die Person kurz da?
+  pitch: >-
+    Grüß Gott, Christian Dobler aus Peißenberg. Ich mache Websites für Praxen hier in der Gegend und hab mir Ihre
+    Seite angeschaut. Ich hab Ihnen schon einen Entwurf gebaut, wie Ihre Startseite heute aussehen könnte, mit Ihren
+    Farben und Ihren Google-Bewertungen. Darf ich Ihnen den kurz per Mail schicken? Ganz unverbindlich, Sie schauen
+    ihn sich an, wann es Ihnen passt.
+  aufhaenger: "Falls gefragt wird, was auffällt: {befund}"
+  einwaende:
+    - "Was kostet das? → Der Entwurf kostet nichts. Eine fertige Seite gibt es ab 990 Euro, aber schauen Sie erst mal, ob er Ihnen gefällt."
+    - "Wir haben schon eine Website → Genau die hab ich mir angeschaut. Der Entwurf zeigt nur, wie sie heute aussehen könnte, Sie entscheiden."
+    - "Keine Zeit → Versteh ich total, deshalb per Mail. Zwei Minuten anschauen, wann es passt."
+    - "Kein Interesse → Alles klar, dann wünsch ich Ihnen einen schönen Tag. (Nicht nachhaken, ❌ drücken.)"
+    - "Chefin/Chef nicht da → Wann erreiche ich sie am besten? (📵 drücken.)"
+    - "Lieber per Post → Gerne, dann kommt er die Tage per Brief. (📮 drücken.)"
+    - "An welche Adresse? → Passt die aus Ihrem Impressum? Sonst Adresse notieren (✏️)."
+  # Erster Satz der Mail nach dem Ja am Telefon (statt Herkunft der Adresse).
+  nach_anruf:
+    sie: danke für das nette Gespräch eben! Wie besprochen schicke ich Ihnen hier meinen Entwurf für Ihre Startseite.
+    du: danke für das nette Gespräch eben! Wie besprochen schick ich dir hier meinen Entwurf für deine Startseite.
+  # So oft "nicht erreicht", dann kommt stattdessen ein Brief.
+  versuche: 3
+
 # Du für diese Branchen, sonst Sie.
 du_branchen: [fahrrad, gastro, friseur, kosmetik]
 
