@@ -12,6 +12,8 @@ export const SWEEP_QUEUE = "sweep";
 export const DEAD_QUEUE = "dead";
 /** Morgen-Paket bauen (src/autopilot/schedule.ts). */
 export const PLAN_QUEUE = "daily-plan";
+/** Berater-Runde (src/advisor/): Recherche, Entwürfe, Gegenprüfung; einige Minuten. */
+export const ADVISOR_QUEUE = "advisor";
 
 const queueSchema = z.object({
   retry_limit: z.number().int().min(0).max(10),
@@ -82,6 +84,7 @@ export async function ensureQueues(boss: PgBoss, config: QueueConfig): Promise<v
     retryDelay: 600,
     expireInSeconds: 2 * 3600,
   });
+  await upsert(ADVISOR_QUEUE, { policy: "exclusive", retryLimit: 0, expireInSeconds: 1800 });
   for (const name of QUEUES) {
     const q = config.queues[name];
     await upsert(name, {

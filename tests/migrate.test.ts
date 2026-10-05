@@ -13,6 +13,8 @@ describeDb("migrate", () => {
       "select table_name from information_schema.tables where table_schema = current_schema() order by 1",
     );
     expect(rows.map((r) => r.table_name)).toEqual([
+      "advisor_reports",
+      "advisor_suggestions",
       "agent_runs",
       "api_usage",
       "app_state",

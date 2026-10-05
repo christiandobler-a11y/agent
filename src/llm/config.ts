@@ -21,6 +21,8 @@ export const modelsConfigSchema = z.object({
     }),
   ),
   pricing: z.record(z.string(), price),
+  /** Server-Werkzeuge von Anthropic (Berater-Recherche): Preis je 1.000 Websuchen in $. */
+  tools: z.object({ web_search_per_1000_usd: z.number().min(0) }).optional(),
   budget: z.object({ daily_usd: z.number().positive(), monthly_usd: z.number().positive() }),
 });
 

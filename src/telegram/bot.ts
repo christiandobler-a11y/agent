@@ -1,3 +1,6 @@
+import { decideSuggestion, suggestionsByStatus } from "../advisor/run.js";
+import { startAdvisor } from "../advisor/job.js";
+import { DECISION_TEXT, decisionKeyboard, parseAdvisorCallback, suggestionList } from "./advisor.js";
 import { Bot, InputFile, type Context } from "grammy";
 import { googleOwnerPhotos } from "../prototype/googlePhotos.js";
 import { heroForCompany } from "../prototype/heroPhoto.js";
@@ -175,6 +178,8 @@ export const BOT_COMMANDS = [
   { command: "kalibrieren", description: "Websites bewerten (A/B/C), gute als Vorbild merken" },
   { command: "vorbilder", description: "Gemerkte Vorbild-Websites" },
   { command: "zahlen", description: "Mails, Antworten, Termine, Kosten" },
+  { command: "berater", description: "Berater-Runde jetzt starten (Prozess + Wachstum)" },
+  { command: "vorschlaege", description: "Vorschläge der Berater, die umgesetzt werden sollen" },
   { command: "hilfe", description: "Was ich kann" },
 ];
 
@@ -272,6 +277,26 @@ export function createBot(options: BotOptions): AvelioBot {
   const inspoKey = (chatId: number | undefined) => `inspo:pending:${chatId ?? "?"}`;
   bot.command(["zahlen", "statistik", "stats"], async (ctx) => {
     await ctx.reply(escapeHtml(statsText(await outreachStats(pipeline.db))), { parse_mode: "HTML" });
+  });
+
+  bot.command(["berater", "beratung"], async (ctx) => {
+    if (!pipeline.advisor) {
+      await ctx.reply("Die Berater sind hier nicht eingerichtet.");
+      return;
+    }
+    const started = await startAdvisor(pipeline, `telegram:${ctx.chat.id}`);
+    await ctx.reply(
+      started
+        ? "🧠 Die Berater legen los: Zahlen ansehen, im Netz recherchieren, Vorschläge entwerfen und gegenprüfen. Dauert ein paar Minuten, ich melde mich ☕"
+        : "🧠 Die Berater sitzen schon dran, der Bericht kommt gleich.",
+    );
+  });
+  bot.command(["vorschlaege", "vorschläge"], async (ctx) => {
+    const list = await suggestionsByStatus(pipeline.db, ["umsetzen", "spaeter"]);
+    await ctx.reply(suggestionList(list), {
+      parse_mode: "HTML",
+      link_preview_options: { is_disabled: true },
+    });
   });
 
   bot.command(["vorbilder", "inspo"], async (ctx) => {
@@ -766,6 +791,23 @@ export function createBot(options: BotOptions): AvelioBot {
       await ctx
         .editMessageText(card.text, { parse_mode: "HTML", reply_markup: { inline_keyboard: card.keyboard } })
         .catch(() => undefined);
+      return;
+    }
+
+    const advice = parseAdvisorCallback(ctx.callbackQuery.data);
+    if (advice) {
+      const done = await decideSuggestion(pipeline.db, advice.id, advice.status, pipeline.now());
+      if (!done) {
+        await ctx.answerCallbackQuery({ text: "Vorschlag nicht gefunden" });
+        return;
+      }
+      await ctx.answerCallbackQuery({ text: DECISION_TEXT[advice.status].slice(0, 190) });
+      await ctx
+        .editMessageReplyMarkup({
+          reply_markup: { inline_keyboard: decisionKeyboard(advice.id, advice.status) },
+        })
+        .catch(() => undefined);
+      await ctx.reply(`${escapeHtml(done.title)}\n${DECISION_TEXT[advice.status]}`, { parse_mode: "HTML" });
       return;
     }
 

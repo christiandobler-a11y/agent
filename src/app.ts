@@ -19,6 +19,7 @@ import { loadScoringConfig } from "./pipeline/scoring/config.js";
 import { createBoss, ensureQueues, loadQueueConfig } from "./queue/boss.js";
 import { logNotifier, type Notifier } from "./queue/notifier.js";
 import { loadAutopilotConfig } from "./autopilot/plan.js";
+import { advisorContext } from "./advisor/job.js";
 import { loadOutreachConfig } from "./outreach/config.js";
 import { chromiumLetterRenderer } from "./outreach/letterPdf.js";
 import { cachedPlaceDetails } from "./prototype/placeDetails.js";
@@ -110,6 +111,7 @@ export async function createApp(options: { notifier?: Notifier; worker?: boolean
   ctx.mailbox = mailbox;
   ctx.seedBoxes = seedBoxesFromEnv(env, mail);
   ctx.mail = mail;
+  ctx.advisor = advisorContext(ctx, llm);
   ctx.autopilot = {
     config: loadAutopilotConfig(),
     planDeps: () => ({

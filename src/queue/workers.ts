@@ -4,7 +4,8 @@ import { setFailed } from "../db/companies.js";
 import { finishSearchRun, getSearchRun } from "../db/searchRuns.js";
 import { BudgetExceededError } from "../llm/budget.js";
 import { computeRecheckAfter } from "../pipeline/research/recheck.js";
-import { PLAN_QUEUE, QUEUES, SWEEP_QUEUE, type QueueName } from "./boss.js";
+import { ADVISOR_QUEUE, PLAN_QUEUE, QUEUES, SWEEP_QUEUE, type QueueName } from "./boss.js";
+import { runAdvisorJob } from "../advisor/job.js";
 import { runPlanJob } from "../autopilot/schedule.js";
 import {
   enqueue,
@@ -172,6 +173,20 @@ export async function startWorkers(ctx: PipelineContext): Promise<void> {
   await ctx.boss.work(PLAN_QUEUE, { pollingIntervalSeconds: 30 }, async () => {
     const result = await runPlanJob(ctx);
     if (result) console.log(JSON.stringify({ level: "info", msg: "Morgen-Paket vorbereitet", ...result }));
+  });
+  await ctx.boss.work<{ trigger?: string }>(ADVISOR_QUEUE, { pollingIntervalSeconds: 10 }, async ([job]) => {
+    const report = await runAdvisorJob(ctx, job?.data.trigger ?? "woche");
+    if (report)
+      console.log(
+        JSON.stringify({
+          level: "info",
+          msg: "Berater-Runde fertig",
+          vorschlaege: report.suggestions.length,
+          verworfen: report.dropped,
+          suchen: report.searches,
+          cost_usd: Math.round(report.costUsd * 1000) / 1000,
+        }),
+      );
   });
   await ctx.boss.work(SWEEP_QUEUE, { pollingIntervalSeconds: 10 }, async () => {
     await sweep(ctx);

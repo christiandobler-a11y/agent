@@ -844,7 +844,7 @@ describeDb("Morgen-Paket mit Datenbank", () => {
           crm: { follow_up_days: 5, quiet_hours: { start: "21:00", end: "08:00" } },
           lead: { branches: {} },
         } as unknown as PipelineContext,
-        llm: { structured: vi.fn(), toolStep: vi.fn() },
+        llm: { structured: vi.fn(), toolStep: vi.fn(), research: vi.fn() },
       },
       botInfo: BOT_INFO,
       outreach: { config: loadOutreachConfig(), contact: { whatsapp: null, phone: null } },

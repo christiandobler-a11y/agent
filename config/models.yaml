@@ -46,6 +46,21 @@ roles:
     max_tokens: 2000 # inkl. Denkphase
     effort: low
 
+  # Berater-Runde (05.10.2026, src/advisor/): einmal die Woche, daher die stärkeren Modelle. Recherche mit Websuche
+  # (Sonnet), Entwürfe und Gegenprüfung (Opus), beide mit Denkphase.
+  advisor_research:
+    model: claude-sonnet-5-5
+    max_tokens: 12000 # inkl. Denkphase
+    effort: medium
+  advisor:
+    model: claude-opus-5-5
+    max_tokens: 16000 # inkl. Denkphase
+    effort: high
+  advisor_critic:
+    model: claude-opus-5-5
+    max_tokens: 10000 # inkl. Denkphase
+    effort: high
+
 # Budget-Wächter: gilt für LLM-Aufrufe UND bezahlte APIs (Places) zusammen. Tag/Monat nach deutscher Zeit.
 # Ist ein Limit erreicht, startet kein neuer kostenpflichtiger Aufruf mehr (laufende werden fertig).
 budget:
@@ -53,6 +68,10 @@ budget:
   # Tageslimit großzügig: die Nachtsuche läuft über Mitternacht und darf das Morgen-Paket (05:00) nicht ausbremsen.
   daily_usd: 15
   monthly_usd: 160
+
+# Server-Werkzeuge von Anthropic: Websuche (Berater-Recherche) je 1.000 Suchen, zusätzlich zu den Tokens.
+tools:
+  web_search_per_1000_usd: 10
 
 pricing:
   claude-haiku-4-5: { input: 1.0, output: 5.0, cache_read: 0.1 }

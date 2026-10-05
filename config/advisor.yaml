@@ -1,0 +1,10 @@
+# Berater-Runde (05.10.2026, Christian): Prozess-Optimierer und Wachstums-Berater (src/advisor/). Einmal die Woche von
+# selbst, sonst auf /berater. Die Berater schlagen nur vor; Christian entscheidet per Knopf, umgesetzt wird im Code.
+aktiv: true
+# Wochentag (montag … sonntag) und Uhrzeit, ab der die Runde startet (Bericht kommt ein paar Minuten später).
+tag: sonntag
+ab: "18:00"
+# Höchstens so viele Vorschläge kommen bei Christian an (nach der Gegenprüfung, die stärksten zuerst).
+max_vorschlaege: 5
+# Websuchen je Runde (je 1.000 Suchen ca. 10 $, siehe config/models.yaml → tools).
+websuchen: 8

@@ -29,7 +29,7 @@ import { crawlCompany, type CrawlOutcome } from "./pipeline/crawl/run.js";
 import { mapLimit } from "./util/mapLimit.js";
 import { audit, explain, score } from "./cliLeads.js";
 import { angebot, letter, prototype, teaser } from "./cliOutreach.js";
-import { chat, coverage, failed, runs, search, worker } from "./cliQueue.js";
+import { advisor, chat, coverage, failed, runs, search, worker } from "./cliQueue.js";
 import { calibrate } from "./cliCalibrate.js";
 
 const ICONS = { ok: "✔", missing: "–", error: "✘" } as const;
@@ -350,6 +350,7 @@ const commands: Record<string, (args: string[]) => Promise<number>> = {
   coverage,
   worker,
   chat,
+  berater: advisor,
   runs,
   failed,
   audit,

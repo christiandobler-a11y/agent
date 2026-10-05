@@ -31,6 +31,7 @@ const USAGE = `Verwendung:
 const NO_LLM: LlmGateway = {
   structured: () => Promise.reject(new Error("Kein LLM in diesem Befehl")),
   toolStep: () => Promise.reject(new Error("Kein LLM in diesem Befehl")),
+  research: () => Promise.reject(new Error("Kein LLM in diesem Befehl")),
 };
 
 async function fromDb<T>(fn: (entries: GoldenEntry[]) => T): Promise<T> {

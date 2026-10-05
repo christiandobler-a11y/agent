@@ -20,6 +20,8 @@ import { dueReminders, markNotified } from "../db/crm.js";
 import { isQuietTime, loadCrmConfig, type CrmConfig } from "../crm/status.js";
 import { claimState } from "../db/appState.js";
 import { autopilotTick, mailTick, monitorTick, queueTick } from "../autopilot/schedule.js";
+import { advisorTick } from "../advisor/job.js";
+import type { AdvisorConfig, AdvisorDeps } from "../advisor/run.js";
 import type { SeedBox } from "../outreach/seed.js";
 import type { AutopilotConfig, PlanDeps } from "../autopilot/plan.js";
 import type { MailConfig, Mailbox } from "../outreach/mail.js";
@@ -73,6 +75,8 @@ export interface PipelineContext {
   mail?: MailConfig;
   /** Morgen-Paket: nachts planen, morgens melden, abends Bilanz. */
   autopilot?: { config: AutopilotConfig; planDeps: () => PlanDeps };
+  /** Berater-Runde (src/advisor/): einmal die Woche bzw. auf /berater. */
+  advisor?: { config: AdvisorConfig; deps: () => AdvisorDeps };
 }
 
 export async function enqueue(
@@ -388,6 +392,9 @@ export async function sweep(ctx: PipelineContext): Promise<void> {
     console.error(
       JSON.stringify({ level: "error", msg: "Morgen-Paket-Takt fehlgeschlagen", error: String(err) }),
     ),
+  );
+  await advisorTick(ctx).catch((err: unknown) =>
+    console.error(JSON.stringify({ level: "error", msg: "Berater-Takt fehlgeschlagen", error: String(err) })),
   );
   await queueTick(ctx).catch((err: unknown) =>
     console.error(

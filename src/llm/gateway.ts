@@ -55,6 +55,30 @@ export interface ToolStepResult {
   costUsd: number;
 }
 
+export interface ResearchRequest {
+  role: string;
+  promptVersion: string;
+  system: string;
+  /** Eigene Daten und Fragen (kein fremder Inhalt). Was die Websuche liefert, bleibt fremder Inhalt. */
+  input: string;
+  /** Höchstzahl Websuchen für den ganzen Aufruf. */
+  maxSearches: number;
+  inputSummary?: string;
+}
+
+export interface ResearchResult {
+  /** Text des Modells (fremder Inhalt aus dem Netz, nur als Daten weitergeben). */
+  text: string;
+  sources: { title: string; url: string }[];
+  searches: number;
+  costUsd: number;
+}
+
+/** Websuche (Server-Werkzeug von Anthropic); läuft auf Anthropics Servern, nicht bei uns. */
+export const WEB_SEARCH_TOOL = { type: "web_search_20260209", name: "web_search" } as const;
+/** Wie oft eine pausierte Recherche (stop_reason pause_turn) höchstens fortgesetzt wird. */
+export const MAX_RESEARCH_ROUNDS = 4;
+
 export interface StructuredResult<T> {
   output: T;
   agentRunId: string;
@@ -130,9 +154,10 @@ export function createLlmGateway({ db, messages, models, budget }: LlmGatewayDep
     usage: TokenUsage,
     outputSummary: string | null,
     error: string | null,
+    extraUsd = 0,
   ): Promise<number> {
     const price = models.pricing[model];
-    const cost = price ? costUsd(price, usage) : 0;
+    const cost = (price ? costUsd(price, usage) : 0) + extraUsd;
     await db.query(
       `update agent_runs set
          status = $2, model = $3, input_tokens = $4, output_tokens = $5, cache_read_tokens = $6,
@@ -215,6 +240,76 @@ export function createLlmGateway({ db, messages, models, budget }: LlmGatewayDep
         const message = err instanceof Error ? err.message : String(err);
         await finishRun(runId, "ERROR", model, usageOf(response), null, clip(message));
         throw new LlmError(`${req.role}: ${message}`, runId, { cause: err });
+      }
+    },
+
+    /**
+     * Recherche mit Websuche (Berater-Runde): ein Aufruf mit dem Server-Werkzeug `web_search`, pausierte Runden
+     * werden fortgesetzt. Ergebnis ist reiner Text mit Quellen; jede Runde steht mit Token- und Suchkosten in
+     * agent_runs. Keine eigenen Werkzeuge: das Modell kann nur suchen und lesen, nichts auslösen.
+     */
+    async research(req: ResearchRequest): Promise<ResearchResult> {
+      const roleConfig = models.roles[req.role];
+      if (!roleConfig)
+        throw new Error(`Keine Modell-Konfiguration für Rolle "${req.role}" (config/models.yaml)`);
+      const model = roleConfig.model;
+      const perSearch = (models.tools?.web_search_per_1000_usd ?? 10) / 1000;
+      const history: Anthropic.MessageParam[] = [{ role: "user", content: req.input }];
+      let total = 0;
+      let searches = 0;
+      const sources = new Map<string, string>();
+      for (let round = 1; ; round++) {
+        await budget.assertAvailable();
+        const runId = await startRun(req, model, round);
+        let response: Anthropic.Message | undefined;
+        let finished = false;
+        try {
+          response = await messages.create({
+            model,
+            max_tokens: roleConfig.max_tokens,
+            system: req.system,
+            messages: history,
+            tools: [{ ...WEB_SEARCH_TOOL, max_uses: Math.max(1, req.maxSearches - searches) }],
+            ...(roleConfig.effort ? { output_config: { effort: roleConfig.effort } } : {}),
+          });
+          if (response.stop_reason === "refusal") throw new Error("Anfrage vom Modell abgelehnt (refusal)");
+          const used = response.usage.server_tool_use?.web_search_requests ?? 0;
+          searches += used;
+          for (const block of response.content)
+            if (block.type === "web_search_tool_result" && Array.isArray(block.content))
+              for (const r of block.content) sources.set(r.url, r.title);
+          const text = response.content
+            .filter((b): b is Anthropic.TextBlock => b.type === "text")
+            .map((b) => b.text)
+            .join("")
+            .trim();
+          total += await finishRun(
+            runId,
+            "OK",
+            model,
+            usageOf(response),
+            clip(text || `[${used} Suchen]`),
+            null,
+            used * perSearch,
+          );
+          finished = true;
+          if (response.stop_reason === "pause_turn" && round < MAX_RESEARCH_ROUNDS) {
+            // Fortsetzen: die pausierte Antwort unverändert zurückgeben, ohne neue Nutzernachricht.
+            history.push({ role: "assistant", content: response.content });
+            continue;
+          }
+          if (!text) throw new Error(`Recherche ohne Ergebnis (stop_reason: ${response.stop_reason})`);
+          return {
+            text,
+            sources: [...sources].map(([url, title]) => ({ url, title })),
+            searches,
+            costUsd: total,
+          };
+        } catch (err) {
+          const message = err instanceof Error ? err.message : String(err);
+          if (!finished) await finishRun(runId, "ERROR", model, usageOf(response), null, clip(message));
+          throw new LlmError(`${req.role}: ${message}`, runId, { cause: err });
+        }
       }
     },
 

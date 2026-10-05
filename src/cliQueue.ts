@@ -6,6 +6,7 @@ import { getSearchRun, type SearchRun } from "./db/searchRuns.js";
 import { pendingJobs, runSummary, startSearch, type PipelineContext } from "./queue/pipeline.js";
 import { startWorkers } from "./queue/workers.js";
 import { askManager } from "./manager/agent.js";
+import { runAdvisor } from "./advisor/run.js";
 import { runTool } from "./manager/tools.js";
 import { loadBranches } from "./pipeline/research/branches.js";
 import { loadResearchConfig } from "./pipeline/research/run.js";
@@ -189,5 +190,38 @@ export async function coverage(argv: string[]): Promise<number> {
     return isError ? 1 : 0;
   } finally {
     await db.end();
+  }
+}
+
+/** Berater-Runde direkt ausführen (ohne Queue): `avelio berater [--ohne-suche]`. Speichert und gibt den Bericht aus. */
+export async function advisor(argv: string[]): Promise<number> {
+  const app = await createApp();
+  try {
+    const base = app.ctx.advisor;
+    if (!base) throw new Error("Berater nicht eingerichtet");
+    const deps = base.deps();
+    if (argv.includes("--ohne-suche")) deps.config = { ...deps.config, websuchen: 0 };
+    const r = await runAdvisor(deps, "cli");
+    console.log(`LAGE: ${r.lage}`);
+    if (r.rueckblick) console.log(`RÜCKBLICK: ${r.rueckblick}`);
+    console.log(`GEGENPRÜFER: ${r.fazit} (${r.dropped} verworfen)\n`);
+    for (const s of r.suggestions)
+      console.log(
+        [
+          `[${s.area}] ${s.title} · Sicherheit ${s.confidence} · Aufwand ${s.effort}`,
+          `  Beobachtung: ${s.observation}`,
+          `  Beleg: ${s.evidence}`,
+          `  Vorschlag: ${s.proposal}`,
+          `  Wirkung: ${s.impact}`,
+          `  Risiko: ${s.risk}`,
+          `  Gegenprüfer: ${s.critique ?? "–"}`,
+          `  Quellen: ${s.sources.join(" ") || "–"}`,
+          "",
+        ].join("\n"),
+      );
+    console.log(`[${r.searches} Websuchen · Kosten ${usd(r.costUsd)}]`);
+    return 0;
+  } finally {
+    await app.close();
   }
 }
