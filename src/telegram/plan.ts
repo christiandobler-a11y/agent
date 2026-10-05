@@ -3,7 +3,7 @@ import { mkdir, writeFile } from "node:fs/promises";
 import { join } from "node:path";
 import { InputFile, type Api, type Context } from "grammy";
 import type { InlineKeyboardButton } from "grammy/types";
-import { getState, setState } from "../db/appState.js";
+import { claimState, getState, setState } from "../db/appState.js";
 import type { Db } from "../db/client.js";
 import type { Company } from "../db/companies.js";
 import { setSalesStatus } from "../db/crm.js";
@@ -16,7 +16,7 @@ import {
   type PlanCounts,
   type PlanItemWithCompany,
 } from "../db/plan.js";
-import { berlinDate, berlinTime } from "../autopilot/plan.js";
+import { berlinDate, berlinTime, yesToday } from "../autopilot/plan.js";
 import { draftEmail, type OutreachDeps } from "../outreach/draft.js";
 import { draftLetter, type LetterDeps } from "../outreach/letter.js";
 import type { MailConfig, Mailbox } from "../outreach/mail.js";
@@ -25,7 +25,7 @@ import { queuePlanMails } from "../outreach/queue.js";
 import { sendDraft } from "../outreach/send.js";
 import { gameState } from "../game/xp.js";
 import { callbackData, escapeHtml, websiteButton } from "./format.js";
-import { hoursOn } from "../prototype/placeDetails.js";
+import { hoursOn, openAt } from "../prototype/placeDetails.js";
 import { missedCalls, parseConsentInput, phoneDigits, pitchAt, recordCall } from "../outreach/call.js";
 
 const DAY_INDEX: Record<string, number> = { Sun: 0, Mon: 1, Tue: 2, Wed: 3, Thu: 4, Fri: 5, Sat: 6 };
@@ -107,10 +107,17 @@ export function planHeaderText(
   counts: PlanCounts,
   night: readonly string[] = [],
   game: string | null = null,
+  /** Anruf-Modus: Ja am Telefon heute und Tagesziel. */
+  yes: { done: number; goal: number } | null = null,
 ): string {
   const line = (emoji: string, label: string, c: { done: number; total: number }) =>
     c.total > 0 ? `${emoji} ${label}: <b>${c.done}/${c.total}</b>${c.done === c.total ? " ✅" : ""}` : null;
   const lines = [
+    ...(yes
+      ? [
+          `🎯 Ja zur Mail: <b>${yes.done}/${yes.goal}</b>${yes.done >= yes.goal ? " ✅ Tagesziel geschafft!" : ""}`,
+        ]
+      : []),
     line("📞", "Anrufe", counts.phone),
     line("📧", "Neue Mails", counts.email),
     line("🖨️", "Befund-Seiten", counts.letter),
@@ -123,14 +130,13 @@ export function planHeaderText(
   const gameBlock = game ? ["", game] : [];
   if (total === 0)
     return [title, "", "Heute ist nichts vorbereitet.", ...nightBlock, ...gameBlock].join("\n");
+  const finished = yes ? yes.done >= yes.goal : done === total;
   return [
     title,
     "",
     ...lines,
     "",
-    done === total
-      ? "🎉 Alles erledigt für heute."
-      : "Alles ist vorbereitet. Einmal drüberlesen, dann ein Knopf.",
+    finished ? "🎉 Alles erledigt für heute." : "Alles ist vorbereitet. Einmal drüberlesen, dann ein Knopf.",
     ...nightBlock,
     ...gameBlock,
   ].join("\n");
@@ -262,13 +268,24 @@ export function planCallCard(
   pos: { n: number; total: number },
   weekday: number,
   dialUrl: string | null,
+  /** Uhrzeit jetzt ("HH:MM"), für „jetzt offen“. */
+  time?: string,
 ): { text: string; keyboard: InlineKeyboardButton[][] } {
   const m = draft.meta;
   const today = hoursOn(m.hours ?? [], weekday);
+  const state = time ? openAt(today, time) : { open: null, next: null };
+  const now =
+    state.open === true
+      ? " · 🟢 jetzt offen"
+      : state.open === false
+        ? state.next
+          ? ` · 🔴 gerade zu, ab ${state.next}`
+          : " · 🔴 heute zu"
+        : "";
   const text = [
     `📞 <b>${escapeHtml(item.company_name)}</b> · ${pos.n}/${pos.total}`,
     `☎️ ${escapeHtml(m.phone ?? "?")}`,
-    ...(today ? [`🕐 Heute: ${escapeHtml(today)}`] : []),
+    ...(today ? [`🕐 Heute: ${escapeHtml(today)}${now}`] : []),
     "",
     `<i>${escapeHtml(m.pitch ?? draft.body ?? "")}</i>`,
   ].join("\n");
@@ -292,6 +309,10 @@ export interface PlanBotDeps {
   followUpDays: number;
   /** Link für Video-Gespräche in der Termin-Bestätigung (OUTREACH_MEETING_URL). */
   meetingUrl?: string | null;
+  /** Anruf-Modus: Tagesziel (Ja am Telefon), Bild und Vorschau-Seite nach dem Ja bauen, Karten nachlegen. */
+  callGoal?: number;
+  beforeMail?: (company: Company) => Promise<void>;
+  refill?: () => Promise<void>;
 }
 
 const HEADER_KEY = (date: string) => `plan-header:${date}`;
@@ -315,6 +336,7 @@ export async function sendPlanHeader(
   date: string,
   nightReport?: string[],
   canSend = false,
+  callGoal?: number,
 ): Promise<void> {
   if (nightReport) await setState(db, NIGHT_KEY(date), nightReport);
   const night = (await getState<string[]>(db, NIGHT_KEY(date))) ?? [];
@@ -324,7 +346,8 @@ export async function sendPlanHeader(
   const game = await gameLine(db);
   const refs: HeaderRef = [];
   for (const chatId of chatIds) {
-    const m = await api.sendMessage(chatId, planHeaderText(date, counts, night, game), {
+    const yes = callGoal ? { done: await yesToday(db, date), goal: callGoal } : null;
+    const m = await api.sendMessage(chatId, planHeaderText(date, counts, night, game, yes), {
       parse_mode: "HTML",
       reply_markup: { inline_keyboard: planHeaderKeyboard(counts, canSend, later) },
     });
@@ -333,7 +356,13 @@ export async function sendPlanHeader(
   await setState(db, HEADER_KEY(date), refs);
 }
 
-async function refreshHeader(api: Api, db: Db, date: string, canSend: boolean): Promise<void> {
+async function refreshHeader(
+  api: Api,
+  db: Db,
+  date: string,
+  canSend: boolean,
+  callGoal?: number,
+): Promise<void> {
   const refs = (await getState<HeaderRef>(db, HEADER_KEY(date))) ?? [];
   const night = (await getState<string[]>(db, NIGHT_KEY(date))) ?? [];
   const items = await planItems(db, date);
@@ -342,10 +371,21 @@ async function refreshHeader(api: Api, db: Db, date: string, canSend: boolean): 
   const game = await gameLine(db);
   for (const r of refs) {
     await api
-      .editMessageText(r.chatId, r.messageId, planHeaderText(date, counts, night, game), {
-        parse_mode: "HTML",
-        reply_markup: { inline_keyboard: planHeaderKeyboard(counts, canSend, later) },
-      })
+      .editMessageText(
+        r.chatId,
+        r.messageId,
+        planHeaderText(
+          date,
+          counts,
+          night,
+          game,
+          callGoal ? { done: await yesToday(db, date), goal: callGoal } : null,
+        ),
+        {
+          parse_mode: "HTML",
+          reply_markup: { inline_keyboard: planHeaderKeyboard(counts, canSend, later) },
+        },
+      )
       .catch(() => undefined); // "message is not modified" o. ä.
   }
 }
@@ -374,7 +414,9 @@ export async function sendNextCard(
   const active = items.filter((i) => i.status !== "dropped" && i.status !== "later");
   const ready = active.filter((i) => i.status === "ready");
   const from = after ?? (await getState<number>(deps.db, cursorKey(date, chatId))) ?? 0;
-  const next = ready.find((i) => i.position > from) ?? ready[0];
+  let next = ready.find((i) => i.position > from) ?? ready[0];
+  // Anruf-Karten: eine gerade geschlossene Praxis überspringen, solange eine offene wartet.
+  if (next?.channel === "phone") next = (await openFirst(deps, ready, next, from)) ?? next;
   if (!next) {
     await api.sendMessage(
       chatId,
@@ -403,6 +445,7 @@ export async function sendNextCard(
       pos,
       berlinWeekdayIndex(deps.now()),
       base && digits.length >= 6 ? `${base}/tel/${digits}` : null,
+      berlinTime(deps.now()),
     );
     await api.sendMessage(chatId, card.text, {
       parse_mode: "HTML",
@@ -437,6 +480,29 @@ export async function sendNextCard(
   return true;
 }
 
+/** Nächste Anruf-Karte (ab dem Cursor, dann von vorn), deren Praxis gerade offen ist oder deren Zeiten unbekannt sind. */
+async function openFirst(
+  deps: PlanBotDeps,
+  ready: readonly PlanItemWithCompany[],
+  current: PlanItemWithCompany,
+  from: number,
+): Promise<PlanItemWithCompany | null> {
+  const phones = ready.filter((i) => i.channel === "phone" && i.draft_id);
+  const ordered = [...phones.filter((i) => i.position > from), ...phones.filter((i) => i.position <= from)];
+  const now = deps.now();
+  const weekday = berlinWeekdayIndex(now);
+  const time = berlinTime(now);
+  const { rows } = await deps.db.query<{ id: string; hours: string[] | null }>(
+    "select id, meta->'hours' as hours from interactions where id = any($1)",
+    [ordered.map((i) => i.draft_id)],
+  );
+  const hours = new Map(rows.map((r) => [r.id, r.hours ?? []]));
+  const isOpen = (i: PlanItemWithCompany) =>
+    openAt(hoursOn(hours.get(i.draft_id!) ?? [], weekday), time).open;
+  if (isOpen(current) !== false) return current;
+  return ordered.find((i) => isOpen(i) !== false) ?? null;
+}
+
 const showNext = (ctx: Context, deps: PlanBotDeps, after?: number) =>
   ctx.chat ? sendNextCard(ctx.api, ctx.chat.id, deps, after) : Promise.resolve(false);
 
@@ -450,7 +516,7 @@ export async function sendMorningPackage(
   date: string,
   nightReport: string[] = [],
 ): Promise<void> {
-  await sendPlanHeader(api, deps.db, chatIds, date, nightReport, deps.mailbox !== null);
+  await sendPlanHeader(api, deps.db, chatIds, date, nightReport, deps.mailbox !== null, deps.callGoal);
   for (const chatId of chatIds) await sendNextCard(api, chatId, deps, 0);
 }
 
@@ -624,7 +690,7 @@ export async function handlePlanCallback(ctx: Context, deps: PlanBotDeps, by: st
         `📤 ${q.count} Mails eingeplant. Die erste geht um ${hm(q.first!)} Uhr raus, die letzte ${sameDay ? "" : "am nächsten Werktag "}gegen ${hm(q.last!)} Uhr. Ich melde mich, wenn alle raus sind.`,
       )
       .catch(() => undefined);
-    await refreshHeader(ctx.api, db, date, true);
+    await refreshHeader(ctx.api, db, date, true, deps.callGoal);
     return true;
   }
   const cb = data ? parsePlanCallback(data) : null;
@@ -647,7 +713,7 @@ export async function handlePlanCallback(ctx: Context, deps: PlanBotDeps, by: st
     });
     if (rows.length === 0) return true;
     if (cb.kind === "undo") await closeCard(ctx, "↩️ Zurückgeholt, siehe unten");
-    await refreshHeader(ctx.api, db, date, deps.mailbox !== null);
+    await refreshHeader(ctx.api, db, date, deps.mailbox !== null, deps.callGoal);
     await showNext(ctx, deps, Math.min(...rows.map((r) => r.position)) - 1);
     return true;
   }
@@ -769,7 +835,7 @@ export async function handlePlanCallback(ctx: Context, deps: PlanBotDeps, by: st
     await showNext(ctx, deps, item.position - 1);
     return true;
   }
-  await refreshHeader(ctx.api, db, item.plan_date, deps.mailbox !== null);
+  await refreshHeader(ctx.api, db, item.plan_date, deps.mailbox !== null, deps.callGoal);
   await showNext(ctx, deps);
   return true;
 }
@@ -850,7 +916,8 @@ async function handleCallOutcome(
       ]);
     }
   }
-  await refreshHeader(ctx.api, db, item.plan_date, deps.mailbox !== null);
+  await topUp(ctx, deps, item.plan_date);
+  await refreshHeader(ctx.api, db, item.plan_date, deps.mailbox !== null, deps.callGoal);
   await showNext(ctx, deps);
   return true;
 }
@@ -880,6 +947,16 @@ async function finishConsent(
   await setPlanStatus(db, item.id, "done", now);
   const { rows } = await db.query<Company>("select * from companies where id = $1", [item.company_id]);
   const company = rows[0]!;
+  if (deps.beforeMail) {
+    await ctx.reply(`🎨 Baue den Entwurf für ${company.name}, dauert etwa eine halbe Minute …`);
+    await deps
+      .beforeMail(company)
+      .catch((err: unknown) =>
+        console.error(
+          JSON.stringify({ level: "error", msg: "Entwurf nach dem Ja fehlgeschlagen", error: String(err) }),
+        ),
+      );
+  }
   await ctx.replyWithChatAction("typing").catch(() => undefined);
   const mail = await draftEmail(deps.outreach, company, by, {
     to: who.email,
@@ -912,8 +989,37 @@ async function finishConsent(
       },
     },
   );
-  const p = await progress(ctx, deps);
-  if (p) await refreshHeader(ctx.api, db, item.plan_date, deps.mailbox !== null);
+  await progress(ctx, deps);
+  await refreshHeader(ctx.api, db, item.plan_date, deps.mailbox !== null, deps.callGoal);
+  if (deps.callGoal) {
+    const yes = await yesToday(db, item.plan_date);
+    if (yes >= deps.callGoal && (await claimState(db, `call-goal:${item.plan_date}`, true)))
+      await ctx.reply(`🎯 ${yes} Ja! Tagesziel geschafft, Chef. Feierabend fürs Telefon 🍻`);
+    else if (yes < deps.callGoal) {
+      await topUp(ctx, deps, item.plan_date);
+      await ctx.reply(`Weiter geht's: ${yes}/${deps.callGoal} Ja 💪`, {
+        reply_markup: {
+          inline_keyboard: [[{ text: "▶️ Nächste Praxis", callback_data: planCallback({ kind: "next" }) }]],
+        },
+      });
+    }
+  }
+}
+
+/** Anruf-Karten fast aufgebraucht und Ziel noch offen: neue Karten nachlegen (geht schnell, ohne Bild). */
+async function topUp(ctx: Context, deps: PlanBotDeps, date: string): Promise<void> {
+  if (!deps.refill || !deps.callGoal) return;
+  const open = (await planItems(deps.db, date)).filter(
+    (i) => i.channel === "phone" && i.status === "ready",
+  ).length;
+  if (open >= 3 || (await yesToday(deps.db, date)) >= deps.callGoal) return;
+  await deps
+    .refill()
+    .catch((err: unknown) =>
+      console.error(
+        JSON.stringify({ level: "error", msg: "Anruf-Karten nachlegen fehlgeschlagen", error: String(err) }),
+      ),
+    );
 }
 
 /**

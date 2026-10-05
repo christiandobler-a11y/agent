@@ -65,6 +65,18 @@ export const autopilotConfigSchema = z.object({
    * Brief), ohne Nummer gleich ein Brief; die Stufen zählen dann Anrufe und Briefe zusammen.
    */
   erstkontakt: z.enum(["mail", "brief", "anruf"]).default("mail"),
+  /**
+   * Anruf-Modus (06.10.2026, Christian: "Tagesziel ist erst erreicht, wenn ich 20× eine Mail zustellen durfte"): Ziel
+   * sind `ziel_ja` Einwilligungen am Tag. Avelio legt je fehlendem Ja `je_ja` Anruf-Karten bereit und legt nach, sobald
+   * sie aufgebraucht sind. Praxen ohne Nummer bekommen einen Brief, höchstens `briefe_ohne_nummer` am Tag.
+   */
+  anrufe: z
+    .object({
+      ziel_ja: z.number().int().min(1),
+      je_ja: z.number().int().min(1),
+      briefe_ohne_nummer: z.number().int().min(0),
+    })
+    .default({ ziel_ja: 20, je_ja: 3, briefe_ohne_nummer: 5 }),
   nachfassen: z.object({ nach_tagen: z.number().int().min(1), hoechstens: z.number().int().min(0) }),
   suche: z
     .object({
@@ -201,6 +213,53 @@ async function firstSentAt(db: Db, from: string | null | undefined): Promise<Dat
     [from ?? null],
   );
   return rows[0]?.first ?? null;
+}
+
+/** Einwilligungen ("Ja" am Telefon) an diesem Tag. */
+export async function yesToday(db: Db, date: string): Promise<number> {
+  const { rows } = await db.query<{ n: number }>(
+    `select count(distinct company_id)::int as n from interactions
+      where type = 'note' and meta->>'call' = 'ja' and (created_at at time zone 'Europe/Berlin')::date = $1::date`,
+    [date],
+  );
+  return rows[0]?.n ?? 0;
+}
+
+/**
+ * Vorschau-Bild und Vorschau-Seite (Prototyp) einer Praxis bauen, falls es sie noch nicht gibt. Im Anruf-Modus erst
+ * nach dem Ja (Telegram) bzw. für Briefe, damit die vielen Anruf-Karten schnell und billig bereitliegen.
+ */
+export async function prepareVisuals(
+  deps: Pick<PlanDeps, "db" | "teaser" | "prototype" | "config">,
+  company: Company,
+  by: string,
+  warnings: string[] = [],
+): Promise<number> {
+  let built = 0;
+  const teaser = usesTeaser(deps.teaser, company);
+  if (teaser) {
+    try {
+      await teaserForCompany(deps.db, deps.teaser!, company);
+      built++;
+    } catch (err) {
+      warnings.push(`Vorschau-Bild ${company.name}: ${String(err).slice(0, 120)}`);
+    }
+  }
+  if (
+    deps.prototype &&
+    deps.config.prototyp_fuer_neue &&
+    company.segment !== "NO_WEBSITE" &&
+    !(await hasPrototype(deps.db, company.id))
+  ) {
+    try {
+      const p = await buildPrototype(deps.prototype, company, by);
+      if (!("kind" in p)) built++;
+    } catch (err) {
+      if (err instanceof BudgetExceededError) throw err;
+      warnings.push(`Prototyp ${company.name}: ${String(err).slice(0, 120)}`);
+    }
+  }
+  return built;
 }
 
 async function hasPrototype(db: Db, companyId: string): Promise<boolean> {
@@ -441,11 +500,32 @@ export async function buildDailyPlan(deps: PlanDeps, by = "autopilot"): Promise<
       (i) => i.kind === "new" && newChannels.includes(i.channel) && i.status !== "dropped",
     ).length;
     let newLetters = 0;
+    // Anruf-Modus: so viele Karten, wie für die fehlenden Ja nötig sind (abzüglich der noch offenen), plus Briefe für
+    // Praxen ohne Nummer.
+    const today = callMode ? await planItems(db, date) : [];
+    let cardsWanted = callMode
+      ? Math.max(
+          0,
+          (config.anrufe.ziel_ja - (await yesToday(db, date))) * config.anrufe.je_ja -
+            today.filter((i) => i.channel === "phone" && i.status === "ready").length,
+        )
+      : 0;
+    let lettersWanted = callMode
+      ? Math.max(
+          0,
+          config.anrufe.briefe_ohne_nummer -
+            today.filter((i) => i.kind === "new" && i.channel === "letter" && i.status !== "dropped").length,
+        )
+      : 0;
     const branches = config.neue_kontakte.branchen ?? config.suche.branchen;
-    const pool = Math.max(0, target - already) * 4 + (lettersLeft > 0 && !offline ? 300 : 0);
+    const pool = callMode
+      ? (cardsWanted + lettersWanted) * 3 + 20
+      : Math.max(0, target - already) * 4 + (lettersLeft > 0 && !offline ? 300 : 0);
     const groups = await contactedGroups(db, date);
     for (const company of await candidates(db, date, pool, branches, config.neue_kontakte.heimat, attempts)) {
-      const mailsDone = (offline ? newLetters : result.emails) + already >= target;
+      const mailsDone = callMode
+        ? cardsWanted <= 0 && lettersWanted <= 0
+        : (offline ? newLetters : result.emails) + already >= target;
       if (mailsDone && (offline || lettersLeft <= 0)) break;
       await isolated(company, result, async () => {
         const person = await recipient(db, company.id);
@@ -491,30 +571,38 @@ export async function buildDailyPlan(deps: PlanDeps, by = "autopilot"): Promise<
         }
         // Tagesziel erreicht: nur noch Briefe sammeln (am Brief-Tag).
         if (channel === "email" && mailsDone) return;
-        const teaser = usesTeaser(deps.teaser, company);
-        if (teaser) {
-          try {
-            await teaserForCompany(db, deps.teaser!, company);
-            result.prototypes++;
-          } catch (err) {
-            result.warnings.push(`Vorschau-Bild ${company.name}: ${String(err).slice(0, 120)}`);
+        if (callMode && channel === "phone" && cardsWanted <= 0) return;
+        if (callMode && channel === "letter" && lettersWanted <= 0) return;
+        if (callMode) {
+          // Anruf-Karten ohne Bild und Vorschau-Seite (kommen erst nach dem Ja); Briefe brauchen beides.
+          if (channel === "letter")
+            result.prototypes += await prepareVisuals(deps, company, by, result.warnings);
+        } else {
+          const teaser = usesTeaser(deps.teaser, company);
+          if (teaser) {
+            try {
+              await teaserForCompany(db, deps.teaser!, company);
+              result.prototypes++;
+            } catch (err) {
+              result.warnings.push(`Vorschau-Bild ${company.name}: ${String(err).slice(0, 120)}`);
+            }
           }
-        }
-        // Prototyp (Vorschau-Seite): ohne Vorschau-Bild immer, im Brief-Modus auch dazu, damit der QR-Code im Brief
-        // auf eine eigene Seite der Praxis führt.
-        if (
-          (!teaser || offline) &&
-          deps.prototype &&
-          config.prototyp_fuer_neue &&
-          company.segment !== "NO_WEBSITE" &&
-          !(offline && (await hasPrototype(db, company.id)))
-        ) {
-          try {
-            const p = await buildPrototype(deps.prototype, company, by);
-            if (!("kind" in p)) result.prototypes++;
-          } catch (err) {
-            if (err instanceof BudgetExceededError) throw err;
-            result.warnings.push(`Prototyp ${company.name}: ${String(err).slice(0, 120)}`);
+          // Prototyp (Vorschau-Seite): ohne Vorschau-Bild immer, im Brief-Modus auch dazu, damit der QR-Code im Brief
+          // auf eine eigene Seite der Praxis führt.
+          if (
+            (!teaser || offline) &&
+            deps.prototype &&
+            config.prototyp_fuer_neue &&
+            company.segment !== "NO_WEBSITE" &&
+            !(offline && (await hasPrototype(db, company.id)))
+          ) {
+            try {
+              const p = await buildPrototype(deps.prototype, company, by);
+              if (!("kind" in p)) result.prototypes++;
+            } catch (err) {
+              if (err instanceof BudgetExceededError) throw err;
+              result.warnings.push(`Prototyp ${company.name}: ${String(err).slice(0, 120)}`);
+            }
           }
         }
         if (channel === "phone") {
@@ -531,9 +619,11 @@ export async function buildDailyPlan(deps: PlanDeps, by = "autopilot"): Promise<
           )
             result.calls = (result.calls ?? 0) + 1;
           newLetters++;
+          cardsWanted--;
           groups.add(keys, company.name);
         } else if (channel === "letter") {
           if (!(await planLetter(deps, company, date, by, "new", result))) return;
+          if (callMode) lettersWanted--;
           if (offline) newLetters++;
           else lettersLeft--;
           groups.add(keys, company.name);
@@ -554,6 +644,21 @@ export async function buildDailyPlan(deps: PlanDeps, by = "autopilot"): Promise<
           groups.add(keys, company.name);
         }
       });
+    }
+    // Anruf-Modus: Vorrat im Blick (Christian: "so viele Leads müssen wir immer im Rücken haben").
+    if (callMode) {
+      if (cardsWanted > 0)
+        result.warnings.push(
+          `Nur ${result.calls ?? 0} neue Anruf-Karten, ${cardsWanted} haben gefehlt: Es gehen die Praxen mit Nummer aus`,
+        );
+      const need = config.anrufe.ziel_ja * config.anrufe.je_ja;
+      const left = (
+        await candidates(db, date, need * 3, branches, config.neue_kontakte.heimat, attempts)
+      ).filter((c) => c.phone).length;
+      if (left < need)
+        result.warnings.push(
+          `Vorrat: nur noch ${left} Praxen mit Nummer zum Anrufen (für ${config.anrufe.ziel_ja} Ja am Tag braucht es etwa ${need}). Die Nachtsuche legt nach, sonst eine Region oder Branche dazunehmen.`,
+        );
     }
   } catch (err) {
     if (!(err instanceof BudgetExceededError)) throw err;

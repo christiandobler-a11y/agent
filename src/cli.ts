@@ -298,6 +298,55 @@ async function seedCheck(): Promise<number> {
   process.exit(failed > 0 ? 1 : 0);
 }
 
+/**
+ * Foto-Diagnose (06.10.2026, Berater: "20 von 20 Mails mit Stockfoto"): je Praxis aus den letzten Tagesplänen, ob ein
+ * eigenes Foto gefunden wurde, woher, und sonst warum nicht (gespeichertes Ergebnis von heroPhoto.ts).
+ */
+async function photoCheck(args: string[]): Promise<number> {
+  const { DATABASE_URL } = requireKeys(loadEnv(), ["DATABASE_URL"]);
+  const n = Number(args[0] ?? 50) || 50;
+  const db = createDb(DATABASE_URL, { max: 1 });
+  try {
+    const { rows } = await db.query<{
+      name: string;
+      plan_date: string;
+      channel: string;
+      hero: { status?: string; quelle?: string; reason?: string; motiv?: string; checkedAt?: string } | null;
+      look: { quelle?: string | null; foto?: string | null } | null;
+    }>(
+      `select c.name, p.plan_date::text as plan_date, p.channel,
+              (select value from app_state where key = 'hero:v4:' || c.id) as hero,
+              (select i.meta->'teaser_look' from interactions i where i.company_id = c.id and i.type = 'draft'
+                 and i.meta ? 'teaser_look' order by i.created_at desc limit 1) as look
+         from outreach_plan p join companies c on c.id = p.company_id
+        where p.kind = 'new'
+        order by p.plan_date desc, p.position
+        limit $1`,
+      [n],
+    );
+    const counts: Record<string, number> = {};
+    for (const r of rows) {
+      const own = r.hero?.status === "ok";
+      const label = own ? `eigenes Foto (${r.hero?.quelle ?? "?"})` : r.hero ? "Stockfoto" : "nie geprüft";
+      counts[label] = (counts[label] ?? 0) + 1;
+      const why = own
+        ? (r.hero?.motiv ?? "")
+        : (r.hero?.reason ?? "kein Ergebnis gespeichert (vor dem Hero-Foto vorbereitet oder Funktion aus?)");
+      console.log(
+        `${r.plan_date} ${r.channel.padEnd(6)} ${r.name.slice(0, 40).padEnd(41)} ${label.padEnd(24)} ${why}`,
+      );
+    }
+    console.log(
+      `\n${Object.entries(counts)
+        .map(([k, v]) => `${k}: ${v}`)
+        .join(" · ")}`,
+    );
+    return 0;
+  } finally {
+    await db.end();
+  }
+}
+
 /** Anrede der nächsten Kandidaten fürs Morgen-Paket prüfen (ohne LLM, verschickt nichts). */
 async function greetings(args: string[]): Promise<number> {
   const { DATABASE_URL } = requireKeys(loadEnv(), ["DATABASE_URL"]);
@@ -345,6 +394,7 @@ async function greetings(args: string[]): Promise<number> {
 
 const commands: Record<string, (args: string[]) => Promise<number>> = {
   anrede: greetings,
+  fotos: photoCheck,
   "seed-check": seedCheck,
   search,
   coverage,

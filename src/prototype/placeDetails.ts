@@ -226,3 +226,21 @@ export function cachedOpeningHours(deps: {
     return hours;
   };
 }
+
+/**
+ * Ist die Praxis zur Uhrzeit `time` ("HH:MM") offen? Aus der Zeile für heute ("08:00–12:00, 14:00–19:00",
+ * "geschlossen", "24 Stunden geöffnet"). `open: null`, wenn sich die Zeile nicht lesen lässt; `next` = nächste
+ * Öffnung heute. Rein.
+ */
+export function openAt(today: string | null, time: string): { open: boolean | null; next: string | null } {
+  if (!today) return { open: null, next: null };
+  if (/geschlossen/i.test(today)) return { open: false, next: null };
+  if (/24\s*Stunden/i.test(today)) return { open: true, next: null };
+  const ranges = [...today.matchAll(/(\d{1,2}):(\d{2})\s*[–-]\s*(\d{1,2}):(\d{2})/g)].map((m) => ({
+    from: `${m[1]!.padStart(2, "0")}:${m[2]}`,
+    to: `${m[3]!.padStart(2, "0")}:${m[4]}`,
+  }));
+  if (ranges.length === 0) return { open: null, next: null };
+  if (ranges.some((r) => time >= r.from && time < r.to)) return { open: true, next: null };
+  return { open: false, next: ranges.find((r) => r.from > time)?.from ?? null };
+}

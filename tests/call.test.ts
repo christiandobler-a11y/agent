@@ -23,12 +23,12 @@ import {
   prepareCall,
   recordCall,
 } from "../src/outreach/call.js";
-import { cachedOpeningHours, hoursOn } from "../src/prototype/placeDetails.js";
+import { cachedOpeningHours, hoursOn, openAt } from "../src/prototype/placeDetails.js";
 import { insertPlacesSnapshot } from "../src/db/placesSnapshots.js";
 import { NO_BUDGET } from "../src/llm/budget.js";
 import { loadOutreachConfig } from "../src/outreach/config.js";
 import { outreachStats, statsText } from "../src/outreach/stats.js";
-import { planCallCard, planCallback, parsePlanCallback } from "../src/telegram/plan.js";
+import { planCallCard, planCallback, parsePlanCallback, planHeaderText } from "../src/telegram/plan.js";
 import { createBot } from "../src/telegram/bot.js";
 import type { PipelineContext } from "../src/queue/pipeline.js";
 import { loadMailConfig } from "../src/outreach/mail.js";
@@ -87,6 +87,33 @@ describe("Anruf-Liste (rein)", () => {
     expect(hoursOn([], 1)).toBeNull();
   });
 
+  it("Jetzt offen? Aus der Zeile für heute", () => {
+    const today = "08:00–12:00, 14:00–19:00";
+    expect(openAt(today, "08:00")).toEqual({ open: true, next: null });
+    expect(openAt(today, "12:30")).toEqual({ open: false, next: "14:00" });
+    expect(openAt(today, "19:30")).toEqual({ open: false, next: null });
+    expect(openAt(today, "07:15")).toEqual({ open: false, next: "08:00" });
+    expect(openAt("geschlossen", "10:00").open).toBe(false);
+    expect(openAt("24 Stunden geöffnet", "03:00").open).toBe(true);
+    expect(openAt(null, "10:00").open).toBeNull();
+  });
+
+  it("Kopf im Anruf-Modus: Ja zur Mail gegen das Tagesziel", () => {
+    const counts = {
+      phone: { done: 10, total: 40 },
+      email: { done: 0, total: 0 },
+      letter: { done: 0, total: 0 },
+      followup: { done: 0, total: 0 },
+    };
+    const text = planHeaderText("2026-10-05", counts, [], null, { done: 7, goal: 20 });
+    expect(text).toContain("🎯 Ja zur Mail: <b>7/20</b>");
+    expect(text).toContain("📞 Anrufe: <b>10/40</b>");
+    expect(text).not.toContain("Alles erledigt");
+    expect(planHeaderText("2026-10-05", counts, [], null, { done: 20, goal: 20 })).toContain(
+      "Tagesziel geschafft",
+    );
+  });
+
   it("Eingabe nach dem Ja: Name und Adresse", () => {
     expect(parseConsentInput("Frau Huber huber@praxis.de")).toEqual({
       email: "huber@praxis.de",
@@ -107,22 +134,23 @@ describe("Anruf-Liste (rein)", () => {
 
   it("Karte: Name, Nummer, Öffnungszeiten heute, Wähl-Knopf, Ja/Nein/nicht erreicht", () => {
     const id = "11111111-2222-3333-4444-555555555555";
+    const item = {
+      id,
+      plan_date: "2026-10-05",
+      company_id: id,
+      kind: "new",
+      channel: "phone",
+      draft_id: id,
+      status: "ready",
+      position: 1,
+      done_at: null,
+      send_after: null,
+      company_name: "Physio <Test>",
+      current_score: 80,
+      website_url: "https://physio.de",
+    } as const;
     const card = planCallCard(
-      {
-        id,
-        plan_date: "2026-10-05",
-        company_id: id,
-        kind: "new",
-        channel: "phone",
-        draft_id: id,
-        status: "ready",
-        position: 1,
-        done_at: null,
-        send_after: null,
-        company_name: "Physio <Test>",
-        current_score: 80,
-        website_url: "https://physio.de",
-      },
+      item,
       {
         body: "",
         meta: {
@@ -135,6 +163,16 @@ describe("Anruf-Liste (rein)", () => {
       1,
       "https://vorschau.example/tel/498811",
     );
+    expect(
+      planCallCard(
+        item,
+        { body: "", meta: { phone: "+49 881 1", hours: ["Mo–Fr: 08:00–12:00, 14:00–18:00"], pitch: "x" } },
+        { n: 1, total: 1 },
+        1,
+        null,
+        "12:30",
+      ).text,
+    ).toContain("🕐 Heute: 08:00–12:00, 14:00–18:00 · 🔴 gerade zu, ab 14:00");
     expect(card.text).toBe(
       "📞 <b>Physio &lt;Test&gt;</b> · 1/3\n☎️ +49 881 1\n🕐 Heute: 08:00–18:00\n\n<i>Guten Morgen</i>",
     );
@@ -457,5 +495,47 @@ describeDb("Anruf-Liste", () => {
     const headers = (fetchFn.mock.calls[0] as unknown as [string, { headers: Record<string, string> }])[1]
       .headers;
     expect(headers["X-Goog-FieldMask"]).toBe("regularOpeningHours.weekdayDescriptions");
+  });
+
+  it("Tagesziel Ja: je fehlendem Ja Karten bereitlegen, nach Ja und Aufbrauchen nachlegen", async () => {
+    await db().query("update companies set status = 'LOST'");
+    await db().query("delete from outreach_plan");
+    // Ja aus den vorigen Tests dieses Tages zählen hier nicht mit.
+    await db().query("delete from interactions where meta ? 'call'");
+    const leads = [];
+    for (let i = 0; i < 8; i++) leads.push(await lead({ score: 90 - i }));
+    const base = loadAutopilotConfig();
+    const config: AutopilotConfig = {
+      ...base,
+      erstkontakt: "anruf",
+      anrufe: { ziel_ja: 2, je_ja: 2, briefe_ohne_nummer: 0 },
+      neue_kontakte: { ...base.neue_kontakte, heimat: undefined },
+    };
+    const deps = {
+      db: db(),
+      now: () => NOW,
+      config,
+      letter: {
+        db: db(),
+        llm: { structured: vi.fn() } as unknown as LlmGateway,
+        outreach: o,
+        branches: {},
+        now: () => NOW,
+        contact: { whatsapp: null, phone: null },
+        render: () => Promise.resolve({ pdf: Buffer.from(""), png: Buffer.from("") }),
+        desktopScreenPx: 900,
+      },
+      prototype: null,
+      mx: vi.fn(() => Promise.resolve(true)),
+      lettersDir: mkdtempSync(join(tmpdir(), "avelio-ziel-")),
+    };
+    expect((await buildDailyPlan(deps)).calls).toBe(4); // 2 Ja × 2 Karten
+    expect((await buildDailyPlan(deps)).calls ?? 0).toBe(0); // noch genug offen
+    // Alle vier abtelefoniert, eins davon Ja: für das fehlende Ja wieder 2 Karten.
+    const items = await planItems(db(), "2026-10-05");
+    await db().query("update outreach_plan set status = 'done' where plan_date = '2026-10-05'");
+    await recordCall(db(), items[0]!.company_id, "ja", { by: "t", now: NOW, to: "a@b.de" });
+    expect((await buildDailyPlan(deps)).calls).toBe(2);
+    await db().query("update companies set status = 'LOST'");
   });
 });

@@ -26,7 +26,7 @@ import type { OutreachConfig } from "../outreach/config.js";
 import { draftEmail, mailtoLink, type OutreachDeps } from "../outreach/draft.js";
 import { draftLetter, type LetterDeps } from "../outreach/letter.js";
 import { loadMailConfig, type MailConfig, type Mailbox } from "../outreach/mail.js";
-import { berlinDate, buildDailyPlan, loadAutopilotConfig } from "../autopilot/plan.js";
+import { berlinDate, buildDailyPlan, loadAutopilotConfig, prepareVisuals } from "../autopilot/plan.js";
 import {
   handleCallText,
   handlePlanCallback,
@@ -367,6 +367,25 @@ export function createBot(options: BotOptions): AvelioBot {
           letter: letterDeps(),
           followUpDays: crmConfig().follow_up_days,
           meetingUrl: process.env.OUTREACH_MEETING_URL?.trim() || null,
+          ...(pipeline.autopilot
+            ? (() => {
+                const ap = pipeline.autopilot;
+                const config = ap.config;
+                return config.erstkontakt === "anruf"
+                  ? {
+                      callGoal: config.anrufe.ziel_ja,
+                      // Nach dem Ja: Vorschau-Bild und Vorschau-Seite bauen, bevor die Mail geschrieben wird.
+                      beforeMail: async (company: Company) => {
+                        await prepareVisuals(ap.planDeps(), company, "telegram");
+                      },
+                      // Karten aufgebraucht, Ziel noch nicht erreicht: nachlegen (nur Karten, das geht schnell).
+                      refill: async () => {
+                        await buildDailyPlan(ap.planDeps(), "telegram");
+                      },
+                    }
+                  : {};
+              })()
+            : {}),
         }
       : null;
   };
@@ -546,6 +565,7 @@ export function createBot(options: BotOptions): AvelioBot {
       berlinDate(pipeline.now()),
       undefined,
       mailbox !== null,
+      deps.callGoal,
     );
     await sendNextCard(ctx.api, ctx.chat.id, deps, 0);
   });
@@ -567,7 +587,7 @@ export function createBot(options: BotOptions): AvelioBot {
     try {
       await ctx.reply("🔧 Lege nach, das dauert ein, zwei Minuten …");
       const r = await buildDailyPlan(pipeline.autopilot.planDeps(), by(ctx.chat.id));
-      if (r.emails === 0 && r.followups === 0 && r.letters === 0) {
+      if (r.emails === 0 && r.followups === 0 && r.letters === 0 && !r.calls) {
         await ctx.reply(
           r.stoppedByBudget
             ? "⚠️ Das Tagesbudget ist aufgebraucht. Mit /budget +5 geht es weiter."
@@ -575,7 +595,11 @@ export function createBot(options: BotOptions): AvelioBot {
         );
         return;
       }
-      await ctx.reply(`✅ ${r.emails} neue Mail${r.emails === 1 ? "" : "s"} nachgelegt.`);
+      await ctx.reply(
+        r.calls
+          ? `✅ ${r.calls} neue Anruf-Karte${r.calls === 1 ? "" : "n"} nachgelegt.`
+          : `✅ ${r.emails} neue Mail${r.emails === 1 ? "" : "s"} nachgelegt.`,
+      );
       await sendPlanHeader(
         ctx.api,
         pipeline.db,
@@ -583,6 +607,7 @@ export function createBot(options: BotOptions): AvelioBot {
         berlinDate(pipeline.now()),
         undefined,
         mailbox !== null,
+        planDeps()?.callGoal,
       );
       await sendNextCard(ctx.api, ctx.chat.id, deps, 0);
     } finally {
