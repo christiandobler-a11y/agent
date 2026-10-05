@@ -1,3 +1,4 @@
+import { claimState } from "../db/appState.js";
 import type { Db } from "../db/client.js";
 import { setPlanStatus } from "../db/plan.js";
 import type { MailConfig } from "./mail.js";
@@ -147,7 +148,22 @@ export async function sendNextQueued(
   }
   if (result.kind === "sent" || result.kind === "already_sent") {
     await setPlanStatus(db, item.id, "done", now);
-    if ((await queuedCount(db)) === 0)
+    const { rows: rest } = await db.query<{ n: number; last: Date | null }>(
+      "select count(*)::int as n, max(send_after) as last from outreach_plan where status = 'queued'",
+    );
+    const left = rest[0]?.n ?? 0;
+    // Erste verteilte Mail des Tages: kurze Entwarnung (05.10.2026, Christians Wunsch).
+    if (
+      result.kind === "sent" &&
+      left > 0 &&
+      (await claimState(db, `queue-first:${parts(now).date}`, true))
+    ) {
+      const last = rest[0]?.last ? parts(rest[0].last).time : null;
+      await deps.notify?.(
+        `🚀 Ging los! Die erste Mail ist ohne Probleme raus (an ${item.name}). ${left === 1 ? `Eine kommt noch${last ? `, gegen ${last} Uhr` : ""}` : `Die restlichen ${left} kommen nach${last ? `, die letzte gegen ${last} Uhr` : ""}`}.`,
+      );
+    }
+    if (left === 0)
       await deps.notify?.("📤 Alle eingeplanten Mails sind raus. Antworten melde ich dir hier.");
     return "sent";
   }

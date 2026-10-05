@@ -875,7 +875,11 @@ describeDb("Morgen-Paket mit Datenbank", () => {
     expect(await sendNextQueued(deps(new Date(t2!)))).toBe("sent");
     expect(box.sent).toHaveLength(2);
     expect((await planItems(db(), date)).every((i) => i.status === "done")).toBe(true);
-    expect(notes).toEqual(["📤 Alle eingeplanten Mails sind raus. Antworten melde ich dir hier."]);
+    expect(notes).toHaveLength(2);
+    expect(notes[0]).toMatch(
+      /^🚀 Ging los! Die erste Mail ist ohne Probleme raus \(an .+\)\. Eine kommt noch, gegen \d\d:\d\d Uhr\.$/,
+    );
+    expect(notes[1]).toBe("📤 Alle eingeplanten Mails sind raus. Antworten melde ich dir hier.");
   });
 
   it("Verteilt senden: Tageslimit stoppt und gibt den Rest zurück ins Paket", async () => {
@@ -906,6 +910,7 @@ describeDb("Morgen-Paket mit Datenbank", () => {
     expect(await sendNextQueued(deps(late))).toBe("sent");
     expect(await sendNextQueued(deps(late))).toBe("problem");
     expect(box.sent).toHaveLength(1);
+    expect(notes.some((n) => n.startsWith("🚀"))).toBe(false); // "Ging los" nur einmal am Tag (schon oben)
     expect(notes.at(-1)).toContain(`Tageslimit erreicht (${limit} neue Mails). 2 Mails bleiben offen`);
     expect((await planItems(db(), date)).map((i) => i.status).sort()).toEqual(["done", "ready", "ready"]);
   });
