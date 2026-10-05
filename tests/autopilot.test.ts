@@ -22,6 +22,7 @@ import { upsertCompany, type Company } from "../src/db/companies.js";
 import { insertDraft, takenSlots } from "../src/db/drafts.js";
 import { createConfirmDraft, icsInvite, terminLabel } from "../src/outreach/confirm.js";
 import { mailEventMessage, websiteButton } from "../src/telegram/format.js";
+import { combineNotifiers, type Notifier } from "../src/queue/notifier.js";
 import { countPlan, planItems, type PlanItem } from "../src/db/plan.js";
 import { insertWebsiteSnapshot } from "../src/db/websiteSnapshots.js";
 import type { LlmGateway } from "../src/llm/gateway.js";
@@ -256,6 +257,36 @@ describe("Morgen-Paket (rein)", () => {
       website: "https://physio.de",
     });
     expect(msg.keyboard[0]![0]).toEqual({ text: "🌐 Jetzige Website", url: "https://physio.de/" });
+  });
+
+  it("Kombinierte Benachrichtigung reicht alle Meldungen weiter (Morgen-Paket, Antworten, Infos)", async () => {
+    const calls: string[] = [];
+    const rec =
+      (k: string) =>
+      (..._args: unknown[]) =>
+        Promise.resolve(void calls.push(k));
+    const full: Notifier = {
+      runCompleted: rec("runCompleted"),
+      runFailed: rec("runFailed"),
+      budgetExceeded: rec("budgetExceeded"),
+      remindersDue: rec("remindersDue"),
+      planReady: rec("planReady"),
+      eveningSummary: rec("eveningSummary"),
+      mailEvent: rec("mailEvent"),
+      info: rec("info"),
+    };
+    const minimal: Notifier = {
+      runCompleted: rec("x"),
+      runFailed: rec("x"),
+      budgetExceeded: rec("x"),
+    };
+    const combined = combineNotifiers(minimal, full);
+    for (const key of Object.keys(full) as (keyof Notifier)[]) {
+      expect(typeof (combined as unknown as Record<string, unknown>)[key], key).toBe("function");
+      await (combined as unknown as Record<string, (...a: unknown[]) => Promise<void>>)[key]!();
+    }
+    expect(calls.filter((c) => c !== "x")).toEqual(Object.keys(full));
+    expect("planReady" in combineNotifiers(minimal)).toBe(false);
   });
 
   it("Mittags-Zwischenstand", () => {

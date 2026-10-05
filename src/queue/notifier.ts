@@ -103,10 +103,20 @@ export function combineNotifiers(...notifiers: Notifier[]): Notifier {
         ),
       ),
     ).then(() => undefined);
-  return {
+  // Optionale Meldungen nur anbieten, wenn ein Kanal sie zustellt (der Aufrufer prüft z. B. `notifier.planReady`).
+  // 05.10.2026: Vorher fehlten sie hier ganz, dadurch kamen Morgen-Paket, Antworten und Infos nie in Telegram an.
+  const has = (key: keyof Notifier) => notifiers.some((n) => typeof n[key] === "function");
+  const combined: Notifier = {
     runCompleted: (s) => all((n) => n.runCompleted(s)),
     runFailed: (r, e) => all((n) => n.runFailed(r, e)),
     budgetExceeded: (m) => all((n) => n.budgetExceeded(m)),
     remindersDue: (r) => all((n) => n.remindersDue?.(r) ?? Promise.resolve()),
   };
+  if (has("planReady"))
+    combined.planReady = (d, r, nr) => all((n) => n.planReady?.(d, r, nr) ?? Promise.resolve());
+  if (has("eveningSummary"))
+    combined.eveningSummary = (s) => all((n) => n.eveningSummary?.(s) ?? Promise.resolve());
+  if (has("mailEvent")) combined.mailEvent = (e) => all((n) => n.mailEvent?.(e) ?? Promise.resolve());
+  if (has("info")) combined.info = (t) => all((n) => n.info?.(t) ?? Promise.resolve());
+  return combined;
 }
