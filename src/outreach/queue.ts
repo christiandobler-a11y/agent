@@ -82,7 +82,18 @@ export async function queuePlanMails(
       order by position`,
     [date],
   );
-  const times = spreadTimes(rows.length, now, w, rand);
+  // Schon eingeplante (z. B. vor /nachlegen) laufen weiter; neue reihen sich mit Abstand dahinter ein.
+  const { rows: last } = await db.query<{ at: Date | null }>(
+    "select max(send_after) as at from outreach_plan where status = 'queued'",
+  );
+  const lastAt = last[0]?.at ?? null;
+  const start =
+    lastAt && lastAt > now
+      ? new Date(
+          lastAt.getTime() + (w.abstand_min + rand() * Math.max(0, w.abstand_max - w.abstand_min)) * 60_000,
+        )
+      : now;
+  const times = spreadTimes(rows.length, start, w, rand);
   for (const [i, r] of rows.entries())
     await db.query("update outreach_plan set status = 'queued', send_after = $2 where id = $1", [
       r.id,

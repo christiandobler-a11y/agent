@@ -910,6 +910,28 @@ describeDb("Morgen-Paket mit Datenbank", () => {
     expect((await planItems(db(), date)).map((i) => i.status).sort()).toEqual(["done", "ready", "ready"]);
   });
 
+  it("Verteilt senden nachgelegt: neue Mails reihen sich hinter die schon eingeplanten", async () => {
+    await db().query("update companies set status = 'LOST'");
+    await db().query("delete from outreach_plan");
+    const date = "2026-10-05";
+    const plan = async (pos: number) => {
+      const c = await lead();
+      const d = await emailDraft(c);
+      await db().query(
+        "insert into outreach_plan (plan_date, company_id, kind, channel, draft_id, position) values ($1, $2, 'new', 'email', $3, $4)",
+        [date, c.id, d.id, pos],
+      );
+    };
+    await plan(1);
+    await plan(2);
+    const at = new Date("2026-10-05T06:30:00Z"); // 08:30 Berlin
+    const first = await queuePlanMails(db(), date, at, mail.verteilt, () => 0);
+    await plan(3);
+    const more = await queuePlanMails(db(), date, at, mail.verteilt, () => 0);
+    expect(more.count).toBe(1);
+    expect(more.first!.getTime() - first.last!.getTime()).toBe(mail.verteilt.abstand_min * 60_000);
+  });
+
   it("Nachtsuche: nächste offene Kombination, eine je Nacht, nie zwei gleichzeitig", async () => {
     const send = vi.fn(() => Promise.resolve("job"));
     let now = new Date("2026-10-05T18:00:00Z"); // 20:00 Berlin, noch nicht dran

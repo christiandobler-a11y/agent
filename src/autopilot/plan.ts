@@ -331,9 +331,9 @@ export async function buildDailyPlan(deps: PlanDeps, by = "autopilot"): Promise<
           : `Bremse: ${bounces.bounced} von ${bounces.sent} Mails der letzten ${config.neue_kontakte.bremse.tage} Tage waren unzustellbar, heute nur ${target} neue`,
       );
     // Nur neue Mails zählen zum Tagesziel; Briefe kommen gesammelt am Brief-Tag dazu. Wer ausfällt (keine Mail,
-    // Fehler), wird durch den nächsten Kandidaten ersetzt.
+    // Fehler) oder aussortiert wurde, wird durch den nächsten Kandidaten ersetzt (/nachlegen baut erneut).
     const already = (await planItems(db, date)).filter(
-      (i) => i.kind === "new" && i.channel === "email",
+      (i) => i.kind === "new" && i.channel === "email" && i.status !== "dropped",
     ).length;
     const branches = config.neue_kontakte.branchen ?? config.suche.branchen;
     const pool = Math.max(0, target - already) * 4 + (lettersLeft > 0 ? 300 : 0);

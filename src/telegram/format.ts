@@ -210,7 +210,7 @@ export const HELP_TEXT = [
   "• Erinner mich Freitag an Hotel Ariadne",
   "",
   "Leads öffnen: /leads (Top 10 mit Buttons) · /lead Name (z. B. /lead Ariadne)",
-  "Schnellbefehle: /heute · /zahlen · /probelauf (/probelauf3) · /level · /status · /pipeline · /abdeckung · /kosten · /fehler · /budget (z. B. /budget +5)",
+  "Schnellbefehle: /heute · /nachlegen · /zahlen · /probelauf (/probelauf3) · /level · /status · /pipeline · /abdeckung · /kosten · /fehler · /budget (z. B. /budget +5)",
   "Kalibrierung: /kalibrieren (Firmen mit A/B/C bewerten, 💡 Vorbild merken) · /vorbilder · /auswertung",
 ].join("\n");
 

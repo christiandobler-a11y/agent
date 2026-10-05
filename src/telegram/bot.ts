@@ -20,7 +20,7 @@ import type { OutreachConfig } from "../outreach/config.js";
 import { draftEmail, mailtoLink, type OutreachDeps } from "../outreach/draft.js";
 import { draftLetter, type LetterDeps } from "../outreach/letter.js";
 import { loadMailConfig, type MailConfig, type Mailbox } from "../outreach/mail.js";
-import { berlinDate, loadAutopilotConfig } from "../autopilot/plan.js";
+import { berlinDate, buildDailyPlan, loadAutopilotConfig } from "../autopilot/plan.js";
 import {
   handlePlanCallback,
   sendMorningPackage,
@@ -161,6 +161,7 @@ export function telegramFetch(fetchFn: typeof globalThis.fetch) {
 export const BOT_COMMANDS = [
   { command: "heute", description: "Morgen-Paket: heute vorbereitete Kontakte" },
   { command: "level", description: "Dein Level, XP und Abzeichen" },
+  { command: "nachlegen", description: "Lücken im heutigen Paket auffüllen" },
   { command: "probelauf", description: "Test-Mail an dich selbst (wie im Morgen-Paket)" },
   { command: "probelauf3", description: "3 Test-Mails mit verschiedenen Praxen" },
   { command: "leads", description: "Beste Leads mit Buttons" },
@@ -484,6 +485,46 @@ export function createBot(options: BotOptions): AvelioBot {
       mailbox !== null,
     );
     await sendNextCard(ctx.api, ctx.chat.id, deps, 0);
+  });
+
+  // Lücken im heutigen Paket auffüllen (05.10.2026: Ausfälle wurden früher nicht ersetzt). Der Plan-Bau ist
+  // idempotent: Er ergänzt nur, was bis zum Tagesziel fehlt, und lässt Geplantes und Gesendetes in Ruhe.
+  let refilling = false;
+  bot.command(["nachlegen", "auffuellen"], async (ctx) => {
+    const deps = planDeps();
+    if (!deps || !pipeline.autopilot) {
+      await ctx.reply("Das Morgen-Paket ist noch nicht eingerichtet.");
+      return;
+    }
+    if (refilling) {
+      await ctx.reply("Ich lege schon nach, einen Moment …");
+      return;
+    }
+    refilling = true;
+    try {
+      await ctx.reply("🔧 Lege nach, das dauert ein, zwei Minuten …");
+      const r = await buildDailyPlan(pipeline.autopilot.planDeps(), by(ctx.chat.id));
+      if (r.emails === 0 && r.followups === 0 && r.letters === 0) {
+        await ctx.reply(
+          r.stoppedByBudget
+            ? "⚠️ Das Tagesbudget ist aufgebraucht. Mit /budget +5 geht es weiter."
+            : "Nichts nachzulegen: Das Tagesziel ist schon voll (oder es gibt gerade keine passenden Leads).",
+        );
+        return;
+      }
+      await ctx.reply(`✅ ${r.emails} neue Mail${r.emails === 1 ? "" : "s"} nachgelegt.`);
+      await sendPlanHeader(
+        ctx.api,
+        pipeline.db,
+        [ctx.chat.id],
+        berlinDate(pipeline.now()),
+        undefined,
+        mailbox !== null,
+      );
+      await sendNextCard(ctx.api, ctx.chat.id, deps, 0);
+    } finally {
+      refilling = false;
+    }
   });
 
   bot.on("callback_query:data", async (ctx) => {
