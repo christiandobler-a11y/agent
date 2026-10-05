@@ -359,5 +359,20 @@ describeDb("CRM mit Datenbank", () => {
     expect(details).toContain("Offene Erinnerung (fällig 2026-10-09): Angebot schicken");
     expect((await runTool("pipeline", {}, t)).text).toContain("Radl Sepp");
     expect(pipelineMessage([], [])).toContain("Noch kein Lead im Vertrieb");
+    // Listen nennen Stand und Status; Score-Verlauf aus lead_scores.
+    expect((await runTool("list_leads", {}, t)).text).toMatch(
+      /^Stand \d\d\.\d\d\., \d\d:\d\d, nur Status QUALIFIED/,
+    );
+    for (const [version, total] of [
+      ["v2", 77],
+      ["v3", 85],
+    ] as const)
+      await db().query(
+        "insert into lead_scores (company_id, scoring_version, total, breakdown, knocked_out) values ($1, $2, $3, '{}', false)",
+        [c.id, version, total],
+      );
+    const history = (await runTool("score_history", { lead: "Radl Sepp" }, t)).text;
+    expect(history).toContain("Scoring v2 · 77 Punkte");
+    expect(history).toContain("Scoring v3 · 85 Punkte");
   });
 });

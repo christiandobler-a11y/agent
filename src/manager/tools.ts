@@ -73,6 +73,16 @@ const STATUS = [
   "LOST",
 ] as const;
 
+/** Uhrzeit in Deutschland, damit der Assistent sieht, wie frisch eine Liste ist. */
+const stand = () =>
+  new Intl.DateTimeFormat("de-DE", {
+    day: "2-digit",
+    month: "2-digit",
+    hour: "2-digit",
+    minute: "2-digit",
+    timeZone: "Europe/Berlin",
+  }).format(new Date());
+
 function line(c: Company): string {
   const score = c.current_score === null ? "–" : String(c.current_score);
   const site = c.segment === "NO_WEBSITE" ? "ohne Website" : (c.website_url ?? "");
@@ -148,9 +158,11 @@ export const TOOLS = {
           order by current_score desc nulls last, updated_at desc limit $5`,
         [i.status ?? "QUALIFIED", i.min_score ?? null, i.ort ?? null, i.branche ?? null, i.limit ?? 10],
       );
+      const status = i.status ?? "QUALIFIED";
+      const head = `Stand ${stand()}, nur Status ${status}${status === "QUALIFIED" ? " (schon kontaktierte stehen nicht mehr drin)" : ""}.`;
       return rows.length === 0
-        ? "Keine passenden Leads."
-        : `ID | Name | Ort | Score | Status | Website\n${rows.map(line).join("\n")}\n\nHinweis für Christian: Karte mit Buttons (Status, E-Mail-Entwurf) über /leads oder /lead <Name>.`;
+        ? `${head}\nKeine passenden Leads.`
+        : `${head}\nID | Name | Ort | Score | Status | Website\n${rows.map(line).join("\n")}\n\nHinweis für Christian: Karte mit Buttons (Status, E-Mail-Entwurf) über /leads oder /lead <Name>.`;
     },
   }),
 
@@ -208,6 +220,36 @@ export const TOOLS = {
     run: async (i, t) => {
       const c = await lookup(t, i.lead);
       return typeof c === "string" ? c : explainStoredLead(t.ctx.db, c);
+    },
+  }),
+
+  score_history: define({
+    description:
+      'Score-Verlauf eines Leads: jede Bewertung mit Datum, Scoring-Version und Punkten. Für Fragen wie "Warum hatte X früher 77?".',
+    schema: z.object({ lead: z.string() }),
+    run: async (i, t) => {
+      const c = await lookup(t, i.lead);
+      if (typeof c === "string") return c;
+      const { rows } = await t.ctx.db.query<{
+        created_at: Date;
+        scoring_version: string;
+        total: number;
+        knocked_out: boolean;
+        knockout_reason: string | null;
+      }>(
+        `select created_at, scoring_version, total, knocked_out, knockout_reason from lead_scores
+          where company_id = $1 order by created_at`,
+        [c.id],
+      );
+      if (rows.length === 0) return `${c.name}: noch nicht bewertet.`;
+      const day = (d: Date) => d.toLocaleDateString("de-DE", { timeZone: "Europe/Berlin" });
+      return [
+        `${c.name}, aktuell ${c.current_score ?? "–"} Punkte, Status ${c.status} (Stand ${stand()}):`,
+        ...rows.map(
+          (r) =>
+            `${day(r.created_at)} · Scoring ${r.scoring_version} · ${r.total} Punkte${r.knocked_out ? ` · Knock-out (${r.knockout_reason ?? "?"})` : ""}`,
+        ),
+      ].join("\n");
     },
   }),
 
@@ -308,7 +350,9 @@ export const TOOLS = {
         "select * from search_runs order by created_at desc limit $1",
         [i.laeufe ?? 3],
       );
-      const out = [`Firmen je Status: ${counts.map((c) => `${c.status} ${c.n}`).join(", ") || "keine"}`];
+      const out = [
+        `Stand ${stand()}. Firmen je Status: ${counts.map((c) => `${c.status} ${c.n}`).join(", ") || "keine"}`,
+      ];
       for (const run of runs) {
         const s = await runSummary(t.ctx, run);
         const q = run.query as { term?: string; region?: string };

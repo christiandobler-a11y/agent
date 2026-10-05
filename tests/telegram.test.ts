@@ -236,6 +236,7 @@ describe("Manager", () => {
       "list_leads",
       "get_lead",
       "explain_score",
+      "score_history",
       "skip_lead",
       "set_status",
       "add_note",
