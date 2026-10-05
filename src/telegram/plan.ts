@@ -21,7 +21,7 @@ import { draftEmail, type OutreachDeps } from "../outreach/draft.js";
 import { draftLetter, type LetterDeps } from "../outreach/letter.js";
 import type { MailConfig, Mailbox } from "../outreach/mail.js";
 import { createConfirmDraft, icsInvite, terminLabel } from "../outreach/confirm.js";
-import { queuePlanMails } from "../outreach/queue.js";
+import { queuePlanMails, scheduleDraft, unscheduleDraft } from "../outreach/queue.js";
 import { sendDraft } from "../outreach/send.js";
 import { gameState } from "../game/xp.js";
 import { callbackData, escapeHtml, websiteButton } from "./format.js";
@@ -589,6 +589,37 @@ export async function handlePlanCallback(ctx: Context, deps: PlanBotDeps, by: st
     );
     return true;
   }
+  // Mail nach dem Ja zeitversetzt senden bzw. das wieder abbrechen.
+  const later = data ? new RegExp(`^(sl|sx):(${UUID})$`).exec(data) : null;
+  if (later) {
+    const draftId = later[2]!;
+    if (later[1] === "sl") {
+      const range = deps.outreach.outreach.anruf?.verzoegerung_min ?? [5, 10];
+      const at = await scheduleDraft(db, draftId, now, range);
+      await ctx.answerCallbackQuery({
+        text: at ? `Geht gegen ${berlinTime(at)} Uhr raus` : "Schon gesendet",
+      });
+      if (at)
+        await ctx
+          .editMessageReplyMarkup({
+            reply_markup: {
+              inline_keyboard: [
+                [{ text: `⏱ Geht gegen ${berlinTime(at)} raus · ✋ Stopp`, callback_data: `sx:${draftId}` }],
+                [{ text: "📤 Doch sofort senden", callback_data: `sd:${draftId}` }],
+              ],
+            },
+          })
+          .catch(() => undefined);
+    } else {
+      const stopped = await unscheduleDraft(db, draftId);
+      await ctx.answerCallbackQuery({ text: stopped ? "Gestoppt, geht nicht raus" : "War schon raus" });
+      if (stopped)
+        await ctx
+          .editMessageReplyMarkup({ reply_markup: { inline_keyboard: delayKeyboard(draftId, deps) } })
+          .catch(() => undefined);
+    }
+    return true;
+  }
   // Einzelner Entwurf aus der Lead-Karte: "Jetzt senden".
   const single = data ? new RegExp(`^sd:(${UUID})$`).exec(data) : null;
   if (single) {
@@ -983,9 +1014,7 @@ async function finishConsent(
       parse_mode: "HTML",
       link_preview_options: { is_disabled: true },
       reply_markup: {
-        inline_keyboard: deps.mailbox
-          ? [[{ text: "📤 Jetzt senden", callback_data: `sd:${mail.draftId}` }]]
-          : [],
+        inline_keyboard: deps.mailbox ? delayKeyboard(mail.draftId, deps) : [],
       },
     },
   );
@@ -1004,6 +1033,15 @@ async function finishConsent(
       });
     }
   }
+}
+
+/** Knöpfe unter der Mail nach dem Ja: zeitversetzt (wirkt wie nach dem Telefonat geschrieben) oder sofort. */
+function delayKeyboard(draftId: string, deps: PlanBotDeps): InlineKeyboardButton[][] {
+  const [a, b] = deps.outreach.outreach.anruf?.verzoegerung_min ?? [5, 10];
+  return [
+    [{ text: `⏱ In ${a}–${b} Min senden`, callback_data: `sl:${draftId}` }],
+    [{ text: "📤 Sofort senden", callback_data: `sd:${draftId}` }],
+  ];
 }
 
 /** Anruf-Karten fast aufgebraucht und Ziel noch offen: neue Karten nachlegen (geht schnell, ohne Bild). */

@@ -2,7 +2,7 @@ import { claimState, getState, setState } from "../db/appState.js";
 import { countPlan, planItems, type PlanCounts } from "../db/plan.js";
 import { gameState, gameStats, loadGameConfig, xpOf, type GameState } from "../game/xp.js";
 import { loadCrmConfig } from "../crm/status.js";
-import { sendNextQueued } from "../outreach/queue.js";
+import { sendNextQueued, sendScheduledDrafts } from "../outreach/queue.js";
 import { seedTick } from "../outreach/seed.js";
 import { statsTick } from "../outreach/stats.js";
 import { checkReplies } from "../outreach/send.js";
@@ -233,14 +233,17 @@ export async function mailTick(ctx: PipelineContext): Promise<void> {
 export async function queueTick(ctx: PipelineContext): Promise<void> {
   if (!ctx.mailbox || !ctx.mail) return;
   const notify = ctx.notifier.info?.bind(ctx.notifier);
-  await sendNextQueued({
+  const deps = {
     db: ctx.db,
     mailbox: ctx.mailbox,
     mail: ctx.mail,
     now: ctx.now,
     followUpDays: (ctx.crm ?? loadCrmConfig()).follow_up_days,
     ...(notify ? { notify } : {}),
-  });
+  };
+  await sendNextQueued(deps);
+  // Mails nach dem Ja am Telefon, zeitversetzt freigegeben.
+  await sendScheduledDrafts(deps);
 }
 
 /** Kontrollmail (Spam-Check) und Zahlen der Testphase (Meilensteine, Warnung ohne Antworten). */

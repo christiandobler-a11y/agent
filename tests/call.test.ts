@@ -28,6 +28,8 @@ import { insertPlacesSnapshot } from "../src/db/placesSnapshots.js";
 import { NO_BUDGET } from "../src/llm/budget.js";
 import { loadOutreachConfig } from "../src/outreach/config.js";
 import { outreachStats, statsText } from "../src/outreach/stats.js";
+import { scheduleDraft, sendScheduledDrafts, unscheduleDraft } from "../src/outreach/queue.js";
+import { insertDraft } from "../src/db/drafts.js";
 import { planCallCard, planCallback, parsePlanCallback, planHeaderText } from "../src/telegram/plan.js";
 import { createBot } from "../src/telegram/bot.js";
 import type { PipelineContext } from "../src/queue/pipeline.js";
@@ -438,7 +440,7 @@ describeDb("Anruf-Liste", () => {
     expect(String(lastMessage().text)).toContain(
       `Mail an ${a.name}</b> (Einwilligung am Telefon ist vermerkt)`,
     );
-    expect(String(lastMessage().text)).toContain("danke für das nette Gespräch eben!");
+    expect(String(lastMessage().text)).toContain("wie telefonisch besprochen, hier mein Vorschlag");
     const { rows } = await db().query<{ n: number }>(
       "select count(*)::int as n from interactions where company_id = $1 and meta->>'call' = 'ja'",
       [a.id],
@@ -537,5 +539,38 @@ describeDb("Anruf-Liste", () => {
     await recordCall(db(), items[0]!.company_id, "ja", { by: "t", now: NOW, to: "a@b.de" });
     expect((await buildDailyPlan(deps)).calls).toBe(2);
     await db().query("update companies set status = 'LOST'");
+  });
+
+  it("Mail nach dem Ja zeitversetzt: einplanen, stoppen, fällige sendet der Sweep", async () => {
+    const c = await lead();
+    const draft = await insertDraft(db(), c.id, {
+      channel: "email",
+      body: "Hallo",
+      meta: { subject: "Vorschlag", to: "huber@praxis.de" },
+      by: "t",
+      now: NOW,
+    });
+    const at = await scheduleDraft(db(), draft.id, NOW, [5, 10], () => 0.5);
+    expect(at!.getTime() - NOW.getTime()).toBe(7.5 * 60_000);
+    expect(await unscheduleDraft(db(), draft.id)).toBe(true);
+    expect(await unscheduleDraft(db(), draft.id)).toBe(false);
+    await scheduleDraft(db(), draft.id, NOW, [5, 10], () => 0);
+    const sent: unknown[] = [];
+    const mailbox = {
+      address: "christian@example.de",
+      send: (m: unknown) => {
+        sent.push(m);
+        return Promise.resolve({ messageId: "<x@example.de>" });
+      },
+      fetchSince: () => Promise.resolve({ uidValidity: "1", maxUid: 0, mails: [] }),
+    };
+    const notify = vi.fn(() => Promise.resolve());
+    const deps = { db: db(), mailbox, mail: loadMailConfig(), followUpDays: 5, notify };
+    // Noch nicht fällig
+    expect(await sendScheduledDrafts({ ...deps, now: () => new Date(NOW.getTime() + 4 * 60_000) })).toBe(0);
+    expect(await sendScheduledDrafts({ ...deps, now: () => new Date(NOW.getTime() + 6 * 60_000) })).toBe(1);
+    expect(sent).toHaveLength(1);
+    expect(notify).toHaveBeenCalledWith(expect.stringContaining("ist raus"));
+    expect(await sendScheduledDrafts({ ...deps, now: () => new Date(NOW.getTime() + 60 * 60_000) })).toBe(0);
   });
 });

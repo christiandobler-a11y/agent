@@ -36,10 +36,21 @@ anruf:
     - { bis: "11:00", text: Guten Morgen }
     - { bis: "17:30", text: Grüß Gott }
     - { bis: "24:00", text: Guten Abend }
-  # Erster Satz der Mail nach dem Ja am Telefon (statt Herkunft der Adresse).
+  # Mail nach dem Ja (06.10.2026, Christian): "wie telefonisch besprochen, hier mein Vorschlag zu Ihrer Praxis.
+  # Folgendes ist mir auf Ihrer jetzigen Seite aufgefallen … so habe ich mir eine erste Skizze erlaubt." Den Absatz mit
+  # den Beobachtungen schreibt das LLM (contact.v9), danach kommt das Bild mit kontaktweg.bild_satz.
   nach_anruf:
-    sie: danke für das nette Gespräch eben! Wie besprochen schicke ich Ihnen hier meinen Entwurf für Ihre Startseite.
-    du: danke für das nette Gespräch eben! Wie besprochen schick ich dir hier meinen Entwurf für deine Startseite.
+    sie: wie telefonisch besprochen, hier mein Vorschlag für Ihre Praxis.
+    du: wie telefonisch besprochen, hier mein Vorschlag für deine Praxis.
+  link_satz:
+    sie: "Die ganze Seite können Sie sich hier in Ruhe anschauen: {link}"
+    du: "Die ganze Seite kannst du dir hier in Ruhe anschauen: {link}"
+  abschluss:
+    sie: Schauen Sie gern rein, wann es Ihnen passt. Wenn Ihnen etwas gefällt oder Sie Fragen haben, antworten Sie einfach kurz auf diese Mail.
+    du: Schau gern rein, wann es dir passt. Wenn dir etwas gefällt oder du Fragen hast, antworte einfach kurz auf diese Mail.
+  # Versand nach dem Ja mit Knopf "In 5–10 Minuten senden": zufällige Verzögerung in Minuten (von, bis), damit die Mail
+  # nicht vorgefertigt wirkt.
+  verzoegerung_min: [5, 10]
   # So oft "nicht erreicht", dann kommt stattdessen ein Brief.
   versuche: 3
 

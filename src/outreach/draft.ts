@@ -21,7 +21,8 @@ import { personFromCompanyName, personInCompanyName, salutationFromFirstName } f
  * nichts; Christian sendet selbst.
  */
 
-export const CONTACT_PROMPT_VERSION = "v8";
+// v9 (06.10.2026): Mail nach dem Ja am Telefon (`nach_anruf`): kein Kompliment-Einstieg, nur die Beobachtungen.
+export const CONTACT_PROMPT_VERSION = "v9";
 
 export const contactOutputSchema = z.object({
   absatz: z.string().min(40).max(1000),
@@ -326,6 +327,8 @@ export async function draftEmail(
     ...(impression ? { gesamteindruck: impression } : {}),
     kompliment_fakt: complimentFact(places),
     ...(previous ? { vorheriger_text: previous } : {}),
+    // Nach dem Telefonat: der Absatz beschreibt nur, was auf der jetzigen Seite auffällt (contact.v9).
+    ...(afterCall ? { nach_anruf: true } : {}),
   };
 
   const system = loadPrompt("contact", CONTACT_PROMPT_VERSION);
@@ -413,14 +416,28 @@ export async function draftEmail(
 
   // 04.10.2026 (mit Christian): kurz, Bild früh, genau eine Bitte (Termin), Weiterleiten als P.S.; mit Entwurfs-Link
   // bleibt der Antwort-Hinweis, ohne Link keine weitere Aufforderung (auch kein WhatsApp-Link in der Erstmail).
-  const called = afterCall && o.anruf ? inForm(o.anruf.nach_anruf.sie, o.anruf.nach_anruf.du) : null;
+  // Nach dem Ja am Telefon (06.10.2026, Christian): "wie telefonisch besprochen, hier mein Vorschlag … Folgendes ist
+  // mir auf Ihrer jetzigen Seite aufgefallen … so habe ich mir eine erste Skizze erlaubt", dann Link und ein Schluss
+  // ohne Video-Call oder Termin.
+  const call = afterCall && o.anruf ? o.anruf : null;
+  const middle = call
+    ? [
+        lowerFirst(inForm(call.nach_anruf.sie, call.nach_anruf.du)),
+        upperFirst(clean.text),
+        ...(imageSentence ? [imageSentence] : []),
+        ...(previewUrl ? [inForm(call.link_satz.sie, call.link_satz.du).replace("{link}", previewUrl)] : []),
+        inForm(call.abschluss.sie, call.abschluss.du),
+      ]
+    : [
+        lowerFirst(clean.text),
+        ...(imageSentence ? [imageSentence] : []),
+        ...(linkSentence ? [linkSentence] : []),
+        [prepared, slotSentence].filter(Boolean).join(" "),
+        ...(previewUrl ? [cta] : []),
+      ];
   const body = [
     salutationLine(form, { name: impressumName, salutation }, company.name, team?.anrede, o.anrede),
-    ...(called ? [lowerFirst(called), upperFirst(clean.text)] : [lowerFirst(clean.text)]),
-    ...(imageSentence ? [imageSentence] : []),
-    ...(linkSentence ? [linkSentence] : []),
-    [prepared, slotSentence].filter(Boolean).join(" "),
-    ...(previewUrl ? [cta] : []),
+    ...middle,
     `${greeting}\n${signature}`,
     ...(team ? [`P.S. ${inForm(team.weiterleiten, team.weiterleiten_du)}`] : []),
     // Herkunft der Adresse und Abmelde-Satz (04.10./06.10.2026): üblich bei Erstkontakt, senkt Spam-Klicks, und mehr

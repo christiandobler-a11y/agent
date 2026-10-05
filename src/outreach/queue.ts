@@ -179,3 +179,68 @@ export async function sendNextQueued(
   await deps.notify?.(`⚠️ ${item.name}: keine Adresse oder Entwurf fehlt, bitte selbst ansehen (/heute).`);
   return "problem";
 }
+
+/**
+ * Mail nach dem Ja am Telefon zeitversetzt (06.10.2026, Christian: "5–10 Minuten nach dem Okay, damit es so
+ * rüberkommt, als hätte ich das erst nach dem Telefonat formuliert"). Christian drückt den Knopf, der Entwurf bekommt
+ * `meta.send_after`; der Sweep schickt fällige Entwürfe. Zufällige Minuten zwischen `range[0]` und `range[1]`.
+ */
+export async function scheduleDraft(
+  db: Db,
+  draftId: string,
+  now: Date,
+  range: readonly [number, number],
+  rand: () => number = Math.random,
+): Promise<Date | null> {
+  const minutes = range[0] + rand() * Math.max(0, range[1] - range[0]);
+  const at = new Date(now.getTime() + minutes * 60_000);
+  const { rowCount } = await db.query(
+    `update interactions set meta = meta || jsonb_build_object('send_after', $2::text)
+      where id = $1 and type = 'draft' and channel = 'email' and not (meta ? 'sent_at')`,
+    [draftId, at.toISOString()],
+  );
+  return rowCount === 1 ? at : null;
+}
+
+/** Zeitversetzten Versand abbrechen ("✋ Stopp"). */
+export async function unscheduleDraft(db: Db, draftId: string): Promise<boolean> {
+  const { rowCount } = await db.query(
+    `update interactions set meta = meta - 'send_after' where id = $1 and meta ? 'send_after' and not (meta ? 'sent_at')`,
+    [draftId],
+  );
+  return rowCount === 1;
+}
+
+/** Sweep: fällige zeitversetzte Entwürfe senden und melden. */
+export async function sendScheduledDrafts(
+  deps: SendDeps & { notify?: (text: string) => Promise<void> },
+): Promise<number> {
+  const { rows } = await deps.db.query<{ id: string; name: string }>(
+    `select i.id, c.name from interactions i join companies c on c.id = i.company_id
+      where i.type = 'draft' and i.channel = 'email' and i.meta ? 'send_after' and not (i.meta ? 'sent_at')
+        and (i.meta->>'send_after')::timestamptz <= $1
+      order by (i.meta->>'send_after')::timestamptz limit 5`,
+    [deps.now()],
+  );
+  let sent = 0;
+  for (const r of rows) {
+    try {
+      const result = await sendDraft(deps, r.id, "zeitversetzt");
+      if (result.kind === "sent") {
+        sent++;
+        await deps.notify?.(`📤 Mail an ${r.name} ist raus (an ${result.to}).`);
+      } else if (result.kind !== "already_sent") {
+        await unscheduleDraft(deps.db, r.id);
+        await deps.notify?.(
+          `⚠️ Mail an ${r.name} ging nicht raus (${result.kind}). Bitte über den Lead neu senden.`,
+        );
+      }
+    } catch (err) {
+      await unscheduleDraft(deps.db, r.id);
+      await deps.notify?.(
+        `⚠️ Mail an ${r.name} ging nicht raus: ${(err instanceof Error ? err.message : String(err)).slice(0, 120)}`,
+      );
+    }
+  }
+  return sent;
+}
