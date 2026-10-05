@@ -239,7 +239,10 @@ describeDb("Vorschau-Bild in Mail und Versand", () => {
     if ("kind" in mail) throw new Error("kein Entwurf");
     const sentence = loadOutreachConfig().kontaktweg.bild_satz;
     expect(mail.body).toContain(sentence);
-    expect(mail.body).toMatch(/unverbindlich/);
+    // Ablauf "vorschau": Angebot einer Vorschau-Seite statt Terminvorschlägen.
+    expect(mail.body).toMatch(/Vorschau-Seite/);
+    expect(mail.body).not.toMatch(/Video-Call|Uhr\?/);
+    expect(mail.slots).toEqual([]);
     expect(mail.body).not.toMatch(/kostenlos|gratis/i);
 
     // Adresse setzen und senden

@@ -20,7 +20,7 @@ import { personFromCompanyName, personInCompanyName, salutationFromFirstName } f
  * nichts; Christian sendet selbst.
  */
 
-export const CONTACT_PROMPT_VERSION = "v7";
+export const CONTACT_PROMPT_VERSION = "v8";
 
 export const contactOutputSchema = z.object({
   absatz: z.string().min(40).max(1000),
@@ -336,7 +336,7 @@ export async function draftEmail(
     clean = sanitizeDraftText(result.output.absatz);
   }
 
-  const slots = proposeSlots({
+  const proposed = proposeSlots({
     now,
     config: o.termine,
     branchKey: company.branch_key,
@@ -346,7 +346,6 @@ export async function draftEmail(
     variant,
   });
   const k = o.kontaktweg;
-  const slotSentence = slots ? (form === "ihr" ? duToIhr(slots.sentence) : slots.sentence) : null;
 
   const { rows: proto } = deps.previewBaseUrl
     ? await db.query<{ slug: string }>(
@@ -360,13 +359,19 @@ export async function draftEmail(
     !previewUrl && deps.teaserDir && teaserExists(deps.teaserDir, company.id)
       ? teaserPath(deps.teaserDir, company.id)
       : null;
+  // Ablauf "vorschau" (05.10.2026, Christian: volle Praxen nehmen sich keinen Video-Call): keine Termine in der
+  // Erstmail mit Vorschau-Bild, sondern das Angebot einer echten Vorschau-Seite; das Gespräch kommt danach.
+  const offerPreview = k.ablauf === "vorschau" && Boolean(teaser) && !previewUrl;
+  const slots = offerPreview ? null : proposed;
+  const slotSentence = slots ? (form === "ihr" ? duToIhr(slots.sentence) : slots.sentence) : null;
   const draftSentence = previewUrl
     ? inForm(k.entwurf_satz, k.entwurf_satz_du).replace("{link}", previewUrl)
     : teaser
       ? inForm(k.bild_satz, k.bild_satz_du)
       : null;
-  const prepared =
-    previewUrl || teaser
+  const prepared = offerPreview
+    ? inForm(pick(k.vorschau_angebot, seed, 7, variant), pick(k.vorschau_angebot_du, seed, 7, variant))
+    : previewUrl || teaser
       ? inForm(
           pick(k.vorbereitet_mit_entwurf, seed, 7, variant),
           pick(k.vorbereitet_mit_entwurf_du, seed, 7, variant),
@@ -409,7 +414,8 @@ export async function draftEmail(
 
   const warnings = [...clean.warnings];
   if (!email) warnings.push("Keine E-Mail-Adresse im Impressum gefunden");
-  if (!slots) warnings.push("Keine freien Termine in den nächsten Tagen (config/outreach.yaml → termine)");
+  if (!slots && !offerPreview)
+    warnings.push("Keine freien Termine in den nächsten Tagen (config/outreach.yaml → termine)");
 
   const draft = await insertDraft(db, company.id, {
     channel: "email",

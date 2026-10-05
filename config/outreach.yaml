@@ -124,8 +124,9 @@ kontaktweg:
   entwurf_satz: "Ich hab mir auch schon mal erlaubt zu skizzieren, wie Ihre Startseite aussehen könnte: {link}"
   entwurf_satz_du: "Ich hab auch schon mal skizziert, wie eure Startseite aussehen könnte: {link}"
   # Mit Vorschau-Bild (04.10.2026, Physio): das Bild steht in der Mail direkt unter diesem Satz.
-  bild_satz: "Ich hab mir deshalb erlaubt zu skizzieren, wie Ihre Startseite aussehen könnte:"
-  bild_satz_du: "Ich hab deshalb mal skizziert, wie eure Startseite aussehen könnte:"
+  # 05.10.2026 (Christian): das Bild als erste Skizze rahmen, die richtige Vorschau-Seite kommt erst auf Wunsch.
+  bild_satz: "Ich hab mir deshalb erlaubt, eine erste Skizze Ihrer Startseite zu machen:"
+  bild_satz_du: "Ich hab deshalb mal eine erste Skizze eurer Startseite gemacht:"
   email_cta_ohne_whatsapp: Am einfachsten antworten Sie kurz auf diese Mail.
   email_cta_ohne_whatsapp_du: Am einfachsten antwortest du kurz auf diese Mail.
   # Überleitung zum Terminvorschlag ("ich hab was vorbereitet"), wird abgewechselt.
@@ -143,6 +144,16 @@ kontaktweg:
   vorbereitet_du:
     - Ich hab dazu schon was vorbereitet und zeig es dir gern in einem kurzen Video-Call, 10 Minuten, unverbindlich.
     - Dazu hab ich schon was vorbereitet, das zeig ich dir gern in 10 Minuten per Video-Call am Bildschirm, ganz unverbindlich.
+  # Ablauf (05.10.2026, Christian: "deren Praxen sind voll, da nimmt sich der Chef keine 10 Minuten Video-Call"):
+  # vorschau = keine Termine in der Erstmail; wer antwortet, bekommt eine echte Vorschau-Seite zum Anschauen, wann es
+  # passt, das kurze Gespräch kommt erst danach. termin = wie bisher mit zwei Terminvorschlägen.
+  ablauf: vorschau
+  vorschau_angebot:
+    - Das ist nur ein erster Eindruck. Wenn Sie mögen, baue ich daraus eine richtige Vorschau-Seite mit Ihren Leistungen und Ihrem Team, die Sie sich in Ruhe anschauen können, wann es Ihnen passt. Eine kurze Antwort genügt.
+    - Die Skizze zeigt nur den Anfang. Gern baue ich Ihnen daraus eine echte Vorschau-Seite zum Durchklicken, ganz ohne Termin und unverbindlich. Sagen Sie einfach kurz Bescheid, dann lege ich los.
+  vorschau_angebot_du:
+    - Das ist nur ein erster Eindruck. Wenn du magst, bau ich daraus eine richtige Vorschau-Seite mit deinen Leistungen und deinem Team, die du dir in Ruhe anschauen kannst, wann es dir passt. Eine kurze Antwort genügt.
+    - Die Skizze zeigt nur den Anfang. Gern bau ich dir daraus eine echte Vorschau-Seite zum Durchklicken, ganz ohne Termin und unverbindlich. Sag einfach kurz Bescheid, dann leg ich los.
 
 # Terminvorschläge statt offenem Kalender (03.10.2026): Knappheit erzeugen, nicht "Mo bis Fr alles frei".
 # Jede Nachricht schlägt 2 konkrete Tage mit je 2 Uhrzeiten vor, z. B. "Dienstag um 12 oder 18 Uhr, sonst Donnerstag

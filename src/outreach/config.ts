@@ -122,6 +122,20 @@ export const outreachConfigSchema = z.object({
       .array(z.string())
       .min(1)
       .default(["Den Rest zeig ich dir gern kurz, 5 bis 10 Minuten reichen."]),
+    /**
+     * Ablauf (05.10.2026, Christian): "vorschau" = keine Termine in der Erstmail; wer Interesse zeigt, bekommt erst eine
+     * echte Vorschau-Seite zum Anschauen, das Gespräch kommt danach. "termin" = wie bisher mit zwei Terminvorschlägen.
+     */
+    ablauf: z.enum(["vorschau", "termin"]).default("termin"),
+    /** Satz nach dem Vorschau-Bild beim Ablauf "vorschau" (endet mit der Bitte um eine kurze Antwort). */
+    vorschau_angebot: z
+      .array(z.string())
+      .min(1)
+      .default(["Wenn Sie mögen, baue ich Ihnen daraus eine Vorschau-Seite."]),
+    vorschau_angebot_du: z
+      .array(z.string())
+      .min(1)
+      .default(["Wenn du magst, bau ich dir daraus eine Vorschau-Seite."]),
   }),
   brief: z
     .object({
