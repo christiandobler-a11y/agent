@@ -47,5 +47,5 @@ teaser:
   eigenes_foto: true
   # Schrift der Überschriften (05.10.2026, zum Ausprobieren): manrope (klar), fraunces (warme Serifen), dmserif
   # (elegant), outfit (rund), jakarta (kräftig), sora (markant)
-  schrift: dmserif # 05.10.2026 Christian: Bild 3 von 7 (DM Serif Display, elegant)
+  schrift: fraunces # 05.10.2026 Christian: Bild 2 von 7 (Fraunces, warme Serifen)
   foto_dir: data/heroes
