@@ -9,6 +9,10 @@
 		Content-Security-Policy "default-src 'self'; img-src 'self' data:; style-src 'self' 'unsafe-inline'; font-src 'self'; script-src 'none'; frame-ancestors 'none'; base-uri 'none'; form-action 'none'"
 		-Server
 	}
+	# Wähl-Knopf der Anruf-Liste (06.10.2026): Telegram erlaubt in Knöpfen nur https-Links, daher leitet
+	# /tel/<Ziffern> auf tel:+<Ziffern> weiter (nur Ziffern, kein offener Redirect).
+	@tel path_regexp tel ^/tel/([0-9]{6,15})$
+	redir @tel tel:+{re.tel.1} 302
 	@root path /
 	respond @root "Nicht gefunden" 404
 	root * /srv/previews

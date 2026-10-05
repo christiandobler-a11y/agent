@@ -14,15 +14,17 @@ import { planItems } from "../src/db/plan.js";
 import { insertWebsiteSnapshot } from "../src/db/websiteSnapshots.js";
 import type { LlmGateway } from "../src/llm/gateway.js";
 import {
-  callSheet,
-  callSheetText,
   dialable,
   dueCallLetters,
   missedCalls,
   parseConsentInput,
+  phoneDigits,
   prepareCall,
   recordCall,
 } from "../src/outreach/call.js";
+import { cachedOpeningHours, hoursOn } from "../src/prototype/placeDetails.js";
+import { insertPlacesSnapshot } from "../src/db/placesSnapshots.js";
+import { NO_BUDGET } from "../src/llm/budget.js";
 import { loadOutreachConfig } from "../src/outreach/config.js";
 import { outreachStats, statsText } from "../src/outreach/stats.js";
 import { planCallCard, planCallback, parsePlanCallback } from "../src/telegram/plan.js";
@@ -65,15 +67,20 @@ describe("Anruf-Liste (rein)", () => {
     expect(dialable("0049 881 1")).toBe("+49 881 1");
   });
 
-  it("Leitfaden: mit Ansprechpartner aus dem Impressum, sonst Frage nach der zuständigen Person", () => {
-    const a = o.anruf!;
-    const s = callSheet(a, { name: "Elisabeth Huber", salutation: "Frau" }, "Telefonnummer nicht antippbar");
-    expect(s.opener).toBe("Grüß Gott, Christian Dobler hier. Ist Frau Huber kurz zu sprechen?");
-    expect(s.pitch).toMatch(/^Grüß Gott, Christian Dobler aus Peißenberg\./);
-    expect(s.pitch).toContain("Darf ich Ihnen den kurz per Mail schicken?");
-    expect(s.hook).toBe("Falls gefragt wird, was auffällt: Telefonnummer nicht antippbar");
-    expect(callSheet(a, { name: null, salutation: null }, null).opener).toContain("Wer kümmert sich");
-    expect(callSheetText(s)).toContain("• Was kostet das?");
+  it("Kurzer Satz aus der Konfiguration, Wähl-Ziffern", () => {
+    expect(o.anruf!.pitch).toBe(
+      "Guten Morgen, Dobler mein Name. Ich habe etwas für die Praxis vorbereitet und würde Ihnen das gerne einmal per Mail zeigen. Ist es in Ordnung, wenn ich Ihnen das schicke?",
+    );
+    expect(phoneDigits("08031 12-34 56")).toBe("498031123456");
+  });
+
+  it("Öffnungszeiten für heute aus den zusammengefassten Zeilen", () => {
+    const hours = ["Mo–Do: 08:00–12:00, 14:00–19:00", "Fr: 08:00–14:00", "Sa, So: geschlossen"];
+    expect(hoursOn(hours, 1)).toBe("08:00–12:00, 14:00–19:00"); // Montag
+    expect(hoursOn(hours, 4)).toBe("08:00–12:00, 14:00–19:00"); // Donnerstag
+    expect(hoursOn(hours, 5)).toBe("08:00–14:00");
+    expect(hoursOn(hours, 0)).toBe("geschlossen"); // Sonntag
+    expect(hoursOn([], 1)).toBeNull();
   });
 
   it("Eingabe nach dem Ja: Name und Adresse", () => {
@@ -94,7 +101,7 @@ describe("Anruf-Liste (rein)", () => {
     expect(parseConsentInput("ruft zurück").email).toBeNull();
   });
 
-  it("Karte: Nummer, Leitfaden, vier Ergebnis-Knöpfe; Knopf-Daten hin und zurück", () => {
+  it("Karte: Name, Nummer, Öffnungszeiten heute, Wähl-Knopf, Ja/Nein/nicht erreicht", () => {
     const id = "11111111-2222-3333-4444-555555555555";
     const card = planCallCard(
       {
@@ -116,19 +123,24 @@ describe("Anruf-Liste (rein)", () => {
         body: "",
         meta: {
           phone: "+49 881 1",
-          person: "Frau Huber",
-          opener: "Grüß Gott",
-          pitch: "Pitch",
-          hook: "Falls gefragt …",
-          objections: ["Was kostet das? → nichts"],
+          hours: ["Mo–Fr: 08:00–18:00", "Sa, So: geschlossen"],
+          pitch: "Guten Morgen",
         },
       },
       { n: 1, total: 3 },
+      1,
+      "https://vorschau.example/tel/498811",
     );
-    expect(card.text).toContain("📞 Anruf <b>1/3</b> · <b>Physio &lt;Test&gt;</b> (80)");
-    expect(card.text).toContain("☎️ <b>+49 881 1</b>");
-    expect(card.text).toContain("👤 Frau Huber");
-    expect(card.keyboard.flat().map((b) => b.text)).toContain("✅ Ja, Mail erwünscht");
+    expect(card.text).toBe(
+      "📞 <b>Physio &lt;Test&gt;</b> · 1/3\n☎️ +49 881 1\n🕐 Heute: 08:00–18:00\n\n<i>Guten Morgen</i>",
+    );
+    expect(card.keyboard.flat().map((b) => b.text)).toEqual([
+      "📞 Anrufen",
+      "✅ Ja",
+      "❌ Nein",
+      "📵 Nicht erreicht",
+    ]);
+    expect(card.keyboard[0]![0]).toMatchObject({ url: "https://vorschau.example/tel/498811" });
     for (const kind of ["yes", "post", "missed", "nope", "impressum", "other"] as const)
       expect(parsePlanCallback(planCallback({ kind, id }))).toEqual({ kind, id });
   });
@@ -253,15 +265,12 @@ describeDb("Anruf-Liste", () => {
       [noPhone.id, "letter"],
       [b.id, "phone"],
     ]);
-    const { rows } = await db().query<{ meta: { phone: string; person: string; befund: string } }>(
+    const { rows } = await db().query<{ meta: { phone: string; email: string } }>(
       "select meta from interactions where id = $1",
       [items[0]!.draft_id],
     );
-    expect(rows[0]!.meta).toMatchObject({
-      phone: "+49 881 12345",
-      person: "Elisabeth Huber",
-      befund: "Kein Termin-Knopf",
-    });
+    expect(rows[0]!.meta.phone).toBe("+49 881 12345");
+    expect(rows[0]!.meta.email).toMatch(/^info@/);
     expect(mx).not.toHaveBeenCalled();
     await db().query("update companies set status = 'LOST'");
   });
@@ -378,7 +387,7 @@ describeDb("Anruf-Liste", () => {
     expect(String(calls.filter((x) => x.method === "sendMessage")[0]!.payload.text)).toContain(
       "📞 Anrufe: <b>0/3</b>",
     );
-    expect(String(lastMessage().text)).toContain(`📞 Anruf <b>1/3</b> · <b>${a.name}</b>`);
+    expect(String(lastMessage().text)).toContain(`📞 <b>${a.name}</b> · 1/3`);
 
     // a: Ja → Adresse aus dem Impressum
     await press("✅ Ja");
@@ -412,5 +421,37 @@ describeDb("Anruf-Liste", () => {
     expect(await missedCalls(db(), c.id)).toBe(1);
     const items = await planItems(db(), date);
     expect(items.map((i) => i.status)).toEqual(["done", "done", "later"]);
+  });
+
+  it("Öffnungszeiten: aus der Suche, sonst ein Abruf nur dieses Felds; gemerkt", async () => {
+    const withSearch = await lead();
+    await insertPlacesSnapshot(db(), {
+      companyId: withSearch.id,
+      rating: 4.8,
+      reviewCount: 10,
+      businessStatus: "OPERATIONAL",
+      photoCount: 0,
+      raw: { regularOpeningHours: { weekdayDescriptions: ["Montag: 08:00–12:00", "Dienstag: 08:00–12:00"] } },
+    });
+    const fetchFn = vi.fn(() =>
+      Promise.resolve(
+        new Response(
+          JSON.stringify({ regularOpeningHours: { weekdayDescriptions: ["Montag: 07:30–19:00"] } }),
+          {
+            status: 200,
+          },
+        ),
+      ),
+    );
+    const hours = cachedOpeningHours({ db: db(), budget: NO_BUDGET, apiKey: "k", fetchFn });
+    expect(await hours({ id: withSearch.id, place_id: "p1" })).toEqual(["Mo, Di: 08:00–12:00"]);
+    expect(fetchFn).not.toHaveBeenCalled();
+    const other = await lead();
+    expect(await hours({ id: other.id, place_id: "p2" })).toEqual(["Mo: 07:30–19:00"]);
+    expect(await hours({ id: other.id, place_id: "p2" })).toEqual(["Mo: 07:30–19:00"]);
+    expect(fetchFn).toHaveBeenCalledOnce();
+    const headers = (fetchFn.mock.calls[0] as unknown as [string, { headers: Record<string, string> }])[1]
+      .headers;
+    expect(headers["X-Goog-FieldMask"]).toBe("regularOpeningHours.weekdayDescriptions");
   });
 });

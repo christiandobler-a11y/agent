@@ -1,10 +1,8 @@
 import type { Db } from "../db/client.js";
 import type { Company } from "../db/companies.js";
-import { latestAudit, latestPlacesSnapshot } from "../db/leads.js";
 import { setSalesStatus } from "../db/crm.js";
-import type { Finding } from "../pipeline/audit/schema.js";
 import type { OutreachConfig } from "./config.js";
-import { complimentFact, pickFindings, recipient } from "./draft.js";
+import { recipient } from "./draft.js";
 import { insertDraft } from "../db/drafts.js";
 
 /**
@@ -24,75 +22,39 @@ export function dialable(phone: string): string {
   return p;
 }
 
-export interface CallSheet {
-  /** Erster Satz am Empfang. */
-  opener: string;
-  pitch: string;
-  /** Stärkster Befund als Stichwort, falls nachgefragt wird. */
-  hook: string | null;
-  objections: string[];
-}
-
-/** Gesprächsleitfaden für eine Praxis. Rein. */
-export function callSheet(
-  a: NonNullable<OutreachConfig["anruf"]>,
-  person: { name: string | null; salutation: "Herr" | "Frau" | null },
-  finding: string | null,
-): CallSheet {
-  const who = person.name && person.salutation ? `${person.salutation} ${lastName(person.name)}` : null;
-  return {
-    opener: who ? a.empfang_person.replace("{person}", who) : a.empfang_team,
-    pitch: a.pitch.trim(),
-    hook: finding ? a.aufhaenger.replace("{befund}", finding) : null,
-    objections: a.einwaende,
-  };
-}
-
-const lastName = (name: string) => name.trim().split(/\s+/).pop() ?? name;
-
-export function callSheetText(s: CallSheet): string {
-  return [
-    s.opener,
-    "",
-    s.pitch,
-    ...(s.hook ? ["", s.hook] : []),
-    "",
-    ...s.objections.map((o) => `• ${o}`),
-  ].join("\n");
-}
-
-/** Anruf vorbereiten: Leitfaden als Entwurf speichern (für die Karte im Morgen-Paket). `null` ohne Telefonnummer. */
+/**
+ * Anruf vorbereiten (für die Karte im Morgen-Paket): Nummer, Öffnungszeiten, Adresse aus dem Impressum (für das Ja)
+ * und der kurze Satz. `null` ohne Telefonnummer.
+ */
 export async function prepareCall(
   db: Db,
   o: OutreachConfig,
   company: Company,
   by: string,
   now: Date,
+  hours?: ((company: Company) => Promise<string[]>) | null,
 ): Promise<{ draftId: string } | null> {
   if (!company.phone || !o.anruf) return null;
-  const audit = await latestAudit(db, company.id);
-  const finding = pickFindings((audit?.findings as Finding[] | undefined) ?? [])[0] ?? null;
   const person = await recipient(db, company.id);
-  const sheet = callSheet(o.anruf, person, finding?.title ?? null);
-  const places = await latestPlacesSnapshot(db, company.id);
   const draft = await insertDraft(db, company.id, {
     channel: "phone",
-    body: callSheetText(sheet),
+    body: o.anruf.pitch.trim(),
     meta: {
       phone: dialable(company.phone),
+      hours: hours ? await hours(company).catch(() => []) : [],
       person: person.name ? `${person.salutation ?? ""} ${person.name}`.trim() : null,
       email: person.email,
-      befund: finding?.title ?? null,
-      bewertung: complimentFact(places),
-      opener: sheet.opener,
-      pitch: sheet.pitch,
-      hook: sheet.hook,
-      objections: sheet.objections,
+      pitch: o.anruf.pitch.trim(),
     },
     by,
     now,
   });
   return { draftId: draft.id };
+}
+
+/** Nur Ziffern mit Ländervorwahl ("+49 881 12345" → "4988112345"), für den Wähl-Link. Rein. */
+export function phoneDigits(phone: string): string {
+  return dialable(phone).replace(/\D/g, "");
 }
 
 /** Wie oft die Praxis schon nicht erreicht wurde. */

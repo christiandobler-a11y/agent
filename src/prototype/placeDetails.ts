@@ -147,3 +147,82 @@ export function cachedPlaceDetails(deps: {
     }
   };
 }
+
+const DAY_ORDER = ["Mo", "Di", "Mi", "Do", "Fr", "Sa", "So"];
+
+/**
+ * Öffnungszeiten für einen Wochentag aus den zusammengefassten Zeilen ("Mo–Fr: 08:00–12:00", "Sa, So: geschlossen").
+ * `weekday`: 0 = Sonntag (Date.getDay). `null`, wenn der Tag nicht vorkommt. Rein.
+ */
+export function hoursOn(hours: readonly string[], weekday: number): string | null {
+  const want = DAY_ORDER[(weekday + 6) % 7]!;
+  for (const line of hours) {
+    const m = /^([^:]+):\s*(.+)$/.exec(line);
+    if (!m) continue;
+    const days = new Set<string>();
+    for (const part of m[1]!.split(",").map((x) => x.trim())) {
+      const range = /^(\p{L}{2})[–-](\p{L}{2})$/u.exec(part);
+      if (range) {
+        const from = DAY_ORDER.indexOf(range[1]!);
+        const to = DAY_ORDER.indexOf(range[2]!);
+        for (let i = from; i >= 0 && i <= to; i++) days.add(DAY_ORDER[i]!);
+      } else days.add(part);
+    }
+    if (days.has(want)) return m[2]!.trim();
+  }
+  return null;
+}
+
+export const OPENING_HOURS_COST_USD = 0.02;
+
+/**
+ * Öffnungszeiten je Firma (Anruf-Liste): aus der letzten Places-Suche, sonst einmal nur dieses Feld abrufen und in
+ * app_state merken. Ohne Schlüssel oder bei Fehlern: leere Liste.
+ */
+export function cachedOpeningHours(deps: {
+  db: Db;
+  budget: BudgetGuard;
+  apiKey: string | null | undefined;
+  fetchFn?: typeof fetch;
+}): (company: { id: string; place_id: string | null }) => Promise<string[]> {
+  const fetchFn = deps.fetchFn ?? fetch;
+  return async (company) => {
+    const key = `place-hours:${company.id}`;
+    const cached = await getState<string[]>(deps.db, key);
+    if (cached) return cached;
+    const { rows } = await deps.db.query<{ lines: string[] | null }>(
+      `select raw->'regularOpeningHours'->'weekdayDescriptions' as lines from places_snapshots
+        where company_id = $1 order by fetched_at desc limit 1`,
+      [company.id],
+    );
+    let lines = rows[0]?.lines ?? null;
+    if (!lines && deps.apiKey && company.place_id) {
+      try {
+        await deps.budget.assertAvailable();
+        const res = await fetchFn(
+          `https://places.googleapis.com/v1/places/${encodeURIComponent(company.place_id)}?languageCode=de`,
+          {
+            headers: {
+              "X-Goog-Api-Key": deps.apiKey,
+              "X-Goog-FieldMask": "regularOpeningHours.weekdayDescriptions",
+            },
+            signal: AbortSignal.timeout(20_000),
+          },
+        );
+        await recordApiUsage(deps.db, {
+          service: "google_places",
+          operation: "opening_hours",
+          costUsd: OPENING_HOURS_COST_USD,
+          companyId: company.id,
+        });
+        if (res.ok)
+          lines = detailsSchema.parse(await res.json()).regularOpeningHours?.weekdayDescriptions ?? [];
+      } catch {
+        return [];
+      }
+    }
+    const hours = compressHours(lines ?? []);
+    if (lines) await setState(deps.db, key, hours);
+    return hours;
+  };
+}

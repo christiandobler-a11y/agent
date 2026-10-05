@@ -22,7 +22,7 @@ import { loadAutopilotConfig } from "./autopilot/plan.js";
 import { advisorContext } from "./advisor/job.js";
 import { loadOutreachConfig } from "./outreach/config.js";
 import { chromiumLetterRenderer } from "./outreach/letterPdf.js";
-import { cachedPlaceDetails } from "./prototype/placeDetails.js";
+import { cachedOpeningHours, cachedPlaceDetails } from "./prototype/placeDetails.js";
 import { loadMailConfig, mailboxFromEnv, type MailConfig, type Mailbox } from "./outreach/mail.js";
 import { seedBoxesFromEnv } from "./outreach/seed.js";
 import { createMxCheck } from "./outreach/mx.js";
@@ -178,6 +178,7 @@ export async function createApp(options: { notifier?: Notifier; worker?: boolean
           : null,
       },
       mx: createMxCheck(),
+      openingHours: cachedOpeningHours({ db, budget, apiKey: keys.GOOGLE_API_KEY }),
       lettersDir: "data/letters",
       senderAddress: mailbox?.address ?? null,
     }),

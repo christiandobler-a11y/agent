@@ -22,6 +22,8 @@ const FIELD_MASK = [
   "places.userRatingCount",
   "places.businessStatus",
   "places.photos.name",
+  // 06.10.2026: Öffnungszeiten für die Anruf-Liste (gleiche Enterprise-Stufe wie Website und Bewertung).
+  "places.regularOpeningHours.weekdayDescriptions",
   "nextPageToken",
 ].join(",");
 

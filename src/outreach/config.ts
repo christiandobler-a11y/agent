@@ -35,11 +35,7 @@ export const outreachConfigSchema = z.object({
   // Anruf-Liste (src/outreach/call.ts): Gesprächsleitfaden und erster Satz der Mail nach dem Ja.
   anruf: z
     .object({
-      empfang_person: z.string(),
-      empfang_team: z.string(),
       pitch: z.string(),
-      aufhaenger: z.string(),
-      einwaende: z.array(z.string()),
       nach_anruf: z.object({ sie: z.string(), du: z.string() }),
       versuche: z.number().int().min(1).default(3),
     })

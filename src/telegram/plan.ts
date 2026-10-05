@@ -25,8 +25,13 @@ import { queuePlanMails } from "../outreach/queue.js";
 import { sendDraft } from "../outreach/send.js";
 import { gameState } from "../game/xp.js";
 import { callbackData, escapeHtml, websiteButton } from "./format.js";
-import { teaserPath } from "../prototype/teaser.js";
-import { missedCalls, parseConsentInput, recordCall } from "../outreach/call.js";
+import { hoursOn } from "../prototype/placeDetails.js";
+import { missedCalls, parseConsentInput, phoneDigits, recordCall } from "../outreach/call.js";
+
+const DAY_INDEX: Record<string, number> = { Sun: 0, Mon: 1, Tue: 2, Wed: 3, Thu: 4, Fri: 5, Sat: 6 };
+/** Wochentag in Deutschland (0 = Sonntag). */
+const berlinWeekdayIndex = (d: Date) =>
+  DAY_INDEX[new Intl.DateTimeFormat("en-US", { weekday: "short", timeZone: "Europe/Berlin" }).format(d)] ?? 0;
 import { levelLine, reportProgress, xpSuffix } from "./game.js";
 
 /**
@@ -170,6 +175,7 @@ interface DraftRow {
     envelope?: string[];
     // Anruf-Liste (src/outreach/call.ts)
     phone?: string;
+    hours?: string[];
     person?: string | null;
     email?: string | null;
     befund?: string | null;
@@ -245,43 +251,34 @@ export function planLetterCard(
   };
 }
 
+/**
+ * Anruf-Karte (06.10.2026, Christian: nur Name, Öffnungszeiten, Wähl-Knopf und Ja/Nein/nicht erreicht). `dialUrl`:
+ * https-Link, der auf tel: weiterleitet (Telegram erlaubt in Knöpfen keine tel:-Links); ohne ihn bleibt die Nummer im
+ * Text zum Antippen.
+ */
 export function planCallCard(
   item: PlanItemWithCompany,
   draft: DraftRow,
   pos: { n: number; total: number },
+  weekday: number,
+  dialUrl: string | null,
 ): { text: string; keyboard: InlineKeyboardButton[][] } {
   const m = draft.meta;
+  const today = hoursOn(m.hours ?? [], weekday);
   const text = [
-    `📞 Anruf <b>${pos.n}/${pos.total}</b> · <b>${escapeHtml(item.company_name)}</b>${item.current_score !== null ? ` (${item.current_score})` : ""}`,
-    `☎️ <b>${escapeHtml(m.phone ?? "?")}</b>`,
-    ...(m.person ? [`👤 ${escapeHtml(m.person)}`] : []),
-    ...(m.bewertung ? [`⭐ ${escapeHtml(m.bewertung)}`] : []),
-    ...(m.befund ? [`🔎 ${escapeHtml(m.befund)}`] : []),
+    `📞 <b>${escapeHtml(item.company_name)}</b> · ${pos.n}/${pos.total}`,
+    `☎️ ${escapeHtml(m.phone ?? "?")}`,
+    ...(today ? [`🕐 Heute: ${escapeHtml(today)}`] : []),
     "",
-    `🗣 <i>${escapeHtml(m.opener ?? "")}</i>`,
-    `<blockquote>${escapeHtml(m.pitch ?? "")}</blockquote>`,
-    ...(m.objections && m.objections.length > 0
-      ? [
-          `<blockquote expandable>${escapeHtml([...(m.hook ? [m.hook, ""] : []), ...m.objections.map((o) => `• ${o}`)].join("\n"))}</blockquote>`,
-        ]
-      : []),
+    `<i>${escapeHtml(m.pitch ?? draft.body ?? "")}</i>`,
   ].join("\n");
-  const keyboard: InlineKeyboardButton[][] = [
-    [
-      { text: "✅ Ja, Mail erwünscht", callback_data: planCallback({ kind: "yes", id: item.id }) },
-      { text: "📮 Lieber per Post", callback_data: planCallback({ kind: "post", id: item.id }) },
-    ],
-    [
-      { text: "📵 Nicht erreicht", callback_data: planCallback({ kind: "missed", id: item.id }) },
-      { text: "❌ Kein Interesse", callback_data: planCallback({ kind: "nope", id: item.id }) },
-    ],
-  ];
-  const extra: InlineKeyboardButton[] = [];
-  const site = websiteButton(item.website_url);
-  if (site) extra.push(site);
-  extra.push({ text: "🗂 Lead", callback_data: callbackData("c", item.company_id) });
-  keyboard.push(extra);
-  keyboard.push([{ text: "▶️ Nächste ansehen", callback_data: planCallback({ kind: "next" }) }]);
+  const keyboard: InlineKeyboardButton[][] = [];
+  if (dialUrl) keyboard.push([{ text: "📞 Anrufen", url: dialUrl }]);
+  keyboard.push([
+    { text: "✅ Ja", callback_data: planCallback({ kind: "yes", id: item.id }) },
+    { text: "❌ Nein", callback_data: planCallback({ kind: "nope", id: item.id }) },
+    { text: "📵 Nicht erreicht", callback_data: planCallback({ kind: "missed", id: item.id }) },
+  ]);
   return { text, keyboard };
 }
 
@@ -395,11 +392,15 @@ export async function sendNextCard(
     return sendNextCard(api, chatId, deps, next.position);
   }
   if (next.channel === "phone") {
-    const card = planCallCard(next, draft, pos);
-    // Das Vorschau-Bild, von dem am Telefon die Rede ist.
-    const teaser = deps.outreach.teaserDir ? teaserPath(deps.outreach.teaserDir, next.company_id) : null;
-    if (teaser && existsSync(teaser))
-      await api.sendPhoto(chatId, new InputFile(teaser), { disable_notification: true });
+    const base = deps.outreach.previewBaseUrl ?? null;
+    const digits = draft.meta.phone ? phoneDigits(draft.meta.phone) : "";
+    const card = planCallCard(
+      next,
+      draft,
+      pos,
+      berlinWeekdayIndex(deps.now()),
+      base && digits.length >= 6 ? `${base}/tel/${digits}` : null,
+    );
     await api.sendMessage(chatId, card.text, {
       parse_mode: "HTML",
       link_preview_options: { is_disabled: true },
@@ -829,7 +830,7 @@ async function handleCallOutcome(
     await recordCall(db, item.company_id, "kein_interesse", { by, now });
     await setPlanStatus(db, item.id, "done", now);
     await ctx.answerCallbackQuery({ text: "Alles klar, kommt nie wieder" });
-    await closeCard(ctx, "❌ Kein Interesse. Abgehakt, die Praxis kommt nicht wieder");
+    await closeCard(ctx, "❌ Nein. Abgehakt, die Praxis kommt nicht wieder");
   } else {
     await recordCall(db, item.company_id, "nicht_erreicht", { by, now });
     const n = await missedCalls(db, item.company_id);

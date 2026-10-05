@@ -93,6 +93,8 @@ export interface PlanDeps {
   lettersDir: string;
   /** Absender-Adresse (OUTREACH_MAIL_ADDRESS): das Aufwärmen zählt je Adresse. */
   senderAddress?: string | null;
+  /** Öffnungszeiten für die Anruf-Karte (src/prototype/placeDetails.ts → cachedOpeningHours). */
+  openingHours?: ((company: Company) => Promise<string[]>) | null;
 }
 
 export interface PlanBuildResult {
@@ -516,7 +518,7 @@ export async function buildDailyPlan(deps: PlanDeps, by = "autopilot"): Promise<
           }
         }
         if (channel === "phone") {
-          const call = await prepareCall(db, outreachDeps.outreach, company, by, now);
+          const call = await prepareCall(db, outreachDeps.outreach, company, by, now, deps.openingHours);
           if (!call) return;
           if (
             await addPlanItem(db, {
