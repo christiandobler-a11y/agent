@@ -34,6 +34,11 @@ ausprobieren kann. Nach Schritt 6 ist ein Abstimmungstermin (Kalibrierung) vorge
   in Lexware (`src/outreach/offer.ts`, Brutto-Preise und Inhalt in `config/angebot.yaml`)
 - Termin bestätigen: Antwort-Meldung zeigt die angebotenen Termine als Knöpfe; `src/outreach/confirm.ts` schreibt die
   Bestätigung (mit .ics) im Verlauf, nach dem Senden Status „interessiert“ und Erinnerung (`config/outreach.yaml → bestaetigung`)
+- `npm run cli -- berater [--ohne-suche]` (Telegram `/berater`, sonst sonntags von selbst): Berater-Runde
+  (`src/advisor/`, `config/advisor.yaml`): Lagebild aus der Datenbank, Recherche mit Websuche (`gateway.research`,
+  Rolle `advisor_research`), Entwürfe (Rolle `advisor`), Gegenprüfung (Rolle `advisor_critic`); nur Behaltenes als
+  Karte mit Knöpfen (Tabelle `advisor_suggestions`, `/vorschlaege`). Die Berater ändern nichts selbst. Dazu
+  dienstags/donnerstags ein Fundstück aus dem Netz (`/fundstueck`, `src/advisor/finds.ts`)
 - `npm run cli -- anrede [N]`: Grußzeile der nächsten N Kandidaten fürs Morgen-Paket mit Quelle (ohne LLM)
 - `npm run cli -- chat "…"`: Manager-Agent ohne Telegram befragen (gleicher Verlauf wie der Chat)
 - `npm run cli -- calibrate [export|--file|rate <firma> <A|B|C|X>]`: Golden Set (Telegram `/kalibrieren`, standardmäßig
