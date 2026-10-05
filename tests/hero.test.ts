@@ -335,11 +335,10 @@ describeDb("Hero-Foto mit Datenbank", () => {
     );
     expect(html).toContain(pathToFileURL(r.file!).href);
     expect(html).toContain(pathToFileURL(r.logo!.file).href);
-    expect(await teaserLook(db(), company.id)).toMatchObject({
-      foto: "praxis",
-      farbe: "foto", // eigenes Foto im Bild: das Foto bestimmt die Farben
-      primary: r.palette!.primary,
-    });
+    const look = await teaserLook(db(), company.id);
+    // Eigenes Foto im Bild: das Foto bestimmt die Farben (frisch aus der gespeicherten Datei, daher nur der Farbton).
+    expect(look).toMatchObject({ foto: "praxis", farbe: "foto" });
+    expect(toHsl(rgbOf(look!.primary))[0]).toBeGreaterThan(180);
 
     // Kein passendes Foto: Stockfoto, Ergebnis gemerkt.
     const { company: other } = await upsertCompany(db(), {
