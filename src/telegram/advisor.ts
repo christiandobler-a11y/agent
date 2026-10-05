@@ -7,7 +7,7 @@ import { escapeHtml } from "./format.js";
  * (teils aus fremder Recherche) und werden escaped; Quellen nur als https-Links.
  */
 
-const AREA = { prozess: "🔧 Prozess", wachstum: "📈 Wachstum" } as const;
+const AREA = { prozess: "🔧 Prozess", wachstum: "📈 Wachstum", website: "🎨 Website" } as const;
 const EFFORT = { klein: "klein", mittel: "mittel", gross: "groß" } as const;
 
 const eur = (usd: number) => `${(usd * 0.92).toFixed(2).replace(".", ",")} €`;

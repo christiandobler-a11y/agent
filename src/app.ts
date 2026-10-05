@@ -106,7 +106,12 @@ export async function createApp(options: { notifier?: Notifier; worker?: boolean
   const mailbox = mailboxFromEnv(env, mail, outreach.absender_name);
   const baseUrl = env.PREVIEW_BASE_URL?.replace(/\/$/, "") ?? null;
   const prototypeConfig = loadPrototypeConfig();
-  const contact = { whatsapp: env.OUTREACH_WHATSAPP ?? null, phone: env.OUTREACH_PHONE ?? null };
+  const contact = {
+    whatsapp: env.OUTREACH_WHATSAPP ?? null,
+    phone: env.OUTREACH_PHONE ?? null,
+    address: env.OUTREACH_ADDRESS ?? null,
+    privacyUrl: env.OUTREACH_PRIVACY_URL ?? null,
+  };
   const desktopScreenPx = crawlConfig.desktop.height * crawlConfig.desktop.scale;
   ctx.mailbox = mailbox;
   ctx.seedBoxes = seedBoxesFromEnv(env, mail);

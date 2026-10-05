@@ -3,6 +3,7 @@ import type { Company } from "../db/companies.js";
 import { addReminder, setSalesStatus } from "../db/crm.js";
 import { insertDraft } from "../db/drafts.js";
 import type { OutreachConfig } from "./config.js";
+import { senderSignature, type SenderContact } from "./signature.js";
 import { pick, recipient, salutationLine } from "./draft.js";
 import { duToIhr, type Form } from "./form.js";
 import { personFromCompanyName } from "./names.js";
@@ -86,7 +87,7 @@ export function icsInvite(e: {
 export interface ConfirmDeps {
   db: Db;
   outreach: OutreachConfig;
-  contact: { phone: string | null };
+  contact: SenderContact;
   /** Link für ein kurzes Video-Gespräch (OUTREACH_MEETING_URL), sonst Telefon. */
   meetingUrl?: string | null;
   now: Date;
@@ -133,7 +134,7 @@ export async function createConfirmDraft(
   const body = [
     salutationLine(form, person, company.name, o.team_anrede[company.branch_key ?? ""]?.anrede, o.anrede),
     inForm(b.text, b.text_du).replace("{termin}", terminLabel(termin)).replace("{ablauf}", ablauf),
-    `${pick(o.spamschutz.gruesse, seed, 13, 1)}\n${[o.absender_name, o.absender_zusatz, deps.contact.phone].filter(Boolean).join("\n")}`,
+    `${pick(o.spamschutz.gruesse, seed, 13, 1)}\n${senderSignature(o, deps.contact)}`,
   ].join("\n\n");
   const subject = /^re:/i.test(first.meta.subject ?? "")
     ? first.meta.subject!

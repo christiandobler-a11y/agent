@@ -10,6 +10,7 @@ import type { Branches } from "../pipeline/research/branches.js";
 import type { OutreachConfig } from "./config.js";
 import { proposeSlots, seedOf } from "./slots.js";
 import { duToIhr, lowerFirst, subjectFor, type Form } from "./form.js";
+import { closingNotice, senderSignature, type SenderContact } from "./signature.js";
 import { teaserExists, teaserLook, teaserName, teaserPath } from "../prototype/teaser.js";
 import { personFromCompanyName, personInCompanyName, salutationFromFirstName } from "./names.js";
 
@@ -32,7 +33,7 @@ export interface OutreachDeps {
   outreach: OutreachConfig;
   branches: Branches;
   now: () => Date;
-  contact: { whatsapp: string | null; phone: string | null };
+  contact: { whatsapp: string | null } & SenderContact;
   /** Vorschau-Adresse der Prototypen; gibt es einen, kommt der Link in die Mail (statt WhatsApp). */
   previewBaseUrl?: string | null;
   /** Ordner der Vorschau-Bilder (config/prototype.yaml → teaser.dir); gibt es eins, steht es in der Mail. */
@@ -395,7 +396,8 @@ export async function draftEmail(
     form,
   );
   const greeting = pick(o.spamschutz.gruesse, seed, 13, variant);
-  const signature = [o.absender_name, o.absender_zusatz, deps.contact.phone].filter(Boolean).join("\n");
+  const signature = senderSignature(o, deps.contact);
+  const notice = closingNotice(o, deps.contact, form !== "sie", emailSource);
 
   // 04.10.2026 (mit Christian): kurz, Bild früh, genau eine Bitte (Termin), Weiterleiten als P.S.; mit Entwurfs-Link
   // bleibt der Antwort-Hinweis, ohne Link keine weitere Aufforderung (auch kein WhatsApp-Link in der Erstmail).
@@ -407,9 +409,9 @@ export async function draftEmail(
     ...(previewUrl ? [cta] : []),
     `${greeting}\n${signature}`,
     ...(team ? [`P.S. ${inForm(team.weiterleiten, team.weiterleiten_du)}`] : []),
-    // Abmelde-Satz (04.10.2026): üblich bei Erstkontakt, senkt Spam-Klicks, und mehr Text neben dem Bild hilft bei
-    // SpamAssassin (HTML_IMAGE_ONLY).
-    ...(o.abmeldung ? [inForm(o.abmeldung.sie, o.abmeldung.du)] : []),
+    // Herkunft der Adresse und Abmelde-Satz (04.10./06.10.2026): üblich bei Erstkontakt, senkt Spam-Klicks, und mehr
+    // Text neben dem Bild hilft bei SpamAssassin (HTML_IMAGE_ONLY).
+    ...(notice ? [form === "ihr" ? duToIhr(notice) : notice] : []),
   ].join("\n\n");
 
   const warnings = [...clean.warnings];

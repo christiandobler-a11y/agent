@@ -266,7 +266,12 @@ describeDb("E-Mail-Entwurf (Datenbank)", () => {
     outreach,
     branches: loadBranches(),
     now: () => NOW,
-    contact: { whatsapp, phone: "0151 12345678" },
+    contact: {
+      whatsapp,
+      phone: "0151 12345678",
+      address: "Musterweg 1, 82380 Peißenberg",
+      privacyUrl: "https://avelio.digital/datenschutz",
+    },
   });
 
   it("Sie-Form: kurz, Code setzt Betreff mit Praxisname, zwei Termine, Gruß und Signatur; kein WhatsApp-Link", async () => {
@@ -294,7 +299,7 @@ describeDb("E-Mail-Entwurf (Datenbank)", () => {
     expect(d.body).toMatch(/unverbindlich\. (Hätten Sie|Passt Ihnen) \w+/);
     expect(d.body).not.toContain("wa.me");
     expect(d.body).toMatch(
-      /Christian Dobler\nWebsites für lokale Betriebe · Avelio, Peißenberg\n0151 12345678\n\nSie möchten keine weiteren Nachrichten von mir\? Eine kurze Antwort genügt, dann melde ich mich nicht mehr\.$/,
+      /Christian Dobler\nWebsites für lokale Betriebe · Avelio, Peißenberg\nMusterweg 1, 82380 Peißenberg\n0151 12345678\n\nIhre Mail-Adresse habe ich aus dem Impressum Ihrer Website und nutze sie nur für diese Anfrage\. Sie möchten keine weiteren Nachrichten von mir\? Eine kurze Antwort genügt, dann melde ich mich nicht mehr\. Mehr zum Datenschutz und zu Ihrem Widerspruchsrecht: https:\/\/avelio\.digital\/datenschutz$/,
     );
     expect(d.slots).toHaveLength(2);
     expect(d.warnings).toEqual([]);

@@ -7,7 +7,7 @@ ab: "18:00"
 # Höchstens so viele Vorschläge kommen bei Christian an (nach der Gegenprüfung, die stärksten zuerst).
 max_vorschlaege: 5
 # Websuchen je Runde (je 1.000 Suchen ca. 10 $, siehe config/models.yaml → tools).
-websuchen: 8
+websuchen: 10
 # Fundstück zwischendurch (05.10.2026, Christian: "gerne auch einfach mal was Lustiges, was die im Netz finden"):
 # an diesen Tagen ab der Uhrzeit ein paar Sätze mit Quelle, ohne Entscheidung (ca. 3–5 Cent). Auch auf /fundstueck.
 zwischendurch:

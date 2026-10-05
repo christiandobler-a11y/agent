@@ -117,6 +117,9 @@ export interface Snapshot {
   abdeckung: CoverageLine[];
   kosten_28_tage_usd: Record<string, number>;
   einstellungen: Record<string, unknown>;
+  /** Websites: gebaute Prototypen je Vorlage und Christians Notizen zu Vorbild-Websites (neueste zuerst). */
+  prototypen_je_vorlage: Record<string, number>;
+  vorbild_notizen: { branche: string | null; name: string; notiz: string }[];
   fruehere_vorschlaege: PastSuggestion[];
 }
 
@@ -234,6 +237,12 @@ export async function buildSnapshot(deps: SnapshotDeps): Promise<Snapshot> {
       group by service, operation`,
     [new Date(now.getTime() - 28 * 86_400_000)],
   );
+  const { rows: protos } = await db.query<{ template: string; n: number }>(
+    "select template, count(distinct company_id)::int as n from prototypes group by template order by n desc",
+  );
+  const { rows: notes } = await db.query<{ branch_key: string | null; name: string; note: string }>(
+    "select branch_key, name, note from design_notes order by created_at desc limit 12",
+  );
   const { rows: past } = await db.query<{
     created_at: Date;
     area: string;
@@ -268,6 +277,8 @@ export async function buildSnapshot(deps: SnapshotDeps): Promise<Snapshot> {
     abdeckung: deps.coverage ? await deps.coverage().catch(() => []) : [],
     kosten_28_tage_usd: Object.fromEntries(costs.map((c) => [c.k, Math.round(c.usd * 100) / 100])),
     einstellungen: deps.settings,
+    prototypen_je_vorlage: Object.fromEntries(protos.map((p) => [p.template, p.n])),
+    vorbild_notizen: notes.map((n) => ({ branche: n.branch_key, name: n.name, notiz: n.note.slice(0, 300) })),
     fruehere_vorschlaege: past.map((p) => ({
       datum: berlinDay(p.created_at),
       bereich: p.area,

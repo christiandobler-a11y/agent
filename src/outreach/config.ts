@@ -21,6 +21,16 @@ export const outreachConfigSchema = z.object({
   absender_zusatz: z.string().default(""),
   // Letzte Zeile der Erstmail: wie man keine weiteren Nachrichten bekommt.
   abmeldung: z.object({ sie: z.string(), du: z.string() }).nullable().default(null),
+  // Davor: woher die Mail-Adresse stammt (Art. 14 DSGVO); danach der Datenschutz-Link mit {url} (OUTREACH_PRIVACY_URL).
+  herkunft: z
+    .object({
+      sie: z.string(),
+      du: z.string(),
+      quelle: z.record(z.string(), z.object({ sie: z.string(), du: z.string() })),
+    })
+    .nullable()
+    .default(null),
+  datenschutz_link: z.object({ sie: z.string(), du: z.string() }).nullable().default(null),
   du_branchen: z.array(z.string()).default([]),
   // Termin-Bestätigung per Knopf (src/outreach/confirm.ts); {termin} und {ablauf} setzt der Code.
   bestaetigung: z

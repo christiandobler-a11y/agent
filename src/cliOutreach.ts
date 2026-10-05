@@ -40,7 +40,12 @@ export async function letter(argv: string[]): Promise<number> {
         outreach: loadOutreachConfig(),
         branches: app.ctx.lead.branches,
         now: app.ctx.now,
-        contact: { whatsapp: env.OUTREACH_WHATSAPP ?? null, phone: env.OUTREACH_PHONE ?? null },
+        contact: {
+          whatsapp: env.OUTREACH_WHATSAPP ?? null,
+          phone: env.OUTREACH_PHONE ?? null,
+          address: env.OUTREACH_ADDRESS ?? null,
+          privacyUrl: env.OUTREACH_PRIVACY_URL ?? null,
+        },
         render: chromiumLetterRenderer(process.env.CHROMIUM_PATH),
         prototype: {
           shotsDir: loadPrototypeConfig().shots_dir,

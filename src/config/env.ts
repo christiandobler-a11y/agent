@@ -33,6 +33,9 @@ const envSchema = z.object({
   /** Kontakt-Entwürfe: WhatsApp-Business-Nummer (international, z. B. +49 151 …) und Telefon für die Signatur. */
   OUTREACH_WHATSAPP: optionalSecret,
   OUTREACH_PHONE: optionalSecret,
+  /** Anschrift für die Signatur (eine Zeile, z. B. "Musterstraße 1, 82380 Peißenberg") und Link zur Datenschutzerklärung. */
+  OUTREACH_ADDRESS: optionalSecret,
+  OUTREACH_PRIVACY_URL: optionalSecret,
   // Fester Link für kurze Video-Gespräche (Google Meet, Zoom …), steht in der Termin-Bestätigung.
   OUTREACH_MEETING_URL: optionalSecret,
   /** Versand über Christians Postfach (config/mail.yaml): Adresse, App-Passwort, Anbieter (icloud, gmail, …). */

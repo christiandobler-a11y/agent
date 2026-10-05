@@ -24,7 +24,12 @@ if (env.TELEGRAM_BOT_TOKEN && env.TELEGRAM_ALLOWED_CHAT_IDS.length > 0) {
     manager: { ctx: app.ctx, llm: app.llm },
     outreach: {
       config: loadOutreachConfig(),
-      contact: { whatsapp: env.OUTREACH_WHATSAPP ?? null, phone: env.OUTREACH_PHONE ?? null },
+      contact: {
+        whatsapp: env.OUTREACH_WHATSAPP ?? null,
+        phone: env.OUTREACH_PHONE ?? null,
+        address: env.OUTREACH_ADDRESS ?? null,
+        privacyUrl: env.OUTREACH_PRIVACY_URL ?? null,
+      },
     },
     mail: { mailbox: app.mailbox, config: app.mail },
     prototype: {

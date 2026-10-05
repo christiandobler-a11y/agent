@@ -17,8 +17,9 @@ import { buildSnapshot, type Snapshot, type SnapshotDeps } from "./snapshot.js";
  * entscheidet per Knopf (src/telegram/advisor.ts), umgesetzt wird im Code.
  */
 
-export const ADVISOR_RESEARCH_PROMPT = "v1";
-export const ADVISOR_PROMPT = "v1";
+// v2 (06.10.2026): dritte Rolle "Website-Werkstatt" (Vorschau-Bild, Prototyp, fertige Kunden-Website).
+export const ADVISOR_RESEARCH_PROMPT = "v2";
+export const ADVISOR_PROMPT = "v2";
 export const ADVISOR_CRITIC_PROMPT = "v1";
 
 const WEEKDAYS = ["sonntag", "montag", "dienstag", "mittwoch", "donnerstag", "freitag", "samstag"] as const;
@@ -57,7 +58,7 @@ export function advisorDue(config: AdvisorConfig, weekday: number, time: string)
 }
 
 const draftSchema = z.object({
-  bereich: z.enum(["prozess", "wachstum"]),
+  bereich: z.enum(["prozess", "wachstum", "website"]),
   titel: z.string(),
   beobachtung: z.string(),
   beleg: z.string(),
@@ -125,7 +126,7 @@ export function knownSources(claimed: readonly string[], found: ReadonlySet<stri
 
 export interface AdvisorSuggestion {
   id: string;
-  area: "prozess" | "wachstum";
+  area: "prozess" | "wachstum" | "website";
   title: string;
   observation: string;
   evidence: string;

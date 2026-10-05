@@ -392,7 +392,7 @@ export async function handlePlanCallback(ctx: Context, deps: PlanBotDeps, by: st
       {
         db,
         outreach: deps.outreach.outreach,
-        contact: { phone: deps.outreach.contact.phone },
+        contact: deps.outreach.contact,
         meetingUrl: deps.meetingUrl ?? null,
         now,
       },

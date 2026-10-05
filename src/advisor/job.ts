@@ -4,6 +4,7 @@ import { ADVISOR_QUEUE } from "../queue/boss.js";
 import type { PipelineContext } from "../queue/pipeline.js";
 import type { LlmGateway } from "../llm/gateway.js";
 import { regionCoverage } from "../pipeline/research/coverage.js";
+import { loadPrototypeConfig } from "../prototype/run.js";
 import {
   advisorDue,
   findDue,
@@ -105,6 +106,30 @@ async function searchCoverage(ctx: PipelineContext): Promise<CoverageLine[]> {
   return out;
 }
 
+/** Wie Vorschau-Bild und Prototypen gerade gebaut werden (config/prototype.yaml), für die Website-Werkstatt. */
+function websiteSettings(): Record<string, unknown> {
+  try {
+    const p = loadPrototypeConfig();
+    const t = p.teaser;
+    return {
+      vorlagen_je_branche: p.templates,
+      vorschau_bild: {
+        branchen: t.branchen,
+        stil: t.stil,
+        schrift: t.schrift,
+        farbe: t.farbe,
+        eigenes_foto: t.eigenes_foto,
+        google_fotos: t.google_fotos,
+        ohne_eigenes_foto: t.ohne_foto,
+        stockfotos: t.fotos.length,
+        google_bewertungen: t.google_details,
+      },
+    };
+  } catch {
+    return {};
+  }
+}
+
 /** Berater im Kontext einhängen (Worker und CLI); die Konfiguration wird je Runde neu gelesen. */
 export function advisorContext(
   ctx: PipelineContext,
@@ -135,8 +160,9 @@ export function advisorContext(
                   branchen: ap.suche.branchen,
                   pro_nacht: ap.suche.pro_nacht,
                 },
+                websites: websiteSettings(),
               }
-            : {},
+            : { websites: websiteSettings() },
         },
       };
     },

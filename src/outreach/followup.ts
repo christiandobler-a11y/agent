@@ -2,6 +2,7 @@ import type { Db, DbClient } from "../db/client.js";
 import type { Company } from "../db/companies.js";
 import { insertDraft } from "../db/drafts.js";
 import type { OutreachConfig } from "./config.js";
+import { senderSignature } from "./signature.js";
 import { pick, recipient, salutationLine } from "./draft.js";
 import { duToIhr, lowerFirst, type Form } from "./form.js";
 import { replySubject } from "./mail.js";
@@ -78,7 +79,7 @@ export function followUpBody(parts: {
 }
 
 export async function createFollowUpDraft(
-  deps: { db: Db; outreach: OutreachConfig; phone: string | null; now: Date },
+  deps: { db: Db; outreach: OutreachConfig; phone: string | null; address?: string | null; now: Date },
   company: Company,
   first: FirstMail,
   by: string,
@@ -102,7 +103,7 @@ export async function createFollowUpDraft(
     preview: first.previewUrl ? inForm(n.entwurf, n.entwurf_du).replace("{link}", first.previewUrl) : null,
     exit: inForm(n.ausstieg, n.ausstieg_du),
     closing: pick(o.spamschutz.gruesse, seed, 17, 1),
-    signature: [o.absender_name, o.absender_zusatz, deps.phone].filter(Boolean).join("\n"),
+    signature: senderSignature(o, { phone: deps.phone, address: deps.address ?? null }),
   });
   const subject = replySubject(first.subject);
   const draft = await insertDraft(deps.db, company.id, {

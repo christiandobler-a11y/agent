@@ -8,7 +8,19 @@ positionierung: >-
 
 absender_name: Christian Dobler
 absender_zusatz: Websites für lokale Betriebe · Avelio, Peißenberg
-# Letzte Zeile der Erstmail (04.10.2026, mail-tester: mehr Text neben dem Bild; bei Kaltakquise ohnehin üblich).
+# Letzter Absatz der Erstmail: Herkunft der Adresse (06.10.2026, Art. 14 DSGVO, bis das Rechtliche geklärt ist), dann
+# der Abmelde-Satz (04.10.2026, mail-tester: mehr Text neben dem Bild; bei Kaltakquise ohnehin üblich), dann der
+# Datenschutz-Link, wenn OUTREACH_PRIVACY_URL in der .env steht. Anschrift für die Signatur: OUTREACH_ADDRESS.
+herkunft:
+  sie: Ihre Mail-Adresse habe ich {quelle} und nutze sie nur für diese Anfrage.
+  du: Deine Mail-Adresse habe ich {quelle} und nutze sie nur für diese Anfrage.
+  quelle:
+    impressum: { sie: aus dem Impressum Ihrer Website, du: aus dem Impressum deiner Website }
+    website: { sie: von Ihrer Website, du: von deiner Website }
+    google: { sie: aus Ihrem Google-Profil, du: aus deinem Google-Profil }
+datenschutz_link:
+  sie: "Mehr zum Datenschutz und zu Ihrem Widerspruchsrecht: {url}"
+  du: "Mehr zum Datenschutz und zu deinem Widerspruchsrecht: {url}"
 abmeldung:
   sie: Sie möchten keine weiteren Nachrichten von mir? Eine kurze Antwort genügt, dann melde ich mich nicht mehr.
   du: Du möchtest keine weiteren Nachrichten von mir? Eine kurze Antwort genügt, dann melde ich mich nicht mehr.

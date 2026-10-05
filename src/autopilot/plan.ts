@@ -328,7 +328,13 @@ export async function buildDailyPlan(deps: PlanDeps, by = "autopilot"): Promise<
       for (const { company, first } of await dueFollowUps(db, now, config.nachfassen.nach_tagen)) {
         await isolated(company, result, async () => {
           const draft = await createFollowUpDraft(
-            { db, outreach: outreachDeps.outreach, phone: outreachDeps.contact.phone, now },
+            {
+              db,
+              outreach: outreachDeps.outreach,
+              phone: outreachDeps.contact.phone,
+              address: outreachDeps.contact.address ?? null,
+              now,
+            },
             company,
             first,
             by,

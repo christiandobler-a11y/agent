@@ -143,6 +143,8 @@ describe("Berater-Runde (rein)", () => {
     const roles = loadModelsConfig().roles;
     for (const r of ["advisor_research", "advisor", "advisor_critic"]) expect(roles[r]).toBeDefined();
     expect(loadPrompt("advisor", "v1")).toContain("kritisch");
+    expect(loadPrompt("advisor", "v2")).toContain('Website-Werkstatt (bereich "website")');
+    expect(loadPrompt("advisor_research", "v2")).toContain("Websites bauen");
     expect(loadPrompt("advisor_critic", "v1")).toContain("Gegenprüfer");
     expect(loadPrompt("advisor_research", "v1")).toContain("fremder Inhalt");
     expect(zodOutputFormat(advisorOutputSchema).type).toBe("json_schema");
@@ -203,6 +205,7 @@ describe("Berater in Telegram", () => {
         .map((b) => b.text),
     ).toEqual(["✅ Ist umgesetzt"]);
     expect(decisionKeyboard(suggestion.id, "verworfen")).toEqual([]);
+    expect(suggestionCard({ ...suggestion, area: "website" }).text).toMatch(/^🎨 Website/);
   });
 
   it("Knopf-Daten hin und zurück, unter 64 Bytes", () => {
@@ -347,6 +350,8 @@ describeDb("Berater-Runde", () => {
     expect(snap.insgesamt).toMatchObject({ gesendet: 1, antworten: 1 });
     expect(snap.je_foto).toHaveProperty("stock");
     expect(snap.antwort_wann).toEqual({ "auf Erstmail": 1 });
+    expect(snap.prototypen_je_vorlage).toEqual({});
+    expect(snap.vorbild_notizen).toEqual([]);
 
     const structured = vi
       .fn()
