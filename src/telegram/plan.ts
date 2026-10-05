@@ -33,20 +33,28 @@ import { levelLine, reportProgress, xpSuffix } from "./game.js";
  */
 
 export type PlanCallback =
-  { kind: "next" } | { kind: "send" | "redo" | "later" | "drop" | "done"; id: string };
+  | { kind: "next" }
+  | { kind: "restore" }
+  | { kind: "send" | "redo" | "later" | "drop" | "done" | "undo"; id: string };
 
 const UUID = "[0-9a-f-]{36}";
-const CODES = { send: "ps", redo: "pr", later: "pz", drop: "pd", done: "pm" } as const;
+const CODES = { send: "ps", redo: "pr", later: "pz", drop: "pd", done: "pm", undo: "pu" } as const;
 
 export function planCallback(c: PlanCallback): string {
-  return c.kind === "next" ? "pl:n" : `${CODES[c.kind]}:${c.id}`;
+  if (c.kind === "next") return "pl:n";
+  if (c.kind === "restore") return "pl:u";
+  return `${CODES[c.kind]}:${c.id}`;
 }
 
 export function parsePlanCallback(data: string): PlanCallback | null {
   if (data === "pl:n") return { kind: "next" };
-  const m = new RegExp(`^(ps|pr|pz|pd|pm):(${UUID})$`).exec(data);
+  if (data === "pl:u") return { kind: "restore" };
+  const m = new RegExp(`^(ps|pr|pz|pd|pm|pu):(${UUID})$`).exec(data);
   if (!m) return null;
-  const kind = Object.entries(CODES).find(([, v]) => v === m[1])![0] as Exclude<PlanCallback["kind"], "next">;
+  const kind = Object.entries(CODES).find(([, v]) => v === m[1])![0] as Exclude<
+    PlanCallback["kind"],
+    "next" | "restore"
+  >;
   return { kind, id: m[2]! };
 }
 
@@ -90,7 +98,12 @@ export function planHeaderText(
   ].join("\n");
 }
 
-export function planHeaderKeyboard(counts: PlanCounts, canSend = false): InlineKeyboardButton[][] {
+export function planHeaderKeyboard(
+  counts: PlanCounts,
+  canSend = false,
+  /** Heute zurückgestellt ("Später"). */
+  later = 0,
+): InlineKeyboardButton[][] {
   const open =
     counts.email.total -
     counts.email.done +
@@ -103,6 +116,10 @@ export function planHeaderKeyboard(counts: PlanCounts, canSend = false): InlineK
   if (open > 0) rows.push([{ text: "▶️ Weiter", callback_data: planCallback({ kind: "next" }) }]);
   if (canSend && mails > 1)
     rows.push([{ text: `📤 Alle ${mails} Mails verteilt senden`, callback_data: "pl:a" }]);
+  if (later > 0)
+    rows.push([
+      { text: `↩️ ${later} zurückgestellte zurückholen`, callback_data: planCallback({ kind: "restore" }) },
+    ]);
   return rows;
 }
 
@@ -151,6 +168,7 @@ export function planEmailCard(
   if (site) extra.push(site);
   extra.push({ text: "🗂 Lead", callback_data: callbackData("c", item.company_id) });
   keyboard.push(extra);
+  keyboard.push([{ text: "▶️ Nächste ansehen", callback_data: planCallback({ kind: "next" }) }]);
   return { text, keyboard };
 }
 
@@ -218,13 +236,15 @@ export async function sendPlanHeader(
 ): Promise<void> {
   if (nightReport) await setState(db, NIGHT_KEY(date), nightReport);
   const night = (await getState<string[]>(db, NIGHT_KEY(date))) ?? [];
-  const counts = countPlan(await planItems(db, date));
+  const items = await planItems(db, date);
+  const counts = countPlan(items);
+  const later = items.filter((i) => i.status === "later").length;
   const game = await gameLine(db);
   const refs: HeaderRef = [];
   for (const chatId of chatIds) {
     const m = await api.sendMessage(chatId, planHeaderText(date, counts, night, game), {
       parse_mode: "HTML",
-      reply_markup: { inline_keyboard: planHeaderKeyboard(counts, canSend) },
+      reply_markup: { inline_keyboard: planHeaderKeyboard(counts, canSend, later) },
     });
     refs.push({ chatId, messageId: m.message_id });
   }
@@ -234,13 +254,15 @@ export async function sendPlanHeader(
 async function refreshHeader(api: Api, db: Db, date: string, canSend: boolean): Promise<void> {
   const refs = (await getState<HeaderRef>(db, HEADER_KEY(date))) ?? [];
   const night = (await getState<string[]>(db, NIGHT_KEY(date))) ?? [];
-  const counts = countPlan(await planItems(db, date));
+  const items = await planItems(db, date);
+  const counts = countPlan(items);
+  const later = items.filter((i) => i.status === "later").length;
   const game = await gameLine(db);
   for (const r of refs) {
     await api
       .editMessageText(r.chatId, r.messageId, planHeaderText(date, counts, night, game), {
         parse_mode: "HTML",
-        reply_markup: { inline_keyboard: planHeaderKeyboard(counts, canSend) },
+        reply_markup: { inline_keyboard: planHeaderKeyboard(counts, canSend, later) },
       })
       .catch(() => undefined); // "message is not modified" o. ä.
   }
@@ -252,13 +274,25 @@ async function draftOf(db: Db, id: string | null): Promise<DraftRow | null> {
   return rows[0] ?? null;
 }
 
-/** Nächste offene Karte schicken; gibt `false` zurück, wenn nichts mehr offen ist. */
-/** Nächste offene Karte in den Chat schicken; gibt `false` zurück, wenn nichts mehr offen ist. */
-export async function sendNextCard(api: Api, chatId: number, deps: PlanBotDeps): Promise<boolean> {
+const cursorKey = (date: string, chatId: number) => `plan-cursor:${date}:${chatId}`;
+
+/**
+ * Nächste offene Karte in den Chat schicken; gibt `false` zurück, wenn nichts mehr offen ist. Ohne `after` geht es
+ * hinter der zuletzt gezeigten Karte weiter (05.10.2026, Christian: "Weiter" zeigte immer dieselbe Mail), am Ende
+ * wieder von vorn; `after: 0` fängt vorn an (Morgen-Paket, /heute).
+ */
+export async function sendNextCard(
+  api: Api,
+  chatId: number,
+  deps: PlanBotDeps,
+  after?: number,
+): Promise<boolean> {
   const date = berlinDate(deps.now());
   const items = await planItems(deps.db, date);
   const active = items.filter((i) => i.status !== "dropped" && i.status !== "later");
-  const next = active.find((i) => i.status === "ready");
+  const ready = active.filter((i) => i.status === "ready");
+  const from = after ?? (await getState<number>(deps.db, cursorKey(date, chatId))) ?? 0;
+  const next = ready.find((i) => i.position > from) ?? ready[0];
   if (!next) {
     await api.sendMessage(
       chatId,
@@ -268,11 +302,12 @@ export async function sendNextCard(api: Api, chatId: number, deps: PlanBotDeps):
     );
     return false;
   }
+  await setState(deps.db, cursorKey(date, chatId), next.position);
   const pos = { n: active.indexOf(next) + 1, total: active.length };
   const draft = await draftOf(deps.db, next.draft_id);
   if (!draft) {
     await setPlanStatus(deps.db, next.id, "later", deps.now());
-    return sendNextCard(api, chatId, deps);
+    return sendNextCard(api, chatId, deps, next.position);
   }
   if (next.channel === "letter") {
     const card = planLetterCard(next, draft, pos);
@@ -302,8 +337,8 @@ export async function sendNextCard(api: Api, chatId: number, deps: PlanBotDeps):
   return true;
 }
 
-const showNext = (ctx: Context, deps: PlanBotDeps) =>
-  ctx.chat ? sendNextCard(ctx.api, ctx.chat.id, deps) : Promise.resolve(false);
+const showNext = (ctx: Context, deps: PlanBotDeps, after?: number) =>
+  ctx.chat ? sendNextCard(ctx.api, ctx.chat.id, deps, after) : Promise.resolve(false);
 
 /**
  * Morgens ohne Zutun: Kopf (mit Nachtbericht) und gleich die erste Karte. Danach führt jeder Knopf zur nächsten.
@@ -316,22 +351,25 @@ export async function sendMorningPackage(
   nightReport: string[] = [],
 ): Promise<void> {
   await sendPlanHeader(api, deps.db, chatIds, date, nightReport, deps.mailbox !== null);
-  for (const chatId of chatIds) await sendNextCard(api, chatId, deps);
+  for (const chatId of chatIds) await sendNextCard(api, chatId, deps, 0);
 }
 
 /** Karte nach einer Aktion abschließen: Knöpfe weg, Ergebnis dazu. */
-async function closeCard(ctx: Context, note: string): Promise<void> {
+async function closeCard(ctx: Context, note: string, keyboard: InlineKeyboardButton[][] = []): Promise<void> {
   const msg = ctx.callbackQuery?.message;
   if (!msg) return;
   if ("caption" in msg && msg.caption !== undefined) {
     await ctx
-      .editMessageCaption({ caption: `${msg.caption}\n\n${note}`, reply_markup: { inline_keyboard: [] } })
+      .editMessageCaption({
+        caption: `${msg.caption}\n\n${note}`,
+        reply_markup: { inline_keyboard: keyboard },
+      })
       .catch(() => undefined);
   } else if ("text" in msg && msg.text !== undefined) {
     await ctx
       .editMessageText(`${escapeHtml(msg.text.split("\n")[0] ?? "")}\n${escapeHtml(note)}`, {
         parse_mode: "HTML",
-        reply_markup: { inline_keyboard: [] },
+        reply_markup: { inline_keyboard: keyboard },
       })
       .catch(() => undefined);
   }
@@ -496,6 +534,23 @@ export async function handlePlanCallback(ctx: Context, deps: PlanBotDeps, by: st
     await showNext(ctx, deps);
     return true;
   }
+  // Zurückgestellte ("Später") von heute wieder in den Stapel, z. B. nach einem Fehlklick (05.10.2026).
+  if (cb.kind === "restore" || cb.kind === "undo") {
+    const date = berlinDate(now);
+    const { rows } = await db.query<{ position: number }>(
+      `update outreach_plan set status = 'ready', done_at = null
+        where plan_date = $1 and status = 'later' and ($2::uuid is null or id = $2) returning position`,
+      [date, cb.kind === "undo" ? cb.id : null],
+    );
+    await ctx.answerCallbackQuery({
+      text: rows.length > 0 ? `↩️ ${rows.length} zurückgeholt` : "Nichts zurückgestellt",
+    });
+    if (rows.length === 0) return true;
+    if (cb.kind === "undo") await closeCard(ctx, "↩️ Zurückgeholt, siehe unten");
+    await refreshHeader(ctx.api, db, date, deps.mailbox !== null);
+    await showNext(ctx, deps, Math.min(...rows.map((r) => r.position)) - 1);
+    return true;
+  }
   const item = await planItem(db, cb.id);
   if (!item) {
     await ctx.answerCallbackQuery({ text: "Eintrag nicht gefunden" });
@@ -566,7 +621,9 @@ export async function handlePlanCallback(ctx: Context, deps: PlanBotDeps, by: st
   } else if (cb.kind === "later") {
     await setPlanStatus(db, item.id, "later", now);
     await ctx.answerCallbackQuery({ text: "Kommt an einem anderen Tag wieder" });
-    await closeCard(ctx, "⏭️ Später");
+    await closeCard(ctx, "⏭️ Später", [
+      [{ text: "↩️ Rückgängig", callback_data: planCallback({ kind: "undo", id: item.id }) }],
+    ]);
   } else if (cb.kind === "drop") {
     await setPlanStatus(db, item.id, "dropped", now);
     await setSalesStatus(db, item.company_id, "LOST", {
@@ -599,7 +656,8 @@ export async function handlePlanCallback(ctx: Context, deps: PlanBotDeps, by: st
       }
     }
     await closeCard(ctx, "🔄 Neu geschrieben, siehe unten");
-    await showNext(ctx, deps);
+    // Dieselbe Karte neu zeigen.
+    await showNext(ctx, deps, item.position - 1);
     return true;
   }
   await refreshHeader(ctx.api, db, item.plan_date, deps.mailbox !== null);

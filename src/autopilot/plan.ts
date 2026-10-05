@@ -43,7 +43,9 @@ export const autopilotConfigSchema = z.object({
       .default({ quote: 0.05, mindestens: 20, tage: 7 }),
   }),
   briefe: z.object({
-    pro_tag: z.number().int().min(0),
+    /** Wochentag, an dem die gesammelten Briefe ins Morgen-Paket kommen. */
+    tag: z.enum(["montag", "dienstag", "mittwoch", "donnerstag", "freitag", "samstag", "sonntag"]),
+    pro_woche: z.number().int().min(0),
     ab_score: z.number().int(),
     /** Brief als zweites Nachfassen: so viele Tage nach der Nachfass-Mail ohne Antwort (nur ab `ab_score`). */
     nachfassen_nach_tagen: z.number().int().min(1).default(7),
@@ -103,6 +105,13 @@ export function berlinTime(d: Date): string {
     hour12: false,
     timeZone: "Europe/Berlin",
   }).format(d);
+}
+
+/** Wochentag in Deutschland, klein geschrieben ("samstag"). */
+export function berlinWeekday(d: Date): string {
+  return new Intl.DateTimeFormat("de-DE", { timeZone: "Europe/Berlin", weekday: "long" })
+    .format(d)
+    .toLowerCase();
 }
 
 export function isWeekday(d: Date): boolean {
@@ -289,16 +298,19 @@ export async function buildDailyPlan(deps: PlanDeps, by = "autopilot"): Promise<
       }
     }
 
-    // 1b. Brief als zweites Nachfassen für sehr gute Leads ohne Antwort (Christian, 04.10.2026).
+    // 1b. Brief als zweites Nachfassen für sehr gute Leads ohne Antwort (Christian, 04.10.2026). Briefe gesammelt
+    // nur am Brief-Tag (05.10.2026).
+    const letterDay = berlinWeekday(now) === config.briefe.tag;
+    let lettersLeft = letterDay ? config.briefe.pro_woche : 0;
     for (const company of await dueLetterFollowUps(
       db,
       now,
       config.briefe.nachfassen_nach_tagen,
       config.briefe.ab_score,
-      config.briefe.pro_tag,
+      lettersLeft,
     )) {
       await isolated(company, result, async () => {
-        await planLetter(deps, company, date, by, "followup", result);
+        if (await planLetter(deps, company, date, by, "followup", result)) lettersLeft--;
       });
     }
 
@@ -318,26 +330,33 @@ export async function buildDailyPlan(deps: PlanDeps, by = "autopilot"): Promise<
           ? `Bremse: Eine Kontrollmail der letzten Tage lag im Spam oder kam nicht an, heute nur ${target} neue`
           : `Bremse: ${bounces.bounced} von ${bounces.sent} Mails der letzten ${config.neue_kontakte.bremse.tage} Tage waren unzustellbar, heute nur ${target} neue`,
       );
-    const already = (await planItems(db, date)).filter((i) => i.kind === "new").length;
-    let lettersLeft = config.briefe.pro_tag;
-    for (const company of await candidates(
-      db,
-      date,
-      Math.max(0, target - already) * 3,
-      config.neue_kontakte.branchen ?? config.suche.branchen,
-    )) {
-      if (result.emails + result.letters + already >= target) break;
+    // Nur neue Mails zählen zum Tagesziel; Briefe kommen gesammelt am Brief-Tag dazu. Wer ausfällt (keine Mail,
+    // Fehler), wird durch den nächsten Kandidaten ersetzt.
+    const already = (await planItems(db, date)).filter(
+      (i) => i.kind === "new" && i.channel === "email",
+    ).length;
+    const branches = config.neue_kontakte.branchen ?? config.suche.branchen;
+    const pool = Math.max(0, target - already) * 4 + (lettersLeft > 0 ? 300 : 0);
+    for (const company of await candidates(db, date, pool, branches)) {
+      const mailsDone = result.emails + already >= target;
+      if (mailsDone && lettersLeft <= 0) break;
       await isolated(company, result, async () => {
         const person = await recipient(db, company.id);
         const mailOk = person.email ? await deps.mx(person.email) : false;
-        const channel = chooseChannel(
-          { hasAddress: Boolean(company.street && company.postal_code), mailOk },
-          lettersLeft,
-        );
+        const hasAddress = Boolean(company.street && company.postal_code);
+        const channel = chooseChannel({ hasAddress, mailOk }, lettersLeft);
         if (!channel) {
-          result.skipped.push({ name: company.name, reason: "keine gültige E-Mail und keine Anschrift" });
+          if (!mailsDone)
+            result.skipped.push({
+              name: company.name,
+              reason: hasAddress
+                ? `keine gültige E-Mail, Brief kommt am ${config.briefe.tag}`
+                : "keine gültige E-Mail und keine Anschrift",
+            });
           return;
         }
+        // Tagesziel erreicht: nur noch Briefe sammeln (am Brief-Tag).
+        if (channel === "email" && mailsDone) return;
         if (usesTeaser(deps.teaser, company)) {
           try {
             await teaserForCompany(db, deps.teaser!, company);

@@ -483,7 +483,7 @@ export function createBot(options: BotOptions): AvelioBot {
       undefined,
       mailbox !== null,
     );
-    await sendNextCard(ctx.api, ctx.chat.id, deps);
+    await sendNextCard(ctx.api, ctx.chat.id, deps, 0);
   });
 
   bot.on("callback_query:data", async (ctx) => {

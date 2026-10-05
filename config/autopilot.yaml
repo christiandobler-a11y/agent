@@ -20,15 +20,15 @@ neue_kontakte:
   # Bremse: Kommen in den letzten `tage` Tagen mehr als `quote` der Mails als unzustellbar zurück (ab `mindestens`
   # gesendeten), geht es eine Stufe zurück und der Morgenbericht sagt es. Unzustellbare schaden dem Ruf am meisten.
   bremse: { quote: 0.05, mindestens: 20, tage: 7 }
-# Befund-Seiten (Briefe), 04.10.2026 (Christian): Erstkontakt nur noch per Mail. Briefe gibt es für Leads ohne
-# erreichbare Mail-Adresse und als zweites Nachfassen für sehr gute Leads (ab_score), wenn auch die Nachfass-Mail
-# nach `nachfassen_nach_tagen` Tagen unbeantwortet blieb. Höchstens `pro_tag` je Tag.
+# Befund-Seiten (Briefe), 04.10.2026 (Christian): Erstkontakt per Mail. Briefe gibt es für Leads ohne erreichbare
+# Mail-Adresse und als zweites Nachfassen für sehr gute Leads (ab_score), wenn auch die Nachfass-Mail nach
+# `nachfassen_nach_tagen` Tagen unbeantwortet blieb. 05.10.2026: Briefe zählen nicht zu den neuen Kontakten des Tages
+# und werden gesammelt; sie kommen gebündelt an `tag` ins Morgen-Paket (höchstens `pro_woche`).
 briefe:
-  pro_tag: 3
+  tag: samstag
+  pro_woche: 15
   ab_score: 80
   nachfassen_nach_tagen: 7
-# Prototyp für jeden neuen Lead mit Website (ca. 5 Cent je Stück); Vorher/Nachher in Brief und Mail. Branchen mit
-# Vorschau-Bild (config/prototype.yaml → teaser, derzeit Physio) bekommen stattdessen das Bild, ohne LLM.
 prototyp_fuer_neue: true
 
 nachfassen:

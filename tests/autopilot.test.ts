@@ -6,6 +6,7 @@ import sharp from "sharp";
 import { describe, expect, it, vi } from "vitest";
 import {
   berlinDate,
+  berlinWeekday,
   buildDailyPlan,
   chooseChannel,
   dailyNewCount,
@@ -287,6 +288,12 @@ describe("Morgen-Paket (rein)", () => {
     }
     expect(calls.filter((c) => c !== "x")).toEqual(Object.keys(full));
     expect("planReady" in combineNotifiers(minimal)).toBe(false);
+  });
+
+  it("Brief-Tag: Wochentag in Deutschland", () => {
+    expect(berlinWeekday(new Date("2026-10-10T08:00:00Z"))).toBe("samstag");
+    expect(berlinWeekday(new Date("2026-10-04T22:30:00Z"))).toBe("montag"); // 00:30 in Berlin
+    expect(loadAutopilotConfig().briefe.tag).toBe("samstag");
   });
 
   it("Mittags-Zwischenstand", () => {
@@ -642,7 +649,8 @@ describeDb("Morgen-Paket mit Datenbank", () => {
       now: () => NOW,
       config: {
         ...config({ stufen: [{ ab_tag: 0, pro_tag: 5 }] }),
-        briefe: { pro_tag: 1, ab_score: 80, nachfassen_nach_tagen: 7 },
+        // Brief-Tag heute (Montag), damit der Brief gleich im Plan steht; Briefe zählen nicht zum Tagesziel.
+        briefe: { tag: "montag", pro_woche: 1, ab_score: 80, nachfassen_nach_tagen: 7 },
       },
       letter: letterDeps,
       prototype: null,
@@ -713,6 +721,45 @@ describeDb("Morgen-Paket mit Datenbank", () => {
     expect(String(calls.at(-1)!.payload.text)).toContain(strong.name);
     const after = await planItems(db(), "2026-10-05");
     expect(after[0]!.status).toBe("done");
+    // "Nächste ansehen" ohne Aktion: jedes Mal die nächste Karte, am Ende wieder von vorn.
+    const nextData = (
+      calls.at(-1)!.payload.reply_markup as { inline_keyboard: { text: string; callback_data?: string }[][] }
+    ).inline_keyboard
+      .flat()
+      .find((b) => b.text === "▶️ Nächste ansehen")!.callback_data!;
+    const shown = async () => {
+      await bot.handleUpdate(callbackUpdate(nextData));
+      const last = calls.filter((c) => c.method === "sendMessage" || c.method === "sendDocument").at(-1)!;
+      return String(last.payload.text ?? last.payload.caption);
+    };
+    expect(await shown()).toContain(normal.name);
+    expect(await shown()).toContain(letterOnly.name);
+    expect(await shown()).toContain(strong.name);
+    // Versehentlich "Später": Rückgängig holt die Karte zurück.
+    const laterData = (
+      calls.at(-1)!.payload.reply_markup as { inline_keyboard: { text: string; callback_data?: string }[][] }
+    ).inline_keyboard
+      .flat()
+      .find((b) => b.text === "⏭️ Später")!.callback_data!;
+    await bot.handleUpdate(callbackUpdate(laterData));
+    expect((await planItems(db(), "2026-10-05")).find((i) => i.company_name === strong.name)!.status).toBe(
+      "later",
+    );
+    const undoData = calls
+      .filter((c) => c.method === "editMessageText")
+      .flatMap(
+        (c) =>
+          (
+            c.payload.reply_markup as
+              { inline_keyboard: { text: string; callback_data?: string }[][] } | undefined
+          )?.inline_keyboard.flat() ?? [],
+      )
+      .find((b) => b.text === "↩️ Rückgängig")!.callback_data!;
+    await bot.handleUpdate(callbackUpdate(undoData));
+    expect((await planItems(db(), "2026-10-05")).find((i) => i.company_name === strong.name)!.status).toBe(
+      "ready",
+    );
+    expect(await shown()).not.toContain("Alles erledigt");
   });
 
   it("Takt: Plan um 05:00 anstoßen, um 07:00 melden, je Tag einmal", async () => {
@@ -932,7 +979,7 @@ describeDb("Morgen-Paket mit Datenbank", () => {
       now: () => NOW,
       config: {
         ...config({ stufen: [{ ab_tag: 0, pro_tag: 5 }] }),
-        briefe: { pro_tag: 0, ab_score: 80, nachfassen_nach_tagen: 7 },
+        briefe: { tag: "samstag", pro_woche: 0, ab_score: 80, nachfassen_nach_tagen: 7 },
       },
       letter: {
         db: db(),

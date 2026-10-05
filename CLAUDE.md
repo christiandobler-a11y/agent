@@ -98,7 +98,7 @@ ausprobieren kann. Nach Schritt 6 ist ein Abstimmungstermin (Kalibrierung) vorge
   Desktop-Screenshot und liefert nur Markierungen (Prozent-Rechtecke), Notizen und Zeilen; Layout (`letterPage.ts`, rein),
   QR-Code und Kontaktdaten setzt Code, Chromium druckt das PDF (`letterPdf.ts`).
 - **Morgen-Paket** (`src/autopilot/`, `config/autopilot.yaml`, Tabelle `outreach_plan`): Sweep stößt um `vorbereiten`
-  den Job `daily-plan` an (Nachfassen, dann neue Leads: Prototyp, Mail oder Befund-Seite), meldet ab `morgens` in
+  den Job `daily-plan` an (Nachfassen, dann neue Leads: Prototyp und Mail; Befund-Seiten gesammelt nur am Brief-Tag `briefe.tag`, zählen nicht zum Tagesziel), meldet ab `morgens` in
   Telegram von selbst (Kopf mit Nachtbericht und gleich die erste Karte, `sendMorning`; `/heute` holt es erneut),
   abends Bilanz. Jeder Schritt einmal je Tag über `claimState`. Menge neuer Kontakte in Stufen zum Aufwärmen der
   Adresse (`neue_kontakte.stufen`, Bremse bei Unzustellbaren). „Alle verteilt senden“ plant die Mails ein (Status
