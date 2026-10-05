@@ -45,6 +45,8 @@ const configSchema = z.object({
       geraete: z.boolean().default(false),
       // Festes Stockfoto für alle (Dateiname in assets/teaser/physio/), sonst je Firma eins.
       foto: z.string().nullable().default(null),
+      // Ohne festes Foto: Auswahl, aus der jede Praxis fest eins bekommt.
+      fotos: z.array(z.string()).default([]),
       // Farbwelt des Stils "vital": petrol, salbei, navy, wald, ozean, anthrazit (src/prototype/teaser.ts).
       farbe: z.string().default("petrol"),
       // Echte Bewertungstexte und Öffnungszeiten von Google (Place Details, ca. 2,5 Cent je Praxis). Aus: nur Note
@@ -66,6 +68,7 @@ const configSchema = z.object({
       stil: "welt",
       geraete: false,
       foto: null,
+      fotos: [],
       farbe: "petrol",
       google_details: false,
       eigenes_foto: false,

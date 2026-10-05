@@ -153,6 +153,7 @@ export async function createApp(options: { notifier?: Notifier; worker?: boolean
           ? cachedPlaceDetails({ db, budget, apiKey: keys.GOOGLE_API_KEY })
           : null,
         font: prototypeConfig.teaser.schrift,
+        photos: prototypeConfig.teaser.fotos,
         withoutPhoto: prototypeConfig.teaser.ohne_foto,
         hero: prototypeConfig.teaser.eigenes_foto
           ? (company) =>

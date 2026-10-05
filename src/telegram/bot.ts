@@ -419,6 +419,7 @@ export function createBot(options: BotOptions): AvelioBot {
                     apiKey: options.prototype?.googleApiKey,
                   }),
               font: teaserConfig.schrift,
+              photos: teaserConfig.fotos,
               withoutPhoto: teaserConfig.ohne_foto,
               hero: teaserConfig.eigenes_foto
                 ? (company) =>

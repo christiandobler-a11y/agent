@@ -138,10 +138,15 @@ const paletteOf = (d: Pick<TeaserData, "palette" | "colors">): Palette =>
   d.colors ?? (VITAL_PALETTES as Record<string, Palette>)[d.palette ?? "petrol"] ?? VITAL_PALETTES.petrol;
 
 /** Hero-Foto: das eigene der Praxis, sonst das Stockfoto. */
-function heroImage(d: TeaserData, assets: TeaserAssets): { src: string; position: string; own: boolean } {
-  if (d.hero) return { src: pathToFileURL(d.hero.file).href, position: d.hero.position, own: true };
+function heroImage(
+  d: TeaserData,
+  assets: TeaserAssets,
+): { src: string; position: string; own: boolean; zoom: string } {
+  if (d.hero) return { src: pathToFileURL(d.hero.file).href, position: d.hero.position, own: true, zoom: "" };
   const p = photoFor(d);
-  return { src: assets.photo(p.file), position: p.position, own: false };
+  // Vergrößern um den Ausschnitt herum (CSS), z. B. damit ein Gesicht außerhalb des Bildes liegt.
+  const zoom = p.zoom ? `transform:scale(${p.zoom});transform-origin:${p.position};` : "";
+  return { src: assets.photo(p.file), position: p.position, own: false, zoom };
 }
 
 /**
@@ -152,13 +157,24 @@ function googleLine(rating: number, count: number, ink: string, size = 17): stri
   return `<span class="gline" style="display:inline-flex;align-items:center;gap:${Math.round(size * 0.6)}px;background:#fff;color:${ink};border-radius:999px;padding:${Math.round(size * 0.55)}px ${Math.round(size * 1.3)}px ${Math.round(size * 0.55)}px ${Math.round(size * 0.8)}px;box-shadow:0 10px 30px rgba(0,0,0,.18);font-weight:600;font-size:${size}px;line-height:1">${GOOGLE.replace(/width="\d+" height="\d+"/, `width="${Math.round(size * 1.35)}" height="${Math.round(size * 1.35)}"`)}<span style="display:flex;color:#fbbc04">${STAR.replace(/width="16" height="16"/, `width="${size}" height="${size}"`).repeat(5)}</span><b style="font-weight:800">${de(rating)}</b><span style="opacity:.75">${count} Google-Bewertungen</span></span>`;
 }
 
+/** Stockfoto mit Ausschnitt; `zoom` vergrößert um `position` herum (z. B. um ein Gesicht auszublenden). */
+export interface StockPhoto {
+  file: string;
+  position: string;
+  zoom?: number;
+}
+
 /** Stockfotos (Unsplash-Lizenz, kommerziell frei, siehe assets/teaser/physio/QUELLEN.md); erstes = Favorit. */
-export const PHYSIO_PHOTOS = [
+export const PHYSIO_PHOTOS: readonly StockPhoto[] = [
   { file: "1706353399656-210cca727a33.jpg", position: "50% 40%" },
   { file: "1649751361457-01d3a696c7e6.jpg", position: "60% 50%" },
   { file: "1645005513713-9e2b92a687d3.jpg", position: "50% 30%" },
   { file: "1519824145371-296894a0daa9.jpg", position: "50% 50%" },
-] as const;
+  // 05.10.2026, Christians Auswahl: Orthese am Bein, Wirbelsäulen-Modell, Behandlung ohne Gesicht (vergrößert).
+  { file: "1706777193603-76c3e9613553.jpg", position: "55% 55%" },
+  { file: "1772122028898-1640a4dd2d7f.jpg", position: "55% 50%" },
+  { file: "1706353399656-210cca727a33-gross.jpg", position: "55% 92%", zoom: 1.6 },
+];
 
 const GENERIC_PREFIX =
   /^(praxis für physiotherapie|physiotherapiepraxis|physiotherapie-praxis|praxis für krankengymnastik|krankengymnastikpraxis|physiotherapie|praxis)\s+(?:(?:und|&)\s+\S+\s+)?/i;
@@ -275,11 +291,11 @@ export const fileAssets: TeaserAssets = {
 };
 
 /** Festes Foto (config/prototype.yaml → teaser.foto), sonst je Firma eins aus der Auswahl. */
-export function photoFor(d: Pick<TeaserData, "seed" | "photo">): (typeof PHYSIO_PHOTOS)[number] {
+export function photoFor(d: Pick<TeaserData, "seed" | "photo">): StockPhoto {
   return PHYSIO_PHOTOS.find((p) => p.file === d.photo) ?? pickPhoto(d.seed);
 }
 
-export function pickPhoto(seed: string): (typeof PHYSIO_PHOTOS)[number] {
+export function pickPhoto(seed: string): StockPhoto {
   return PHYSIO_PHOTOS[seedOf(seed) % PHYSIO_PHOTOS.length]!;
 }
 
@@ -873,7 +889,7 @@ header{height:56px;display:flex;align-items:center;justify-content:space-between
 .burger{flex:none;width:22px;height:14px;border-top:2px solid var(--ink);border-bottom:2px solid var(--ink);position:relative}
 .burger::after{content:"";position:absolute;left:0;right:0;top:4px;border-top:2px solid var(--ink)}
 .hero{position:relative;height:120px;overflow:hidden}
-.hero img{position:absolute;inset:0;width:100%;height:100%;object-fit:cover;object-position:${photo.position}}
+.hero img{position:absolute;inset:0;width:100%;height:100%;object-fit:cover;object-position:${photo.position};${photo.zoom}}
 .hero::before{content:"";position:absolute;inset:0;z-index:1;background:${showPhoto ? (theme.veil ?? "rgba(27,86,95,.74)") : "transparent"}}
 .hero .shapes{position:absolute;inset:0;width:100%;height:100%}
 .hero span{position:absolute;z-index:2;left:0;right:0;top:26px;text-align:center;color:#fff;font-family:"Barlow Condensed",sans-serif;font-weight:600;font-size:24px}
@@ -981,7 +997,7 @@ ${fonts}
 *{box-sizing:border-box;margin:0;padding:0}
 html,body{width:1440px;height:900px;overflow:hidden}
 body{position:relative;font-family:Manrope,sans-serif;-webkit-font-smoothing:antialiased;color:${pal.ink};background:#a9aeb3}
-.photo{position:absolute;inset:0;width:100%;height:100%;object-fit:cover;object-position:${photo.position};filter:${photo.own ? "saturate(.9)" : "grayscale(.35)"}}
+.photo{position:absolute;inset:0;width:100%;height:100%;object-fit:cover;object-position:${photo.position};${photo.zoom}filter:${photo.own ? "saturate(.9)" : "saturate(.85)"}}
 .veil{position:absolute;inset:0;background:${pal.veil};opacity:${photo.own ? ".78" : ".85"}}
 .shapes{position:absolute;inset:0;width:100%;height:100%}
 header{position:absolute;z-index:5;top:20px;left:70px;right:70px;height:78px;background:#fff;border-radius:18px;display:flex;align-items:center;justify-content:space-between;padding:0 16px 0 18px;box-shadow:0 10px 30px rgba(0,0,0,.08)}
@@ -1183,6 +1199,8 @@ export interface TeaserDeps {
   devices?: boolean;
   /** Festes Foto für alle (Dateiname aus assets/teaser/physio/). */
   photo?: string | null;
+  /** Auswahl, aus der jede Praxis fest eins bekommt (wenn `photo` fehlt). */
+  photos?: readonly string[] | null;
   /** Farbwelt für "vital" (VITAL_PALETTES). */
   palette?: string | null;
   /** Google-Details (Bewertungstext, Öffnungszeiten), siehe cachedPlaceDetails; fehlt es, ohne. */
@@ -1344,7 +1362,7 @@ export async function teaserForCompany(db: DbClient, t: TeaserDeps, company: Com
       services,
       quote: details?.quotes[0] ?? null,
       hours: details?.hours ?? [],
-      photo: t.photo ?? null,
+      photo: t.photo ?? (t.photos?.length ? t.photos[seedOf(company.id) % t.photos.length]! : null),
       palette: t.palette ?? null,
       hero: own ? { file: own.file!, position: own.position ?? "50% 50%" } : null,
       colors: choice.palette,

@@ -33,7 +33,13 @@ teaser:
   # erkennbaren Therapeuten, passt zu Inhaberin wie Inhaber. Andere: 1645005513713-9e2b92a687d3.jpg (Training ohne
   # Gesichter), 1706353399656-210cca727a33.jpg (Therapeut mit Patientin), 1649751361457-01d3a696c7e6.jpg (Therapeut am
   # Knie). null = je Praxis eins aus der Auswahl.
-  foto: 1519824145371-296894a0daa9.jpg
+  foto: null
+  # 05.10.2026 (Christians Auswahl): jede Praxis ohne eigenes Foto bekommt fest eines davon. Orthese am Bein,
+  # Wirbelsäulen-Modell, Behandlung ohne Gesicht (vergrößert, siehe PHYSIO_PHOTOS in src/prototype/teaser.ts).
+  fotos:
+    - 1706777193603-76c3e9613553.jpg
+    - 1772122028898-1640a4dd2d7f.jpg
+    - 1706353399656-210cca727a33-gross.jpg
   # Farbwelt (vital und elementa): aqua (Christians Farbwelt), petrol (Petrol + Orange), salbei, navy, wald, ozean, anthrazit,
   # gelb (Elementa-Original)
   farbe: aqua # 04.10.2026 Christians Farbwelt: #1D7184, #41D6C3, #F7F5EF, #23343A, #E8F4F2

@@ -147,6 +147,7 @@ export async function teaser(argv: string[]): Promise<number> {
               apiKey: loadEnv().GOOGLE_API_KEY,
             }),
         font: config.schrift,
+        photos: config.fotos,
         withoutPhoto: config.ohne_foto,
         hero: config.eigenes_foto
           ? (company) =>

@@ -79,6 +79,18 @@ describe("Vorschau-Bild Physio (rein)", () => {
     expect(PHYSIO_PHOTOS.some((p) => html.includes(`photo/${p.file}`))).toBe(true);
   });
 
+  it("Stockfoto aus Christians Auswahl: Gesicht per Zoom ausgeblendet, sonst kein Zoom", () => {
+    const zoomed = renderTeaserMockup(
+      data({ photo: "1706353399656-210cca727a33-gross.jpg" }),
+      assets,
+      "elementa",
+    );
+    expect(zoomed).toContain("transform:scale(1.6);transform-origin:55% 92%;");
+    const plain = renderTeaserMockup(data({ photo: "1706777193603-76c3e9613553.jpg" }), assets, "elementa");
+    expect(plain).not.toContain("transform-origin:55% 50%;");
+    expect(plain).not.toContain("transform:scale(1.6)");
+  });
+
   it("Geräte-Bild: Laptop und Smartphone mit derselben Seite, Name escaped, kein Skript", () => {
     const html = renderTeaserMockup(data({ name: "Physio <b>Test</b>" }), assets);
     expect(html.match(/<iframe srcdoc="/g)).toHaveLength(2);
