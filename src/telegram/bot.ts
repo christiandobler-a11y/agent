@@ -1,4 +1,5 @@
 import { Bot, InputFile, type Context } from "grammy";
+import { googleOwnerPhotos } from "../prototype/googlePhotos.js";
 import { heroForCompany } from "../prototype/heroPhoto.js";
 import type { UserFromGetMe } from "grammy/types";
 import { getState, setState } from "../db/appState.js";
@@ -418,10 +419,22 @@ export function createBot(options: BotOptions): AvelioBot {
                     apiKey: options.prototype?.googleApiKey,
                   }),
               font: teaserConfig.schrift,
+              withoutPhoto: teaserConfig.ohne_foto,
               hero: teaserConfig.eigenes_foto
                 ? (company) =>
                     heroForCompany(
-                      { db: pipeline.db, llm: options.manager.llm, dir: teaserConfig.foto_dir },
+                      {
+                        db: pipeline.db,
+                        llm: options.manager.llm,
+                        dir: teaserConfig.foto_dir,
+                        googlePhotos: teaserConfig.google_fotos
+                          ? googleOwnerPhotos({
+                              db: pipeline.db,
+                              budget: pipeline.budget,
+                              apiKey: options.prototype?.googleApiKey,
+                            })
+                          : null,
+                      },
                       company,
                     )
                 : null,

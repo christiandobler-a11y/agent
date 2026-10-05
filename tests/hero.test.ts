@@ -7,7 +7,19 @@ import { describe, expect, it, vi } from "vitest";
 import { getState } from "../src/db/appState.js";
 import { upsertCompany } from "../src/db/companies.js";
 import type { LlmGateway } from "../src/llm/gateway.js";
-import { contrast, derivePalette, isSkinOrWood, rgbOf, toHsl, type Rgb } from "../src/prototype/colors.js";
+import {
+  choosePalette,
+  contrast,
+  derivePalette,
+  isSkinOrWood,
+  opaquePixels,
+  rgbOf,
+  toHsl,
+  warmth,
+  WARM_PALETTE,
+  WARM_THRESHOLD,
+  type Rgb,
+} from "../src/prototype/colors.js";
 import {
   heroForCompany,
   heroKey,
@@ -76,6 +88,35 @@ describe("Farbwelt aus dem Foto (rein)", () => {
     const [ha] = toHsl(rgbOf(p.accent));
     expect(ha).toBeGreaterThan(45);
     expect(ha).toBeLessThan(60);
+  });
+
+  it("Farbquelle: Logo vor Foto vor Website, sonst warm oder Standard", () => {
+    const blue = derivePalette(
+      pixels([
+        [[40, 120, 160], 0.6],
+        [[240, 240, 240], 0.4],
+      ]),
+    )!;
+    const green = derivePalette(
+      pixels([
+        [[30, 110, 60], 0.6],
+        [[240, 240, 240], 0.4],
+      ]),
+    )!;
+    expect(choosePalette({ logo: green, photo: blue }).source).toBe("logo");
+    expect(choosePalette({ photo: blue, website: green }).source).toBe("foto");
+    expect(choosePalette({ website: green }).palette).toBe(green);
+    // Holz und Beige, nichts Farbiges: warme Farbwelt statt kühlem Standard.
+    const wood = pixels([
+      [[180, 130, 90], 0.5],
+      [[235, 220, 200], 0.5],
+    ]);
+    expect(warmth(wood)).toBeGreaterThan(WARM_THRESHOLD);
+    expect(choosePalette({ warmth: warmth(wood) })).toEqual({ palette: WARM_PALETTE, source: "warm" });
+    expect(warmth(pixels([[[60, 120, 200], 1]]))).toBeLessThan(0);
+    expect(choosePalette({ warmth: -0.1 })).toEqual({ palette: null, source: "standard" });
+    expect(contrast(rgbOf(WARM_PALETTE.primary), WHITE)).toBeGreaterThanOrEqual(4.5);
+    expect(opaquePixels([1, 2, 3, 255, 9, 9, 9, 0])).toEqual([1, 2, 3]);
   });
 
   it("Farbloses Foto oder nur Haut und Holz: keine eigene Farbwelt", () => {
@@ -277,7 +318,7 @@ describeDb("Hero-Foto mit Datenbank", () => {
     expect(html).toContain(pathToFileURL(r.logo!.file).href);
     expect(await teaserLook(db(), company.id)).toMatchObject({
       foto: "praxis",
-      farbe: "aus_foto",
+      farbe: "logo", // Logo hat Vorrang vor dem Foto
       primary: r.palette!.primary,
     });
 
@@ -289,6 +330,14 @@ describeDb("Hero-Foto mit Datenbank", () => {
     });
     structured.mockResolvedValueOnce(answer(null, 2, "nur Text-Banner"));
     expect((await heroForCompany(deps, other)).status).toBe("none");
+
+    // Ohne Website, aber mit eigenem Foto im Google-Profil: das Google-Foto.
+    const { company: noSite } = await upsertCompany(db(), { name: "Physio Google", placeId: "hero-3" });
+    const fromGoogle = await heroForCompany(
+      { ...deps, googlePhotos: () => Promise.resolve([photo]) },
+      noSite,
+    );
+    expect(fromGoogle).toMatchObject({ status: "ok", quelle: "google", url: "google-profil:1" });
   });
 });
 

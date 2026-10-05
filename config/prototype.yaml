@@ -45,6 +45,11 @@ teaser:
   # Praxis, einmal je Praxis). Die Farben der Seite kommen dann aus dem Foto (src/prototype/colors.ts). Passt keins,
   # bleiben Stockfoto und `farbe`.
   eigenes_foto: true
+  # Zweite Quelle (05.10.2026, Christian): Fotos aus dem Google-Profil, nur die von der Praxis selbst hochgeladenen
+  # (nie Fotos von Patienten). Ca. 2 Cent je Praxis, einmal je Praxis.
+  google_fotos: true
+  # Ohne eigenes Foto (05.10.2026): stock = Stockfoto, flaechen = nur Farbflächen in der Praxisfarbe (kein fremdes Foto)
+  ohne_foto: stock
   # Schrift der Überschriften (05.10.2026, zum Ausprobieren): manrope (klar), fraunces (warme Serifen), dmserif
   # (elegant), outfit (rund), jakarta (kräftig), sora (markant)
   schrift: fraunces # 05.10.2026 Christian: Bild 2 von 7 (Fraunces, warme Serifen)

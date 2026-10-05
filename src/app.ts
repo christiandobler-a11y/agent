@@ -1,4 +1,5 @@
 import { loadEnv, requireKeys } from "./config/env.js";
+import { googleOwnerPhotos } from "./prototype/googlePhotos.js";
 import { heroForCompany } from "./prototype/heroPhoto.js";
 import { createDb, type Db } from "./db/client.js";
 import { createBudgetGuard } from "./llm/budget.js";
@@ -152,8 +153,20 @@ export async function createApp(options: { notifier?: Notifier; worker?: boolean
           ? cachedPlaceDetails({ db, budget, apiKey: keys.GOOGLE_API_KEY })
           : null,
         font: prototypeConfig.teaser.schrift,
+        withoutPhoto: prototypeConfig.teaser.ohne_foto,
         hero: prototypeConfig.teaser.eigenes_foto
-          ? (company) => heroForCompany({ db, llm, dir: prototypeConfig.teaser.foto_dir }, company)
+          ? (company) =>
+              heroForCompany(
+                {
+                  db,
+                  llm,
+                  dir: prototypeConfig.teaser.foto_dir,
+                  googlePhotos: prototypeConfig.teaser.google_fotos
+                    ? googleOwnerPhotos({ db, budget, apiKey: keys.GOOGLE_API_KEY })
+                    : null,
+                },
+                company,
+              )
           : null,
       },
       mx: createMxCheck(),

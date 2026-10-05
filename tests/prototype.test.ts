@@ -391,6 +391,8 @@ describeDb("Prototyp mit Datenbank", () => {
           farbe: "petrol",
           google_details: false,
           eigenes_foto: false,
+          google_fotos: false,
+          ohne_foto: "stock" as const,
           schrift: "manrope",
           foto_dir: "data/heroes",
           foto: null,

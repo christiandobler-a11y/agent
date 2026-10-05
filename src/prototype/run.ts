@@ -52,6 +52,10 @@ const configSchema = z.object({
       google_details: z.boolean().default(false),
       // Eigenes Foto von der Website der Praxis als Hero, Farben daraus (heroPhoto.ts, ca. 1 Cent je Praxis).
       eigenes_foto: z.boolean().default(false),
+      // Eigene Fotos aus dem Google-Profil der Praxis als zweite Quelle (googlePhotos.ts, ca. 2 Cent je Praxis).
+      google_fotos: z.boolean().default(false),
+      // Ohne eigenes Foto: stock (Stockfoto) oder flaechen (nur Farbflächen in der Praxisfarbe).
+      ohne_foto: z.enum(["stock", "flaechen"]).default("stock"),
       // Schrift der Überschriften: manrope, fraunces, dmserif, outfit, jakarta, sora (TEASER_FONTS).
       schrift: z.string().default("manrope"),
       foto_dir: z.string().default("data/heroes"),
@@ -65,6 +69,8 @@ const configSchema = z.object({
       farbe: "petrol",
       google_details: false,
       eigenes_foto: false,
+      google_fotos: false,
+      ohne_foto: "stock",
       schrift: "manrope",
       foto_dir: "data/heroes",
     }),

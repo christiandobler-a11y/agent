@@ -195,3 +195,59 @@ export function paletteFromClusters(cs: readonly Cluster[]): HeroPalette | null 
 export function derivePalette(pixels: ArrayLike<number>): HeroPalette | null {
   return paletteFromClusters(clusters(pixels));
 }
+
+/**
+ * Wärme eines Bildes (05.10.2026, Christian: "wenn dort alles warm, hell, eher gelb ist, beißt sich das mit einer
+ * kalten blauen Seite"): mittlerer Überhang Rot über Blau, von -1 (kühl) bis 1 (warm). Holz, Beige, warmes Licht
+ * liegen deutlich über 0,05.
+ */
+export function warmth(pixels: ArrayLike<number>): number {
+  const n = Math.floor(pixels.length / 3);
+  if (n === 0) return 0;
+  let sum = 0;
+  for (let i = 0; i < n; i++) sum += (pixels[i * 3]! - pixels[i * 3 + 2]!) / 255;
+  return sum / n;
+}
+export const WARM_THRESHOLD = 0.05;
+
+/**
+ * Warme Farbwelt für Praxen ohne eigene Markenfarbe, deren Räume warm wirken (Holz, Beige, Sand): Cognac, Sand-Gold,
+ * warmes Off-White. Lesbar wie die anderen (weiße Schrift auf der Hauptfarbe, dunkle auf dem Akzent).
+ */
+export const WARM_PALETTE: HeroPalette = {
+  primary: "#8a5a44",
+  accent: "#e2b25a",
+  ink: "#2f2621",
+  veil: "rgba(122,80,60,.68)",
+  label: "warm: Cognac + Sand",
+  bg: "#faf6ef",
+  soft: "#f1e7d8",
+  onAccent: "#2f2621",
+};
+
+/** Nur deckende Pixel (Logos mit Transparenz) als RGB. Rein. */
+export function opaquePixels(rgba: ArrayLike<number>, minAlpha = 200): number[] {
+  const out: number[] = [];
+  for (let i = 0; i + 3 < rgba.length; i += 4)
+    if (rgba[i + 3]! >= minAlpha) out.push(rgba[i]!, rgba[i + 1]!, rgba[i + 2]!);
+  return out;
+}
+
+export type ColorSource = "logo" | "foto" | "website" | "warm" | "standard";
+
+/**
+ * Welche Farbwelt passt zur Praxis? Reihenfolge: Logo (ihre Markenfarbe), eigenes Foto, bisherige Website; ohne
+ * farbige Quelle die warme Farbwelt, wenn Foto oder Website warm wirken, sonst die Standardfarbe (`null`). Rein.
+ */
+export function choosePalette(s: {
+  logo?: HeroPalette | null;
+  photo?: HeroPalette | null;
+  website?: HeroPalette | null;
+  warmth?: number | null;
+}): { palette: HeroPalette | null; source: ColorSource } {
+  if (s.logo) return { palette: s.logo, source: "logo" };
+  if (s.photo) return { palette: s.photo, source: "foto" };
+  if (s.website) return { palette: s.website, source: "website" };
+  if ((s.warmth ?? 0) > WARM_THRESHOLD) return { palette: WARM_PALETTE, source: "warm" };
+  return { palette: null, source: "standard" };
+}

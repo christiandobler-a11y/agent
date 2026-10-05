@@ -10,7 +10,7 @@ import type { DbClient } from "../db/client.js";
 import type { Company } from "../db/companies.js";
 import { loadPrompt } from "../llm/config.js";
 import type { LlmGateway } from "../llm/gateway.js";
-import { derivePalette, type HeroPalette } from "./colors.js";
+import { derivePalette, opaquePixels, warmth, type HeroPalette } from "./colors.js";
 
 /**
  * Hero-Foto aus der eigenen Website der Praxis (05.10.2026, Christian: "das bringt mehr Nähe als ein generisches
@@ -48,6 +48,12 @@ export interface HeroResult {
   /** Farbwelt aus dem Foto; fehlt sie (farbloses Foto), gilt die Standardfarbe. */
   palette?: HeroPalette | null;
   reason?: string;
+  /** Woher das Foto stammt: Website der Praxis oder ihr Google-Profil (selbst hochgeladen). */
+  quelle?: "website" | "google";
+  /** Wärme des Fotos (colors.ts → warmth), für die Farbwahl ohne farbige Quelle. */
+  warmth?: number | null;
+  /** Farbwelt aus dem Logo (Markenfarbe der Praxis); hat Vorrang vor dem Foto. */
+  logoPalette?: HeroPalette | null;
   /** Logo der Praxis (PNG, unabhängig vom Foto); `wide` = Schriftzug, der den Namen schon enthält. */
   logo?: { file: string; wide: boolean } | null;
   checkedAt: string;
@@ -69,8 +75,8 @@ export interface PageImages {
   logos: LogoCandidate[];
 }
 
-// v3 (05.10.2026, lockerere Regeln, Prompt v4): ältere Ergebnisse werden neu geprüft.
-export const heroKey = (companyId: string) => `hero:v3:${companyId}`;
+// v4 (05.10.2026, Google-Profil als zweite Quelle): ältere Ergebnisse werden neu geprüft.
+export const heroKey = (companyId: string) => `hero:v4:${companyId}`;
 
 // Viele Praxis-Seiten liefern Fotos um 900 bis 1200 px; im Vorschau-Bild (Laptop) reicht das unter dem Farbschleier.
 // 05.10.2026: zu viele Praxen fielen raus. Der Farbschleier verzeiht etwas weniger Auflösung; Hochformat (Porträt der
@@ -318,6 +324,8 @@ export interface HeroDeps {
   dir: string;
   fetch?: typeof fetch;
   collect?: (url: string) => Promise<PageImages>;
+  /** Eigene Fotos aus dem Google-Profil (googlePhotos.ts) als zweite Quelle; fehlt es, nur die Website. */
+  googlePhotos?: ((company: Company) => Promise<Buffer[]>) | null;
   now?: () => Date;
 }
 
@@ -331,35 +339,43 @@ export async function heroForCompany(deps: HeroDeps, company: Company): Promise<
     return r;
   };
   const none = (reason: string) => save({ status: "none", reason, checkedAt: now });
-  if (!company.website_url) return none("keine Website");
   const fetchFn = deps.fetch ?? fetch;
-  let page: PageImages;
-  try {
-    const url = /^https?:\/\//i.test(company.website_url)
-      ? company.website_url
-      : `https://${company.website_url}`;
-    page = await (deps.collect ?? ((u) => collectCandidates(u, process.env.CHROMIUM_PATH)))(url);
-  } catch (err) {
-    // Nicht merken: beim nächsten Mal neu versuchen (Seite kurz down, Zeitüberschreitung).
-    return { status: "none", reason: `Seite nicht ladbar: ${String(err).slice(0, 80)}`, checkedAt: now };
+  let page: PageImages = { images: [], logos: [] };
+  if (company.website_url) {
+    try {
+      const url = /^https?:\/\//i.test(company.website_url)
+        ? company.website_url
+        : `https://${company.website_url}`;
+      page = await (deps.collect ?? ((u) => collectCandidates(u, process.env.CHROMIUM_PATH)))(url);
+    } catch (err) {
+      // Nicht merken: beim nächsten Mal neu versuchen (Seite kurz down, Zeitüberschreitung).
+      if (!deps.googlePhotos)
+        return { status: "none", reason: `Seite nicht ladbar: ${String(err).slice(0, 80)}`, checkedAt: now };
+    }
   }
-  const loaded: { cand: ImageCandidate; buf: Buffer; thumb: string }[] = [];
-  for (const cand of rankCandidates(page.images)) {
-    if (loaded.length >= 4) break;
-    const buf = await download(cand.url, fetchFn).catch(() => null);
-    if (!buf) continue;
+  const loaded: { url: string; source: "website" | "google"; buf: Buffer; thumb: string }[] = [];
+  const check = async (buf: Buffer, url: string, source: "website" | "google") => {
     try {
       const img = sharp(buf).rotate();
       const meta = await img.metadata();
       const stats = await img.stats();
       const problem = qualityOk({ width: meta.width ?? 0, height: meta.height ?? 0, entropy: stats.entropy });
-      if (problem) continue;
+      if (problem) return;
       const thumb = await sharp(buf).rotate().resize({ width: 640 }).jpeg({ quality: 80 }).toBuffer();
-      loaded.push({ cand, buf, thumb: thumb.toString("base64") });
+      loaded.push({ url, source, buf, thumb: thumb.toString("base64") });
     } catch {
       // kein lesbares Bild
     }
+  };
+  // Website zuerst (höchstens 3), dazu bis zu 3 eigene Fotos aus dem Google-Profil; die Prüfung nimmt das beste.
+  for (const cand of rankCandidates(page.images)) {
+    if (loaded.length >= 3) break;
+    const buf = await download(cand.url, fetchFn).catch(() => null);
+    if (buf) await check(buf, cand.url, "website");
   }
+  if (deps.googlePhotos)
+    for (const [i, buf] of (await deps.googlePhotos(company).catch(() => [])).entries())
+      await check(buf, `google-profil:${i + 1}`, "google");
   let logo: { png: Buffer; wide: boolean } | null = null;
   for (const cand of rankLogos(page.logos)) {
     const buf = await download(cand.url, fetchFn, true).catch(() => null);
@@ -375,7 +391,7 @@ export async function heroForCompany(deps: HeroDeps, company: Company): Promise<
     input: [
       {
         type: "text",
-        text: `Betrieb: Physiotherapie-Praxis. ${loaded.length} Foto(s) von ihrer Website${logo ? " und ein mögliches Logo" : ", kein Logo"}:`,
+        text: `Betrieb: Physiotherapie-Praxis. ${loaded.length} Foto(s) von ihrer Website bzw. aus ihrem Google-Profil${logo ? " und ein mögliches Logo" : ", kein Logo"}:`,
       },
       ...loaded.flatMap((l, i) => [
         { type: "text" as const, text: `Bild ${i + 1}:` },
@@ -405,10 +421,15 @@ export async function heroForCompany(deps: HeroDeps, company: Company): Promise<
 
   await mkdir(deps.dir, { recursive: true });
   let savedLogo: HeroResult["logo"] = null;
+  let logoPalette: HeroPalette | null = null;
   if (logo && choice.logo_ok) {
     const file = join(deps.dir, `${company.id}-logo.png`);
     await writeFile(file, logo.png);
     savedLogo = { file, wide: choice.logo_mit_name || logo.wide };
+    const { data } = await sharp(logo.png).resize(64, 64, { fit: "inside" }).ensureAlpha().raw().toBuffer({
+      resolveWithObject: true,
+    });
+    logoPalette = derivePalette(opaquePixels(data));
   }
   const picked = choice.wahl !== null ? loaded[choice.wahl - 1] : undefined;
   if (!picked || choice.passt < HERO_MIN_FIT)
@@ -416,6 +437,7 @@ export async function heroForCompany(deps: HeroDeps, company: Company): Promise<
       status: "none",
       reason: loaded.length === 0 ? "kein großes, echtes Foto" : `kein passendes Foto (${choice.grund})`,
       logo: savedLogo,
+      logoPalette,
       checkedAt: now,
     });
 
@@ -437,11 +459,14 @@ export async function heroForCompany(deps: HeroDeps, company: Company): Promise<
   return save({
     status: "ok",
     file,
-    url: picked.cand.url,
+    url: picked.url,
+    quelle: picked.source,
     position: `${Math.round(choice.fokus_x)}% ${Math.round(choice.fokus_y)}%`,
     motiv: choice.motiv,
     palette: derivePalette(px),
+    warmth: warmth(px),
     logo: savedLogo,
+    logoPalette,
     checkedAt: now,
   });
 }

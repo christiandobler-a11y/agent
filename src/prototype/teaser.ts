@@ -11,7 +11,7 @@ import type { DbClient } from "../db/client.js";
 import type { Company } from "../db/companies.js";
 import { latestAudit, latestPlacesSnapshot } from "../db/leads.js";
 import { seedOf } from "../outreach/slots.js";
-import type { HeroPalette } from "./colors.js";
+import { choosePalette, derivePalette, warmth, type HeroPalette } from "./colors.js";
 import type { HeroResult } from "./heroPhoto.js";
 import type { PlaceDetails } from "./placeDetails.js";
 
@@ -50,6 +50,8 @@ export interface TeaserData {
   logo?: { file: string; wide: boolean } | null;
   /** Schrift für Überschriften (TEASER_FONTS), Standard manrope. */
   font?: string | null;
+  /** Ohne eigenes Foto kein Stockfoto, sondern ein Hero nur aus Farbflächen (config/prototype.yaml → teaser.ohne_foto). */
+  noPhoto?: boolean;
 }
 
 /**
@@ -1007,8 +1009,12 @@ h2{font-family:"${font.family}",Manrope,sans-serif;font-weight:${font.weight};fo
 .call i{width:82px;height:82px;border-radius:50%;background:#2fd15a;display:grid;place-items:center}
 </style></head>
 <body>
-<img class="photo" src="${photo.src}" alt="">
-<div class="veil"></div>
+${
+  d.noPhoto && !photo.own
+    ? `<div class="flat" style="position:absolute;inset:0;background:radial-gradient(120% 90% at 70% 30%,${pal.primary} 0%,${pal.ink} 100%)"></div><svg class="shapes" viewBox="0 0 1440 900" preserveAspectRatio="none" aria-hidden="true" style="opacity:.10"><circle cx="1180" cy="520" r="300" fill="none" stroke="#fff" stroke-width="2"/><circle cx="1180" cy="520" r="220" fill="none" stroke="#fff" stroke-width="2"/><circle cx="1180" cy="520" r="140" fill="none" stroke="#fff" stroke-width="2"/><circle cx="260" cy="420" r="180" fill="none" stroke="#fff" stroke-width="2"/></svg>`
+    : `<img class="photo" src="${photo.src}" alt="">
+<div class="veil"></div>`
+}
 <svg class="shapes" viewBox="0 0 1440 900" preserveAspectRatio="none" aria-hidden="true">
   <path d="M0 0H430L0 185Z" fill="${pal.accent}"/>
   <path d="M730 0H1440V210Z" fill="${pal.primary}"/>
@@ -1185,17 +1191,21 @@ export interface TeaserDeps {
   hero?: ((company: Company) => Promise<HeroResult | null>) | null;
   /** Schrift für Überschriften (TEASER_FONTS). */
   font?: string | null;
+  /** Ohne eigenes Foto: Stockfoto oder nur Farbflächen (config/prototype.yaml → teaser.ohne_foto). */
+  withoutPhoto?: "stock" | "flaechen";
 }
 
 /** Foto und Farben eines gebauten Vorschau-Bildes. */
 export interface TeaserLook {
   foto: "praxis" | "stock";
+  /** Bei eigenem Foto: Website oder Google-Profil. */
+  quelle?: "website" | "google" | null;
   motiv: string | null;
   logo: boolean;
   schrift: string;
   /** Warum kein eigenes Foto (nur beim Stockfoto). */
   grund: string | null;
-  /** Name der Farbwelt oder "aus_foto". */
+  /** Woher die Farben kommen: logo, foto, website, warm, sonst der Name der Standard-Farbwelt. */
   farbe: string;
   primary: string;
   accent: string;
@@ -1203,6 +1213,39 @@ export interface TeaserLook {
 export const teaserLookKey = (companyId: string) => `teaser-look:${companyId}`;
 export const teaserLook = (db: DbClient, companyId: string) =>
   getState<TeaserLook>(db, teaserLookKey(companyId));
+
+/**
+ * Farben der bisherigen Website (Screenshot der Startseite): Markenfarben aus Kopfzeile, Knöpfen, Flächen, und wie
+ * warm die Seite wirkt. Ohne Screenshot `null`.
+ */
+async function websiteColors(
+  db: DbClient,
+  companyId: string,
+): Promise<{ palette: HeroPalette | null; warmth: number } | null> {
+  const { rows } = await db.query<{ shot: string | null }>(
+    `select screenshot_desktop as shot from website_snapshots
+      where company_id = $1 and error is null and screenshot_desktop is not null order by fetched_at desc limit 1`,
+    [companyId],
+  );
+  const shot = rows[0]?.shot;
+  if (!shot || !existsSync(shot)) return null;
+  try {
+    // Nur der erste Bildschirm (Kopfzeile, Hero), Seitenverhältnis 16:10.
+    const meta = await sharp(shot).metadata();
+    const width = meta.width ?? 0;
+    const height = Math.min(meta.height ?? 0, Math.round(width * 0.625));
+    if (width === 0 || height === 0) return null;
+    const { data } = await sharp(shot)
+      .extract({ left: 0, top: 0, width, height })
+      .resize(72, 45, { fit: "fill" })
+      .removeAlpha()
+      .raw()
+      .toBuffer({ resolveWithObject: true });
+    return { palette: derivePalette(data), warmth: warmth(data) };
+  } catch {
+    return null;
+  }
+}
 
 export const usesTeaser = (t: Pick<TeaserDeps, "branches"> | null | undefined, company: Company) =>
   Boolean(t && company.branch_key && t.branches.includes(company.branch_key));
@@ -1236,15 +1279,24 @@ export async function teaserForCompany(db: DbClient, t: TeaserDeps, company: Com
         logo: Boolean(hero.logo),
       }),
     );
+  // Farbliche Nähe zur Praxis (05.10.2026): Logo, eigenes Foto, bisherige Website, sonst warm oder Standard.
+  const site = await websiteColors(db, company.id);
+  const choice = choosePalette({
+    logo: hero?.logoPalette ?? null,
+    photo: own?.palette ?? null,
+    website: site?.palette ?? null,
+    warmth: own?.warmth ?? site?.warmth ?? null,
+  });
   // Was das Bild zeigt (Foto und Farben), für die spätere Auswertung je Mail (outreach/draft.ts → meta.teaser_look).
-  const pal = paletteOf({ palette: t.palette ?? null, colors: own?.palette ?? null });
+  const pal = paletteOf({ palette: t.palette ?? null, colors: choice.palette });
   await setState(db, teaserLookKey(company.id), {
     foto: own ? "praxis" : "stock",
+    quelle: own?.quelle ?? null,
     motiv: own?.motiv ?? null,
     logo: Boolean(hero?.logo),
     schrift: t.font ?? "manrope",
     grund: own ? null : t.hero ? (hero?.reason ?? "Prüfung fehlgeschlagen") : "eigenes Foto ausgeschaltet",
-    farbe: own?.palette ? "aus_foto" : (t.palette ?? "petrol"),
+    farbe: choice.source === "standard" ? (t.palette ?? "petrol") : choice.source,
     primary: pal.primary,
     accent: pal.accent,
   } satisfies TeaserLook);
@@ -1264,9 +1316,10 @@ export async function teaserForCompany(db: DbClient, t: TeaserDeps, company: Com
       photo: t.photo ?? null,
       palette: t.palette ?? null,
       hero: own ? { file: own.file!, position: own.position ?? "50% 50%" } : null,
-      colors: own?.palette ?? null,
+      colors: choice.palette,
       logo: hero?.logo && existsSync(hero.logo.file) ? hero.logo : null,
       font: t.font ?? null,
+      noPhoto: t.withoutPhoto === "flaechen",
     },
     t.shoot,
     t.style,
