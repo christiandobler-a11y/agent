@@ -9,7 +9,7 @@ import type { LlmGateway } from "../src/llm/gateway.js";
 import { loadOutreachConfig } from "../src/outreach/config.js";
 import { draftEmail } from "../src/outreach/draft.js";
 import { loadMailConfig, textToHtml, type Mailbox, type OutgoingMail } from "../src/outreach/mail.js";
-import { pickProbeLead, pickProbeLeads, runProbe } from "../src/outreach/probe.js";
+import { pickProbeLead, pickProbeLeads, probePoolSize, runProbe } from "../src/outreach/probe.js";
 import { sendDraft } from "../src/outreach/send.js";
 import {
   buildTeaser,
@@ -332,6 +332,28 @@ describeDb("Probelauf", () => {
     );
     const several = await pickProbeLeads(db(), ["physiotherapie"], 3);
     expect(new Set(several.map((x) => x.id))).toEqual(new Set([c.id, c2.id]));
+    // Abteilungen/Standorte mit derselben Website zählen nur einmal.
+    for (const name of ["Physio Probe 3", "Physio Probe 4"]) {
+      const { company: x } = await upsertCompany(db(), { name, placeId: name });
+      await db().query(
+        "update companies set branch_key = 'physiotherapie', status = 'QUALIFIED', website_url = 'https://www.tc-rosenheim.de/' || $2 where id = $1",
+        [x.id, name.endsWith("3") ? "" : "ergo"],
+      );
+      await db().query(
+        `insert into audits (company_id, prompt_version, model, findings, rubric, commercial, summary)
+         values ($1, 'v1', 'm', '[]', '{}', '{}', 's')`,
+        [x.id],
+      );
+    }
+    expect(await probePoolSize(db(), ["physiotherapie"])).toBe(3);
+    const all = await pickProbeLeads(db(), ["physiotherapie"], 5);
+    expect(all).toHaveLength(3);
+    expect(
+      all.filter((x) => x.name.startsWith("Physio Probe 3") || x.name.startsWith("Physio Probe 4")),
+    ).toHaveLength(1);
+    await db().query(
+      "update companies set status = 'LOST' where name in ('Physio Probe 3', 'Physio Probe 4')",
+    );
     const sent: OutgoingMail[] = [];
     const box: Mailbox = {
       address: "christian@example.de",

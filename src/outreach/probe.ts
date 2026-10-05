@@ -43,18 +43,36 @@ export interface ProbeResult {
 
 /**
  * Zufällige Leads, wie sie ins Morgen-Paket kämen (Vorschau-Bild-Branche, qualifiziert, mit Audit), damit Probeläufe
- * nicht immer dieselbe Praxis zeigen.
+ * nicht immer dieselbe Praxis zeigen. Je Website nur ein Eintrag (05.10.2026: Google führt Standorte und Abteilungen
+ * wie "Therapie Centrum Rosenheim" mehrfach, die kamen sonst ständig dran).
  */
 export async function pickProbeLeads(db: Db, branches: readonly string[], count: number): Promise<Company[]> {
   const { rows } = await db.query<Company>(
-    `select c.* from companies c
-      where c.status in ('READY_FOR_CONTACT', 'QUALIFIED') and c.branch_key = any($1::text[])
-        and exists (select 1 from audits a where a.company_id = c.id)
-      order by random()
-      limit $2`,
+    `select * from (
+       select distinct on (coalesce(regexp_replace(lower(c.website_url), '^https?://(www\\.)?([^/]+).*$', '\\2'), c.id::text))
+              c.*
+         from companies c
+        where c.status in ('READY_FOR_CONTACT', 'QUALIFIED') and c.branch_key = any($1::text[])
+          and exists (select 1 from audits a where a.company_id = c.id)
+        order by coalesce(regexp_replace(lower(c.website_url), '^https?://(www\\.)?([^/]+).*$', '\\2'), c.id::text), random()
+     ) one_per_site
+     order by random()
+     limit $2`,
     [branches, count],
   );
   return rows;
+}
+
+/** Wie viele verschiedene Praxen (je Website eine) für Probeläufe in Frage kommen. */
+export async function probePoolSize(db: Db, branches: readonly string[]): Promise<number> {
+  const { rows } = await db.query<{ n: number }>(
+    `select count(distinct coalesce(regexp_replace(lower(c.website_url), '^https?://(www\\.)?([^/]+).*$', '\\2'), c.id::text))::int as n
+       from companies c
+      where c.status in ('READY_FOR_CONTACT', 'QUALIFIED') and c.branch_key = any($1::text[])
+        and exists (select 1 from audits a where a.company_id = c.id)`,
+    [branches],
+  );
+  return rows[0]?.n ?? 0;
 }
 
 export async function pickProbeLead(db: Db, branches: readonly string[]): Promise<Company | null> {

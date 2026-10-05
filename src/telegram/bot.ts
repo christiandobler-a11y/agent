@@ -33,7 +33,7 @@ import { levelText, reportProgress, xpSuffix } from "./game.js";
 import { gameState, loadGameConfig } from "../game/xp.js";
 import { buildPrototype, type PrototypeDeps } from "../prototype/run.js";
 import { chromiumTeaserShooter } from "../prototype/teaser.js";
-import { pickProbeLeads, runProbe } from "../outreach/probe.js";
+import { pickProbeLeads, probePoolSize, runProbe } from "../outreach/probe.js";
 import {
   createOffer,
   LexwareError,
@@ -371,6 +371,7 @@ export function createBot(options: BotOptions): AvelioBot {
     const ref = target ? "" : ctx.match.trim();
     const count = /^[1-5]$/.test(ref) ? Number(ref) : ctx.message?.text?.startsWith("/probelauf3") ? 3 : 1;
     let companies: Company[];
+    let pool: number | null = null;
     if (ref && !/^[1-5]$/.test(ref)) {
       const found = await findLead(pipeline.db, ref);
       if (found.kind !== "found") {
@@ -380,7 +381,10 @@ export function createBot(options: BotOptions): AvelioBot {
         return;
       }
       companies = [found.company];
-    } else companies = await pickProbeLeads(pipeline.db, teaserConfig.branchen, count);
+    } else {
+      companies = await pickProbeLeads(pipeline.db, teaserConfig.branchen, count);
+      pool = await probePoolSize(pipeline.db, teaserConfig.branchen);
+    }
     if (companies.length === 0) {
       await ctx.reply(
         "Noch kein passender Lead (Physio, qualifiziert, mit Audit). Die Nachtsuche liefert welche.",
@@ -388,7 +392,7 @@ export function createBot(options: BotOptions): AvelioBot {
       return;
     }
     await ctx.reply(
-      `🧪 Probelauf mit ${companies.map((c) => c.name).join(", ")} … (etwa eine halbe Minute je Praxis)`,
+      `🧪 Probelauf mit ${companies.map((c) => c.name).join(", ")}${pool !== null ? ` (zufällig aus ${pool} Praxen)` : ""} … (etwa eine halbe Minute je Praxis)`,
     );
     for (const company of companies) {
       try {
