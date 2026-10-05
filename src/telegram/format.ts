@@ -212,7 +212,7 @@ export const HELP_TEXT = [
   "Leads öffnen: /leads (Top 10 mit Buttons) · /lead Name (z. B. /lead Ariadne)",
   "Schnellbefehle: /heute · /nachlegen · /zahlen · /probelauf (/probelauf3) · /level · /status · /pipeline · /abdeckung · /kosten · /fehler · /budget (z. B. /budget +5)",
   "Kalibrierung: /kalibrieren (Firmen mit A/B/C bewerten, 💡 Vorbild merken) · /vorbilder · /auswertung",
-  "Berater: /berater (Runde jetzt starten, sonst sonntags von selbst) · /vorschlaege (was umgesetzt werden soll)",
+  "Berater: /berater (Runde jetzt starten, sonst sonntags von selbst) · /vorschlaege (was umgesetzt werden soll) · /fundstueck (was Lustiges oder Spannendes aus dem Netz, sonst dienstags und donnerstags)",
 ].join("\n");
 
 // ---------------------------------------------------------------------------------------------------------------

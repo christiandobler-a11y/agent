@@ -1,10 +1,13 @@
 import type Anthropic from "@anthropic-ai/sdk";
 import { zodOutputFormat } from "@anthropic-ai/sdk/helpers/zod";
 import { describe, expect, it, vi } from "vitest";
-import { berlinWeekday } from "../src/advisor/job.js";
+import { advisorTick, berlinWeekday, FIND_TRIGGER } from "../src/advisor/job.js";
+import { clipFind, findSomething } from "../src/advisor/finds.js";
+import type { PipelineContext } from "../src/queue/pipeline.js";
 import {
   advisorDue,
   advisorOutputSchema,
+  findDue,
   criticOutputSchema,
   decideSuggestion,
   keepSuggestions,
@@ -113,6 +116,26 @@ describe("Berater-Runde (rein)", () => {
     // 2026-10-04 war ein Sonntag; 23:30 UTC ist in Deutschland schon Montag.
     expect(berlinWeekday(new Date("2026-10-04T12:00:00Z"))).toBe(0);
     expect(berlinWeekday(new Date("2026-10-04T23:30:00Z"))).toBe(1);
+  });
+
+  it("Fundstück: an den eingestellten Tagen ab der Uhrzeit, Text gekürzt", () => {
+    const c = {
+      aktiv: true,
+      tag: "sonntag" as const,
+      ab: "18:00",
+      max_vorschlaege: 5,
+      websuchen: 8,
+      zwischendurch: { tage: ["dienstag" as const, "donnerstag" as const], ab: "16:30", websuchen: 3 },
+    };
+    expect(findDue(c, 2, "16:30")).toBe(true);
+    expect(findDue(c, 2, "16:00")).toBe(false);
+    expect(findDue(c, 3, "17:00")).toBe(false);
+    const { zwischendurch: _, ...ohne } = c;
+    expect(findDue(ohne, 2, "17:00")).toBe(false);
+    expect(loadAdvisorConfig().zwischendurch?.tage).toEqual(["dienstag", "donnerstag"]);
+    expect(clipFind("  kurz \n")).toBe("kurz");
+    expect(clipFind("x".repeat(20), 10)).toBe(`${"x".repeat(9)}…`);
+    expect(loadPrompt("fundstueck", "v1")).toContain("Quelle");
   });
 
   it("Konfiguration, Prompts und Ausgabe-Schemas sind gültig", () => {
@@ -389,5 +412,47 @@ describeDb("Berater-Runde", () => {
     // Nächste Runde sieht den Vorschlag samt Entscheidung im Lagebild.
     const next = await buildSnapshot({ db: db(), now: new Date(), settings: {}, branches: [] });
     expect(next.fruehere_vorschlaege[0]).toMatchObject({ titel: "Behalten", status: "umsetzen" });
+  });
+
+  it("Fundstück: merkt sich die letzten Themen und gibt sie beim nächsten Mal mit", async () => {
+    const research = vi
+      .fn()
+      .mockResolvedValueOnce({
+        text: "Erstes Ding 😄\nQuelle: https://a.de",
+        sources: [],
+        searches: 1,
+        costUsd: 0.03,
+      })
+      .mockResolvedValueOnce({ text: "Zweites Ding", sources: [], searches: 1, costUsd: 0.03 });
+    const llm = { research } as unknown as LlmGateway;
+    expect((await findSomething({ db: db(), llm, maxSearches: 3 })).text).toContain("Erstes Ding");
+    await findSomething({ db: db(), llm, maxSearches: 3 });
+    const second = research.mock.calls[1]![0] as { input: string; system: string; maxSearches: number };
+    expect(second.input).toContain("- Erstes Ding 😄");
+    expect(second.maxSearches).toBe(3);
+  });
+
+  it("Sweep: Fundstück und Wochen-Runde je einmal am Tag einreihen", async () => {
+    const send = vi.fn(() => Promise.resolve("job"));
+    const config = {
+      aktiv: true,
+      tag: "sonntag" as const,
+      ab: "18:00",
+      max_vorschlaege: 5,
+      websuchen: 8,
+      zwischendurch: { tage: ["sonntag" as const], ab: "16:30", websuchen: 3 },
+    };
+    const ctx = {
+      db: db(),
+      boss: { send },
+      now: () => new Date("2026-10-04T17:00:00Z"), // Sonntag 19:00 in Deutschland
+      advisor: { config, deps: () => ({}) },
+    } as unknown as PipelineContext;
+    expect(await advisorTick(ctx)).toBe(true);
+    expect(await advisorTick(ctx)).toBe(false);
+    expect(send.mock.calls.map((c) => (c as unknown[])[1])).toEqual([
+      { trigger: FIND_TRIGGER },
+      { trigger: "woche" },
+    ]);
   });
 });

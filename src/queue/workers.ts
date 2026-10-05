@@ -5,7 +5,7 @@ import { finishSearchRun, getSearchRun } from "../db/searchRuns.js";
 import { BudgetExceededError } from "../llm/budget.js";
 import { computeRecheckAfter } from "../pipeline/research/recheck.js";
 import { ADVISOR_QUEUE, PLAN_QUEUE, QUEUES, SWEEP_QUEUE, type QueueName } from "./boss.js";
-import { runAdvisorJob } from "../advisor/job.js";
+import { FIND_TRIGGER, runAdvisorJob, runFindJob } from "../advisor/job.js";
 import { runPlanJob } from "../autopilot/schedule.js";
 import {
   enqueue,
@@ -175,6 +175,10 @@ export async function startWorkers(ctx: PipelineContext): Promise<void> {
     if (result) console.log(JSON.stringify({ level: "info", msg: "Morgen-Paket vorbereitet", ...result }));
   });
   await ctx.boss.work<{ trigger?: string }>(ADVISOR_QUEUE, { pollingIntervalSeconds: 10 }, async ([job]) => {
+    if (job?.data.trigger === FIND_TRIGGER) {
+      await runFindJob(ctx);
+      return;
+    }
     const report = await runAdvisorJob(ctx, job?.data.trigger ?? "woche");
     if (report)
       console.log(

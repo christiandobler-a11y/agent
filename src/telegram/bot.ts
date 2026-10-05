@@ -1,5 +1,6 @@
 import { decideSuggestion, suggestionsByStatus } from "../advisor/run.js";
-import { startAdvisor } from "../advisor/job.js";
+import { FIND_TRIGGER, startAdvisor } from "../advisor/job.js";
+import { ADVISOR_QUEUE } from "../queue/boss.js";
 import { DECISION_TEXT, decisionKeyboard, parseAdvisorCallback, suggestionList } from "./advisor.js";
 import { Bot, InputFile, type Context } from "grammy";
 import { googleOwnerPhotos } from "../prototype/googlePhotos.js";
@@ -180,6 +181,7 @@ export const BOT_COMMANDS = [
   { command: "zahlen", description: "Mails, Antworten, Termine, Kosten" },
   { command: "berater", description: "Berater-Runde jetzt starten (Prozess + Wachstum)" },
   { command: "vorschlaege", description: "Vorschläge der Berater, die umgesetzt werden sollen" },
+  { command: "fundstueck", description: "Die Berater stöbern im Netz und erzählen was" },
   { command: "hilfe", description: "Was ich kann" },
 ];
 
@@ -290,6 +292,14 @@ export function createBot(options: BotOptions): AvelioBot {
         ? "🧠 Die Berater legen los: Zahlen ansehen, im Netz recherchieren, Vorschläge entwerfen und gegenprüfen. Dauert ein paar Minuten, ich melde mich ☕"
         : "🧠 Die Berater sitzen schon dran, der Bericht kommt gleich.",
     );
+  });
+  bot.command(["fundstueck", "fundstück"], async (ctx) => {
+    if (!pipeline.advisor) {
+      await ctx.reply("Die Berater sind hier nicht eingerichtet.");
+      return;
+    }
+    await pipeline.boss.send(ADVISOR_QUEUE, { trigger: FIND_TRIGGER }, { singletonKey: "advisor-find" });
+    await ctx.reply("🔎 Die Berater stöbern kurz im Netz, gleich kommt was 😄");
   });
   bot.command(["vorschlaege", "vorschläge"], async (ctx) => {
     const list = await suggestionsByStatus(pipeline.db, ["umsetzen", "spaeter"]);

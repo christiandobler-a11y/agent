@@ -29,12 +29,26 @@ export const advisorConfigSchema = z.object({
   ab: z.string().regex(/^\d\d:\d\d$/),
   max_vorschlaege: z.number().int().min(1).max(10),
   websuchen: z.number().int().min(0).max(30),
+  /** Fundstück zwischendurch (src/advisor/finds.ts); fehlt = keins. */
+  zwischendurch: z
+    .object({
+      tage: z.array(z.enum(WEEKDAYS)),
+      ab: z.string().regex(/^\d\d:\d\d$/),
+      websuchen: z.number().int().min(1).max(5),
+    })
+    .optional(),
 });
 
 export type AdvisorConfig = z.infer<typeof advisorConfigSchema>;
 
 export function loadAdvisorConfig(): AdvisorConfig {
   return loadYamlConfig("advisor.yaml", advisorConfigSchema);
+}
+
+/** Ist heute (Berliner Zeit) ein Fundstück dran und die Uhrzeit erreicht? Rein. */
+export function findDue(config: AdvisorConfig, weekday: number, time: string): boolean {
+  const z = config.zwischendurch;
+  return config.aktiv && !!z && z.tage.includes(WEEKDAYS[weekday]!) && time >= z.ab;
 }
 
 /** Ist jetzt (Berliner Zeit) der Tag der Wochen-Runde und die Uhrzeit erreicht? Rein. */

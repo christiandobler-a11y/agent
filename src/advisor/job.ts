@@ -6,6 +6,7 @@ import type { LlmGateway } from "../llm/gateway.js";
 import { regionCoverage } from "../pipeline/research/coverage.js";
 import {
   advisorDue,
+  findDue,
   loadAdvisorConfig,
   runAdvisor,
   type AdvisorConfig,
@@ -13,6 +14,10 @@ import {
   type AdvisorReport,
 } from "./run.js";
 import type { CoverageLine } from "./snapshot.js";
+import { findSomething } from "./finds.js";
+
+/** Auftrag der Berater-Queue: Wochen-Runde bzw. /berater, oder ein Fundstück zwischendurch. */
+export const FIND_TRIGGER = "fundstueck";
 
 const DAY_INDEX: Record<string, number> = { Sun: 0, Mon: 1, Tue: 2, Wed: 3, Thu: 4, Fri: 5, Sat: 6 };
 
@@ -26,10 +31,41 @@ export function berlinWeekday(d: Date): number {
 export async function advisorTick(ctx: PipelineContext): Promise<boolean> {
   if (!ctx.advisor) return false;
   const now = ctx.now();
-  if (!advisorDue(ctx.advisor.config, berlinWeekday(now), berlinTime(now))) return false;
+  const day = berlinWeekday(now);
+  const time = berlinTime(now);
+  if (
+    findDue(ctx.advisor.config, day, time) &&
+    (await claimState(ctx.db, `advisor-find:${berlinDate(now)}`, now.toISOString()))
+  )
+    await ctx.boss.send(ADVISOR_QUEUE, { trigger: FIND_TRIGGER }, { singletonKey: "advisor-find" });
+  if (!advisorDue(ctx.advisor.config, day, time)) return false;
   if (!(await claimState(ctx.db, `advisor:${berlinDate(now)}`, now.toISOString()))) return false;
   await startAdvisor(ctx, "woche");
   return true;
+}
+
+/** Job: Fundstück suchen und melden. Klappt es nicht, bleibt es still (es ist nur ein Extra). */
+export async function runFindJob(ctx: PipelineContext): Promise<string | null> {
+  if (!ctx.advisor) return null;
+  const deps = ctx.advisor.deps();
+  try {
+    const { text } = await findSomething({
+      db: deps.db,
+      llm: deps.llm,
+      maxSearches: deps.config.zwischendurch?.websuchen ?? 3,
+    });
+    await ctx.notifier.info?.(`🔎 Fundstück aus dem Berater-Büro\n\n${text}`);
+    return text;
+  } catch (err) {
+    console.error(
+      JSON.stringify({
+        level: "error",
+        msg: "Fundstück fehlgeschlagen",
+        error: err instanceof Error ? err.message : String(err),
+      }),
+    );
+    return null;
+  }
 }
 
 /** Runde einreihen (Sweep oder /berater). Läuft schon eine, kommt keine zweite dazu. */
