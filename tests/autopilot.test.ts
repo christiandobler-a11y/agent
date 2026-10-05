@@ -8,6 +8,7 @@ import {
   berlinDate,
   berlinWeekday,
   buildDailyPlan,
+  candidates,
   chooseChannel,
   dailyNewCount,
   loadAutopilotConfig,
@@ -596,6 +597,24 @@ describeDb("Morgen-Paket mit Datenbank", () => {
     await followUpSent(noAddress, 8);
     expect((await dueLetterFollowUps(db(), NOW, 7, 80, 3)).map((c) => c.id)).toEqual([top.id]);
     expect(await dueLetterFollowUps(db(), NOW, 7, 80, 0)).toEqual([]);
+  });
+
+  it("Kandidaten: erst die Praxen im Umkreis, dann nach Score", async () => {
+    await db().query("update companies set status = 'LOST'");
+    const far = await lead({ score: 95 });
+    const near = await lead({ score: 60 });
+    await db().query("update companies set lat = 47.84, lng = 11.14 where id = $1", [near.id]); // Weilheim
+    await db().query("update companies set lat = 47.86, lng = 12.12 where id = $1", [far.id]); // Rosenheim
+    const home = { lat: 47.7955, lng: 11.0645, umkreis_km: 30 };
+    expect((await candidates(db(), "2026-10-05", 10, ["physiotherapie"], home)).map((c) => c.id)).toEqual([
+      near.id,
+      far.id,
+    ]);
+    expect((await candidates(db(), "2026-10-05", 10, ["physiotherapie"])).map((c) => c.id)).toEqual([
+      far.id,
+      near.id,
+    ]);
+    await db().query("update companies set status = 'LOST'");
   });
 
   it("Plan bauen und in Telegram durchklicken: Senden geht übers Postfach, Zähler und nächste Karte", async () => {

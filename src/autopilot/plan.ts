@@ -35,6 +35,10 @@ export const autopilotConfigSchema = z.object({
     nur_werktags: z.boolean(),
     /** Nur Leads dieser Branchen (fehlt = Branchen der Nachtsuche, [] = alle). Vorgemerkte immer. */
     branchen: z.array(z.string()).optional(),
+    /** Erst die Praxen in der Nähe (Christian kann bei den ersten Kunden vorbeifahren), dann der Rest nach Score. */
+    heimat: z
+      .object({ ort: z.string(), lat: z.number(), lng: z.number(), umkreis_km: z.number().positive() })
+      .optional(),
     bremse: z
       .object({
         quote: z.number().min(0).max(1),
@@ -260,11 +264,12 @@ async function contactedGroups(db: Db, date: string): Promise<GroupIndex> {
 }
 
 /** Neue Kandidaten: vorgemerkt zuerst, dann qualifiziert nach Score; nie schon angeschrieben oder heute geplant. */
-async function candidates(
+export async function candidates(
   db: Db,
   date: string,
   limit: number,
   branches: readonly string[],
+  home?: { lat: number; lng: number; umkreis_km: number },
 ): Promise<Company[]> {
   // Von Christian vorgemerkte (READY_FOR_CONTACT) immer, sonst nur die Fokus-Branchen (leer = alle).
   const { rows } = await db.query<Company>(
@@ -275,9 +280,14 @@ async function candidates(
                          where p.company_id = c.id and (p.plan_date = $1 or p.status in ('done', 'dropped')))
         and not exists (select 1 from interactions i
                          where i.company_id = c.id and i.type = 'draft' and i.meta ? 'sent_at')
-      order by (c.status = 'READY_FOR_CONTACT') desc, c.current_score desc nulls last
+      order by (c.status = 'READY_FOR_CONTACT') desc,
+               -- Im Umkreis zuerst (Entfernung näherungsweise, reicht für ein paar Dutzend Kilometer).
+               (c.lat is not null and $4::float is not null
+                and 111.32 * sqrt(power(c.lat::float - $4::float, 2)
+                                  + power(cos(radians($4::float)) * (c.lng::float - $5::float), 2)) <= $6::float) desc,
+               c.current_score desc nulls last
       limit $2`,
-    [date, limit, branches],
+    [date, limit, branches, home?.lat ?? null, home?.lng ?? null, home?.umkreis_km ?? null],
   );
   return rows;
 }
@@ -377,7 +387,7 @@ export async function buildDailyPlan(deps: PlanDeps, by = "autopilot"): Promise<
     const branches = config.neue_kontakte.branchen ?? config.suche.branchen;
     const pool = Math.max(0, target - already) * 4 + (lettersLeft > 0 ? 300 : 0);
     const groups = await contactedGroups(db, date);
-    for (const company of await candidates(db, date, pool, branches)) {
+    for (const company of await candidates(db, date, pool, branches, config.neue_kontakte.heimat)) {
       const mailsDone = result.emails + already >= target;
       if (mailsDone && lettersLeft <= 0) break;
       await isolated(company, result, async () => {

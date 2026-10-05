@@ -17,6 +17,9 @@ neue_kontakte:
   # Nur Leads dieser Branchen (04.10.2026: Fokus Physio). [] = alle Branchen. Von Christian vorgemerkte Leads
   # ("bereit für Kontakt") kommen immer dran.
   branchen: [physiotherapie]
+  # Erst die Praxen in der Nähe (05.10.2026, Christian: "bei den ersten Kunden vor Ort überzeugen"), danach der Rest
+  # nach Score. Umkreis um Peißenberg: Weilheim, Schongau, Penzberg, Murnau, Ammersee-Westufer.
+  heimat: { ort: Peißenberg, lat: 47.7955, lng: 11.0645, umkreis_km: 30 }
   # Bremse: Kommen in den letzten `tage` Tagen mehr als `quote` der Mails als unzustellbar zurück (ab `mindestens`
   # gesendeten), geht es eine Stufe zurück und der Morgenbericht sagt es. Unzustellbare schaden dem Ruf am meisten.
   bremse: { quote: 0.05, mindestens: 20, tage: 7 }
