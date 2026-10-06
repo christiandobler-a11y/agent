@@ -17,7 +17,9 @@ erstkontakt: anruf
 anrufe:
   ziel_ja: 20
   je_ja: 3
-  briefe_ohne_nummer: 5 # Praxen ohne Telefonnummer: Brief, höchstens so viele am Tag
+  # 06.10.2026 (Christian): Briefe komplett raus. Ohne Nummer bzw. nach `versuche`× nicht erreicht: kein Brief mehr.
+  briefe_ohne_nummer: 0
+  brief_nach_versuchen: false
 # Stufen gelten nur für "mail" und "brief" (neue Kontakte je Werktag nach Tagen seit dem ersten Kontakt).
 neue_kontakte:
   stufen:
@@ -37,9 +39,10 @@ neue_kontakte:
 # Mail-Adresse und als zweites Nachfassen für sehr gute Leads (ab_score), wenn auch die Nachfass-Mail nach
 # `nachfassen_nach_tagen` Tagen unbeantwortet blieb. 05.10.2026: Briefe zählen nicht zu den neuen Kontakten des Tages
 # und werden gesammelt; sie kommen gebündelt an `tag` ins Morgen-Paket (höchstens `pro_woche`).
+# 06.10.2026 (Christian): Briefe komplett raus (pro_woche 0, vorher 15).
 briefe:
   tag: samstag
-  pro_woche: 15
+  pro_woche: 0
   ab_score: 80
   nachfassen_nach_tagen: 7
 prototyp_fuer_neue: true

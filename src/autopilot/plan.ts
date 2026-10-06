@@ -75,8 +75,10 @@ export const autopilotConfigSchema = z.object({
       ziel_ja: z.number().int().min(1),
       je_ja: z.number().int().min(1),
       briefe_ohne_nummer: z.number().int().min(0),
+      /** Nach "lieber per Post" bzw. `versuche`× nicht erreicht einen Brief planen. */
+      brief_nach_versuchen: z.boolean().default(true),
     })
-    .default({ ziel_ja: 20, je_ja: 3, briefe_ohne_nummer: 5 }),
+    .default({ ziel_ja: 20, je_ja: 3, briefe_ohne_nummer: 5, brief_nach_versuchen: true }),
   nachfassen: z.object({ nach_tagen: z.number().int().min(1), hoechstens: z.number().int().min(0) }),
   suche: z
     .object({
@@ -485,7 +487,7 @@ export async function buildDailyPlan(deps: PlanDeps, by = "autopilot"): Promise<
     );
     // 1c. Anruf-Modus: Brief für Praxen, die lieber Post wollten oder mehrfach nicht erreicht wurden.
     const attempts = outreachDeps.outreach.anruf?.versuche ?? 3;
-    if (callMode)
+    if (callMode && config.anrufe.brief_nach_versuchen)
       for (const company of await dueCallLetters(db, attempts, 10))
         await isolated(company, result, async () => {
           await planLetter(deps, company, date, by, "followup", result);

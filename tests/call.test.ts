@@ -276,6 +276,8 @@ describeDb("Anruf-Liste", () => {
     const config: AutopilotConfig = {
       ...base,
       erstkontakt: "anruf",
+      // Brief-Zweig für Praxen ohne Nummer weiter abgedeckt, auch wenn er in der echten Konfiguration aus ist.
+      anrufe: { ziel_ja: 20, je_ja: 3, briefe_ohne_nummer: 5, brief_nach_versuchen: true },
       neue_kontakte: { ...base.neue_kontakte, stufen: [{ ab_tag: 0, pro_tag: 3 }], heimat: undefined },
     };
     const mx = vi.fn(() => Promise.resolve(true));
@@ -510,7 +512,7 @@ describeDb("Anruf-Liste", () => {
     const config: AutopilotConfig = {
       ...base,
       erstkontakt: "anruf",
-      anrufe: { ziel_ja: 2, je_ja: 2, briefe_ohne_nummer: 0 },
+      anrufe: { ziel_ja: 2, je_ja: 2, briefe_ohne_nummer: 0, brief_nach_versuchen: false },
       neue_kontakte: { ...base.neue_kontakte, heimat: undefined },
     };
     const deps = {
