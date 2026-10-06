@@ -36,16 +36,35 @@ gepostet, dazu YouTube Shorts ohne Mehraufwand.
 
 ## 4. Formate
 
-### A. Hauptfolge „Ungefragt“ (1× pro Woche, 45–90 Sek.)
+### A. Hauptfolge „Ungefragt“ (1× pro Woche, 45–75 Sek.)
 
-1. **Haken (0–2 Sek.):** Split-Bild alte Seite links, neue rechts, Text: „Ich hab diesem Fahrradladen ungefragt eine
-   neue Website gebaut.“
-2. **Vor der Tür (bis 8 Sek.):** kurz, wer der Laden ist, warum du ihn magst. Nervosität ehrlich zeigen.
-3. **Rein, fragen, zeigen:** siehe Abschnitt 6, erst Einverständnis, dann Tablet raus.
-4. **Reaktion:** das Herzstück, ungeschnitten wirken lassen.
-5. **Ende offen oder mit Ergebnis:** „Will er sie? Teil 2.“ oder „Er nimmt sie.“ Auch ein Nein wird gezeigt.
+Keine Folge beginnt im Laden. Die Zuschauer fahren mit: schneller Anfang, ruhige Mitte, offenes Ende.
 
-Feste Eröffnung, damit man die Reihe erkennt: **„Ungefragt, Folge 3.“** und die Folgennummer im Bild.
+| Zeit       | Teil              | Was man sieht                                                                       | Schnitt                    |
+| ---------- | ----------------- | ----------------------------------------------------------------------------------- | -------------------------- |
+| 0–2 Sek.   | Haken             | Vorgriff auf den besten Moment (Reaktion) oder Split alt/neu, Text „Folge 3“        | hart                       |
+| 2–10 Sek.  | Weg dorthin       | Laptop nachts, Kaffee, Autoschlüssel, Fahrt, Ortsschild, Parken, Ladenfront, Türgriff | 0,5–1 Sek. je Bild, im Takt |
+| 10–15 Sek. | Vor der Tür       | Ein Satz zu dir: „Ich hab echt Puls gerade.“                                        | ein Schnitt                |
+| 15–50 Sek. | Drinnen           | Tablet raus, Seite zeigen, Reaktion                                                 | langsam, Reaktion stehen lassen |
+| 50–65 Sek. | Zurück im Auto    | Kurzes Fazit, offenes Ende: „Will er sie? Teil 2.“                                  | ein Schnitt                |
+
+Darüber liegt ab Sekunde 2 deine Stimme aus dem Off: „Ich hab diesem Laden ungefragt eine neue Website gebaut. Heute
+zeig ich sie ihm.“ Feste Eröffnung, damit man die Reihe erkennt: **„Ungefragt, Folge 3.“**
+
+**Drehliste für jeden Besuch** (Brille, je 3–5 Sek., lieber zu viel als zu wenig):
+
+1. Am Abend vorher: Laptop mit der neuen Seite, Hände auf der Tastatur, Bildschirm nah.
+2. Morgens: Kaffee, Tablet einstecken, Autoschlüssel nehmen, Haustür.
+3. Im Auto: Aufnahme **vor dem Losfahren** starten (nie während der Fahrt die Brille bedienen), Blick auf die Straße,
+   Ortsschild, Abbiegen auf den Parkplatz.
+4. Aussteigen, Ladenfront von gegenüber, Schaufenster, Hand am Türgriff.
+5. Vor der Tür: dein Satz in die Kamera (Handy in der Hand oder Spiegelung im Schaufenster).
+6. Drinnen nach dem Ja: Tablet, Reaktion, Händedruck.
+7. Nachher im Auto: 10–20 Sek. ehrliches Fazit, noch mit Puls.
+
+**Schnitt (Schnitt-Agent):** Er sucht den besten Moment für den Haken, schneidet den Weg im Takt eines festen
+Tempos (dazu passt dann ein TikTok-Sound gleicher Geschwindigkeit, den du in der App drüberlegst), setzt Untertitel
+und „Folge X“, gleicht den Ton an und schickt den Rohschnitt nach Telegram.
 
 ### B. Vorher/Nachher (15–25 Sek.)
 
