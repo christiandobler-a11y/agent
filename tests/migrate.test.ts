@@ -33,6 +33,7 @@ describeDb("migrate", () => {
       "schema_migrations",
       "search_coverage",
       "search_runs",
+      "shop_picks",
       "v_costs_daily",
       "website_snapshots",
     ]);

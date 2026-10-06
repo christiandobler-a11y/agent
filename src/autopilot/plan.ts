@@ -63,8 +63,9 @@ export const autopilotConfigSchema = z.object({
    * Grund: Werbe-Mails ohne Einwilligung sind nach § 7 UWG auch an Firmen unzulässig, Werbebriefe nicht.
    * "anruf" (06.10.2026): Praxen mit Telefonnummer kommen auf die Anruf-Liste (Ja → Mail mit Einwilligung, sonst
    * Brief), ohne Nummer gleich ein Brief; die Stufen zählen dann Anrufe und Briefe zusammen.
+   * "aus" (06.10.2026, Christian: Physio-Anrufe pausieren, Fokus Laden der Woche): keine neuen Kontakte.
    */
-  erstkontakt: z.enum(["mail", "brief", "anruf"]).default("mail"),
+  erstkontakt: z.enum(["mail", "brief", "anruf", "aus"]).default("mail"),
   /**
    * Anruf-Modus (06.10.2026, Christian: "Tagesziel ist erst erreicht, wenn ich 20× eine Mail zustellen durfte"): Ziel
    * sind `ziel_ja` Einwilligungen am Tag. Avelio legt je fehlendem Ja `je_ja` Anruf-Karten bereit und legt nach, sobald
@@ -471,7 +472,9 @@ export async function buildDailyPlan(deps: PlanDeps, by = "autopilot"): Promise<
       });
     }
 
-    // 2. Neue Leads. Im Brief-Modus zählen die Stufen Briefe; Bremsen für Unzustellbare und Spam gelten nur für Mails.
+    // 2. Neue Leads (nicht bei erstkontakt "aus"). Im Brief-Modus zählen die Stufen Briefe; Bremsen für Unzustellbare
+    // und Spam gelten nur für Mails.
+    if (config.erstkontakt === "aus") return result;
     const bounces = offline
       ? { sent: 0, bounced: 0 }
       : await recentBounces(db, now, config.neue_kontakte.bremse.tage);

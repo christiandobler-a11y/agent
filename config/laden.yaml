@@ -1,0 +1,13 @@
+# Laden der Woche (06.10.2026, Christian): Statt Kaltakquise besucht Christian einen Laden in der Nähe, zeigt eine für
+# ihn gebaute Seite und filmt das (mit Freigabe) für TikTok/Instagram. Avelio sucht den Laden aus und liefert ein
+# Design-Briefing mit drei klar verschiedenen Richtungen; gebaut wird die Seite gemeinsam mit Claude (kein KI-Einheitsbrei).
+aktiv: true
+# Vorschlag kommt von selbst an diesem Wochentag ab der Uhrzeit (sonst /laden).
+tag: montag
+ab: "07:30"
+# Ladentypen (Schlüssel aus config/branches.yaml) und Umkreis um die Heimat (autopilot.yaml → neue_kontakte.heimat).
+branchen: [fahrrad, friseur, kosmetik]
+umkreis_km: 25
+# Nur Läden, die bei Google gut dastehen: dort ist die Reaktion vor der Kamera eher positiv.
+min_bewertung: 4.2
+min_bewertungen: 10

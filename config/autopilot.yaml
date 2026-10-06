@@ -9,7 +9,8 @@ zeiten:
 # 06.10.2026 (Christian): kein Erstkontakt per Kaltmail mehr (§ 7 UWG: Werbe-Mails ohne Einwilligung sind auch an
 # Firmen unzulässig). "anruf": Praxen mit Telefonnummer kommen auf die Anruf-Liste (Ja → Mail mit Einwilligung,
 # lieber Post oder 3× nicht erreicht → Brief), ohne Nummer gleich ein Brief. "brief": nur Briefe. "mail": wie vorher.
-erstkontakt: anruf
+# 06.10.2026 (Christian): Physio-Anrufe pausiert, Fokus Laden der Woche (config/laden.yaml). Wieder an: anruf.
+erstkontakt: aus
 # Anruf-Modus (06.10.2026, Christian: "Tagesziel ist erst erreicht, wenn ich 20× eine Mail zustellen durfte, so viele
 # Leads müssen wir immer im Rücken haben"): Ziel sind `ziel_ja` Einwilligungen am Tag. Je fehlendem Ja liegen `je_ja`
 # Anruf-Karten bereit (Karten sind schnell gebaut, Bild und Vorschau-Seite erst nach dem Ja); sind sie aufgebraucht,
@@ -73,4 +74,5 @@ suche:
       ostallgaeu,
       rosenheim,
     ]
-  branchen: [physiotherapie]
+  # 06.10.2026 (Christian): Laden der Woche, erst Fahrrad und Friseur/Kosmetik rund um Peißenberg. Physio pausiert.
+  branchen: [fahrrad, friseur, kosmetik]

@@ -1,5 +1,7 @@
 import { decideSuggestion, suggestionsByStatus } from "../advisor/run.js";
 import { FIND_TRIGGER, startAdvisor } from "../advisor/job.js";
+import { proposeShop } from "../shop/job.js";
+import { handleShopCallback, sendShopProposal } from "./shop.js";
 import { ADVISOR_QUEUE } from "../queue/boss.js";
 import { DECISION_TEXT, decisionKeyboard, parseAdvisorCallback, suggestionList } from "./advisor.js";
 import { Bot, InputFile, type Context } from "grammy";
@@ -183,6 +185,7 @@ export const BOT_COMMANDS = [
   { command: "berater", description: "Berater-Runde jetzt starten (Prozess + Wachstum)" },
   { command: "vorschlaege", description: "Vorschläge der Berater, die umgesetzt werden sollen" },
   { command: "fundstueck", description: "Die Berater stöbern im Netz und erzählen was" },
+  { command: "laden", description: "Laden der Woche: Vorschlag mit Design-Briefing" },
   { command: "hilfe", description: "Was ich kann" },
 ];
 
@@ -296,6 +299,21 @@ export function createBot(options: BotOptions): AvelioBot {
         : "🧠 Die Berater sitzen schon dran, der Bericht kommt gleich.",
     );
   });
+  // Laden der Woche jetzt vorschlagen (sonst montags von selbst).
+  bot.command(["laden", "shop"], async (ctx) => {
+    if (!pipeline.shop) {
+      await ctx.reply("Der Laden der Woche ist hier nicht eingerichtet.");
+      return;
+    }
+    const p = await proposeShop(pipeline.db, pipeline.shop, pipeline.now());
+    if (!p) {
+      await ctx.reply(
+        "Gerade finde ich keinen passenden Laden in deiner Nähe (gut bewertet, schwache Website). Die Nachtsuche legt nach.",
+      );
+      return;
+    }
+    await sendShopProposal(ctx.api, [ctx.chat.id], p);
+  });
   bot.command(["fundstueck", "fundstück"], async (ctx) => {
     if (!pipeline.advisor) {
       await ctx.reply("Die Berater sind hier nicht eingerichtet.");
@@ -316,7 +334,9 @@ export function createBot(options: BotOptions): AvelioBot {
 
   bot.command(["vorbilder", "inspo"], async (ctx) => {
     const arg = ctx.match.trim().toLowerCase();
-    const branch = arg === "alle" ? null : arg || "physiotherapie";
+    // Standard: erste Branche der Nachtsuche (06.10.2026: Fahrrad statt Physio).
+    const branch =
+      arg === "alle" ? null : arg || (loadAutopilotConfig().suche.branchen[0] ?? "physiotherapie");
     await replyLong(ctx, designNotesMessage(await designNotes(pipeline.db, branch), branch));
   });
   bot.command(["auswertung", "kalibrierung"], async (ctx) => {
@@ -620,6 +640,7 @@ export function createBot(options: BotOptions): AvelioBot {
   });
 
   bot.on("callback_query:data", async (ctx) => {
+    if (await handleShopCallback(ctx, pipeline)) return;
     const plan = planDeps();
     if (plan && (await handlePlanCallback(ctx, plan, by(ctx.chat?.id)))) return;
     const crm = parseCrmCallback(ctx.callbackQuery.data);

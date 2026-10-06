@@ -1,6 +1,6 @@
 import { loadEnv, requireKeys } from "./config/env.js";
 import { googleOwnerPhotos } from "./prototype/googlePhotos.js";
-import { heroForCompany } from "./prototype/heroPhoto.js";
+import { collectCandidates, heroForCompany } from "./prototype/heroPhoto.js";
 import { createDb, type Db } from "./db/client.js";
 import { createBudgetGuard } from "./llm/budget.js";
 import { loadModelsConfig } from "./llm/config.js";
@@ -20,6 +20,7 @@ import { createBoss, ensureQueues, loadQueueConfig } from "./queue/boss.js";
 import { logNotifier, type Notifier } from "./queue/notifier.js";
 import { loadAutopilotConfig } from "./autopilot/plan.js";
 import { advisorContext } from "./advisor/job.js";
+import { loadShopConfig } from "./shop/pick.js";
 import { loadOutreachConfig } from "./outreach/config.js";
 import { chromiumLetterRenderer } from "./outreach/letterPdf.js";
 import { cachedOpeningHours, cachedPlaceDetails } from "./prototype/placeDetails.js";
@@ -117,6 +118,21 @@ export async function createApp(options: { notifier?: Notifier; worker?: boolean
   ctx.seedBoxes = seedBoxesFromEnv(env, mail);
   ctx.mail = mail;
   ctx.advisor = advisorContext(ctx, llm);
+  // Laden der Woche (src/shop/): Vorschlag montags, Briefing mit drei Richtungen auf Knopfdruck.
+  const home = loadAutopilotConfig().neue_kontakte.heimat;
+  ctx.shop = {
+    config: loadShopConfig(),
+    home: home ? { lat: home.lat, lng: home.lng } : null,
+    briefing: () => ({
+      db,
+      llm,
+      collect: (url) => collectCandidates(url, process.env.CHROMIUM_PATH, process.env.HTTPS_PROXY),
+      hours: cachedOpeningHours({ db, budget, apiKey: keys.GOOGLE_API_KEY }),
+      details: cachedPlaceDetails({ db, budget, apiKey: keys.GOOGLE_API_KEY }),
+      desktopScreenPx: crawlConfig.desktop.height * crawlConfig.desktop.scale,
+      branchLabel: (key) => (key ? (branches[key]?.label ?? key) : null),
+    }),
+  };
   ctx.autopilot = {
     config: loadAutopilotConfig(),
     planDeps: () => ({

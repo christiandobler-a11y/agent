@@ -22,6 +22,7 @@ import {
   runCompletedMessage,
 } from "../src/telegram/format.js";
 import { telegramNotifier } from "../src/telegram/notifier.js";
+import { loadAutopilotConfig } from "../src/autopilot/plan.js";
 import { describeDb, useTestDb } from "./helpers/db.js";
 
 const ALLOWED = 4242;
@@ -461,7 +462,9 @@ describeDb("Telegram-Bot und Manager mit Datenbank", () => {
     expect(toolStep).not.toHaveBeenCalled();
   });
 
-  it("Kalibrierung: standardmäßig nur Physio, Vorbild merken mit Notiz, /vorbilder", async () => {
+  it("Kalibrierung: standardmäßig nur die Branchen der Nachtsuche, Vorbild merken mit Notiz, /vorbilder", async () => {
+    // Fokus-Branche aus config/autopilot.yaml → suche.branchen (06.10.2026: Fahrrad statt Physio).
+    const focus = loadAutopilotConfig().suche.branchen[0]!;
     const scored = async (name: string, branch: string) => {
       const { company } = await upsertCompany(db(), {
         name,
@@ -477,7 +480,7 @@ describeDb("Telegram-Bot und Manager mit Datenbank", () => {
       await db().query("update companies set current_score_id = $2 where id = $1", [company.id, rows[0]!.id]);
       return company;
     };
-    const physio = await scored("Physio Vorbild", "physiotherapie");
+    const physio = await scored("Physio Vorbild", focus);
     await scored("Gasthaus Andere", "gastro");
     const pctx = {
       ...ctx(),
@@ -506,7 +509,7 @@ describeDb("Telegram-Bot und Manager mit Datenbank", () => {
     );
     expect(rows).toEqual([
       {
-        branch_key: "physiotherapie",
+        branch_key: focus,
         url: "https://physiovorbild.de/",
         note: "Übergänge zwischen den Abschnitten & Team-Fotos",
       },

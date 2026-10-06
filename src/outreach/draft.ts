@@ -378,7 +378,8 @@ export async function draftEmail(
   // Ablauf "vorschau" (05.10.2026, Christian: volle Praxen nehmen sich keinen Video-Call): keine Termine in der
   // Erstmail mit Vorschau-Bild, sondern das Angebot einer echten Vorschau-Seite; das Gespräch kommt danach.
   const offerPreview = k.ablauf === "vorschau" && Boolean(teaser) && !previewUrl;
-  const slots = offerPreview ? null : proposed;
+  // Nach dem Ja am Telefon gibt es keine Terminvorschläge; sonst würden sie Termine für andere Leads blockieren.
+  const slots = offerPreview || afterCall ? null : proposed;
   const slotSentence = slots ? (form === "ihr" ? duToIhr(slots.sentence) : slots.sentence) : null;
   const linkSentence = previewUrl
     ? inForm(k.entwurf_satz, k.entwurf_satz_du).replace("{link}", previewUrl)

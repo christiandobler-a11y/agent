@@ -13,6 +13,7 @@ import {
 import { levelLine, reportProgress } from "./game.js";
 import { sendPlanHeader } from "./plan.js";
 import { advisorHeader, suggestionCard } from "./advisor.js";
+import { sendShopProposal } from "./shop.js";
 
 /**
  * Meldungen per Telegram. Ziel: der Chat, aus dem die Suche kam (`requested_by = telegram:<id>`), sonst alle
@@ -95,6 +96,9 @@ export function telegramNotifier(
     },
     async info(text) {
       await sendAll(targets(), escapeHtml(text));
+    },
+    async shopProposal(p) {
+      await sendShopProposal(api, targets(), p);
     },
     async advisorReport(report) {
       // Manuell gestartet (/berater): nur in den Chat, aus dem es kam; die Wochen-Runde an alle.

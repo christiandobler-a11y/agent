@@ -291,6 +291,7 @@ describeDb("E-Mail-Entwurf (Datenbank)", () => {
     );
     expect(d.body).toContain("Wenn Ihnen die Richtung gefällt, sagen Sie kurz Bescheid");
     expect(d.body).not.toContain("Die ganze Seite");
+    expect(d.slots).toEqual([]); // keine Termine angeboten, also auch keine belegt
     expect(d.body).not.toContain("Video-Call");
     expect(d.body).not.toContain("aus dem Impressum");
     expect(d.body).toContain("Eine kurze Antwort genügt, dann melde ich mich nicht mehr.");

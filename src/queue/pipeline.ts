@@ -21,6 +21,7 @@ import { isQuietTime, loadCrmConfig, type CrmConfig } from "../crm/status.js";
 import { claimState } from "../db/appState.js";
 import { autopilotTick, mailTick, monitorTick, queueTick } from "../autopilot/schedule.js";
 import { advisorTick } from "../advisor/job.js";
+import { shopTick, type ShopContext } from "../shop/job.js";
 import type { AdvisorConfig, AdvisorDeps } from "../advisor/run.js";
 import type { SeedBox } from "../outreach/seed.js";
 import type { AutopilotConfig, PlanDeps } from "../autopilot/plan.js";
@@ -77,6 +78,8 @@ export interface PipelineContext {
   autopilot?: { config: AutopilotConfig; planDeps: () => PlanDeps };
   /** Berater-Runde (src/advisor/): einmal die Woche bzw. auf /berater. */
   advisor?: { config: AdvisorConfig; deps: () => AdvisorDeps };
+  /** Laden der Woche (src/shop/): Vorschlag und Design-Briefing. */
+  shop?: ShopContext;
 }
 
 export async function enqueue(
@@ -391,6 +394,11 @@ export async function sweep(ctx: PipelineContext): Promise<void> {
   await autopilotTick(ctx).catch((err: unknown) =>
     console.error(
       JSON.stringify({ level: "error", msg: "Morgen-Paket-Takt fehlgeschlagen", error: String(err) }),
+    ),
+  );
+  await shopTick(ctx).catch((err: unknown) =>
+    console.error(
+      JSON.stringify({ level: "error", msg: "Laden-der-Woche-Takt fehlgeschlagen", error: String(err) }),
     ),
   );
   await advisorTick(ctx).catch((err: unknown) =>
