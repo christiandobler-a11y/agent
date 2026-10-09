@@ -133,7 +133,8 @@ ausprobieren kann. Nach Schritt 6 ist ein Abstimmungstermin (Kalibrierung) vorge
   `suche.ab` die nächste nicht vollständig abgesuchte Kombination Region × Branche als Komplett-Suche
   (`requested_by = 'autopilot'`, keine Einzelmeldung in der Nacht), höchstens `pro_nacht`, nie zwei gleichzeitig.
 - **Spiel** (`src/game/xp.ts`, `config/game.yaml`, Telegram `/level`, `src/telegram/game.ts`): XP, Level und Abzeichen
-  werden nur aus dem Verlauf berechnet (Status-Wechsel je Firma einmal, Nachfass-Mails, perfekte Tage im Morgen-Paket),
+  werden nur aus dem Verlauf berechnet (Trainingsgespräche aus `training_sessions`, Status-Wechsel je Firma einmal, aus
+  der Mail-Zeit auch Nachfass-Mails und perfekte Tage; Level seit 09.10.2026 auf Training und Ladenbesuche ausgerichtet),
   nie extra gezählt. `checkProgress` merkt sich in `app_state` (`game:seen`), was schon gefeiert wurde.
 - Recherche-Reihenfolge: Places → Dubletten → **Gate (Code) → Prefilter (LLM)**. Das Gate läuft zuerst, weil es
   nichts kostet. Skip-Gründe entsprechen den Schlüsseln in `config/recheck.yaml`.

@@ -39,6 +39,9 @@ export interface GameStats {
   trainings: number;
   trainingXp: number;
   mastered: number;
+  /** Trainings, in denen der Inhaber Ja gesagt hat, und der beste Schnitt eines Gesprächs. */
+  trainingYes: number;
+  bestScore: number;
 }
 
 /** Bedingungen der Abzeichen (Schlüssel wie in config/game.yaml). */
@@ -54,6 +57,9 @@ const BADGES: Record<string, (s: GameStats) => boolean> = {
   serie_20: (s) => s.bestStreak >= 20,
   erstes_training: (s) => s.trainings >= 1,
   training_10: (s) => s.trainings >= 10,
+  training_50: (s) => s.trainings >= 50,
+  erstes_ja: (s) => s.trainingYes >= 1,
+  glatte_fuenf: (s) => s.bestScore >= 5,
   einwand_profi: (s) => s.mastered >= 10,
 };
 
@@ -143,9 +149,16 @@ export async function gameStats(
   // Bis `until` vor jetzt (z. B. Tagesanfang) zählt der heutige Tag nicht mit.
   const counted = days.filter((d) => !d.today || (until >= now && d.perfect));
   const s = streaks(counted);
-  const { rows: t } = await db.query<{ n: number; xp: number; mastered: number }>(
+  const { rows: t } = await db.query<{
+    n: number;
+    xp: number;
+    mastered: number;
+    yes: number;
+    best: string | null;
+  }>(
     `select count(*)::int as n, coalesce(sum(xp), 0)::int as xp,
-            count(distinct scenario) filter (where score >= $2)::int as mastered
+            count(distinct scenario) filter (where score >= $2)::int as mastered,
+            count(*) filter (where decision = 'ja')::int as yes, max(score) as best
        from training_sessions where status = 'fertig' and finished_at <= $1`,
     [until, masteredFrom],
   );
@@ -161,6 +174,8 @@ export async function gameStats(
     trainings: t[0]?.n ?? 0,
     trainingXp: t[0]?.xp ?? 0,
     mastered: t[0]?.mastered ?? 0,
+    trainingYes: t[0]?.yes ?? 0,
+    bestScore: t[0]?.best != null ? Number(t[0].best) : 0,
   };
 }
 

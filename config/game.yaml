@@ -8,33 +8,36 @@ xp:
   gewonnen: 100 # Kunde gewonnen
   perfekter_tag: 10 # Morgen-Paket komplett abgearbeitet
 
-# Level nach XP; bei 5 XP je Lead entspricht das grob 10, 20, 30, 50, 100 … kontaktierten Leads.
+# Level nach XP (09.10.2026 neu, Christian: "Postbote etc. passt nicht mehr"): der Weg vom ersten Training bis zum
+# eigenen Kundenstamm. Ein Trainingsgespräch bringt grob 10 bis 25 XP, ein Kunde 100.
 level:
   - { ab: 0, name: Startklar, emoji: "🌱" }
-  - { ab: 50, name: Erste Zehn, emoji: "📬" }
-  - { ab: 100, name: Postbote, emoji: "✉️" }
-  - { ab: 150, name: Kaltakquise-Kadett, emoji: "🎯" }
-  - { ab: 250, name: Durchstarter, emoji: "🔥" }
-  - { ab: 500, name: Hunderter-Club, emoji: "💯" }
-  - { ab: 750, name: Pipeline-Pilot, emoji: "🚀" }
-  - { ab: 1000, name: Akquise-Profi, emoji: "🏆" }
-  - { ab: 1500, name: Physio-Flüsterer, emoji: "👑" }
-  - { ab: 2500, name: Legende, emoji: "💎" }
-  - { ab: 5000, name: Avelio-Imperium, emoji: "🌍" }
+  - { ab: 50, name: Türöffner, emoji: "🚪" }
+  - { ab: 100, name: Zuhörer, emoji: "👂" }
+  - { ab: 175, name: Einwand-Knacker, emoji: "🔓" }
+  - { ab: 275, name: Ladenheld, emoji: "🏪" }
+  - { ab: 400, name: Abschluss-Ass, emoji: "🤝" }
+  - { ab: 600, name: Oberland-Original, emoji: "🏔️" }
+  - { ab: 850, name: Verkaufsprofi, emoji: "🏆" }
+  - { ab: 1200, name: Stammkunden-Magnet, emoji: "🧲" }
+  - { ab: 2000, name: Legende, emoji: "💎" }
+  - { ab: 3500, name: Avelio-Imperium, emoji: "🌍" }
 
 # Abzeichen (Bedingung im Code, src/game/xp.ts, gleiche Schlüssel).
 abzeichen:
-  erste_mail: { name: Erster Schuss, emoji: "📤", text: Der erste Lead ist angeschrieben. }
-  erste_antwort: { name: Eis gebrochen, emoji: "💬", text: Die erste Antwort ist da. }
-  erster_interessent: { name: Fuß in der Tür, emoji: "🤝", text: Der erste Interessent. }
-  erster_kunde: { name: Erster Kunde, emoji: "🥇", text: Der erste Auftrag ist gewonnen. }
-  drei_kunden: { name: Hattrick, emoji: "🎩", text: Drei Kunden gewonnen. }
-  zehn_kunden: { name: Agentur-Modus, emoji: "🏢", text: Zehn Kunden gewonnen. }
-  perfekter_tag: { name: Perfekter Tag, emoji: "✅", text: Ein Morgen-Paket komplett abgearbeitet. }
-  serie_5: { name: Am Ball, emoji: "⚡", text: Fünf Pakete in Folge komplett. }
-  serie_20: { name: Maschine, emoji: "🤖", text: Zwanzig Pakete in Folge komplett. }
-  # Sales-Trainer (09.10.2026): XP je Gespräch rechnet src/trainer/session.ts (config/trainer.yaml → xp).
+  # Training (src/trainer/)
   erstes_training: { name: Erste Runde, emoji: "🎭", text: Das erste Trainingsgespräch geführt. }
+  erstes_ja: { name: Überzeugt, emoji: "✅", text: Im Training hat ein Inhaber Ja gesagt. }
+  glatte_fuenf: { name: Glatte Fünf, emoji: "💯", text: Ein Trainingsgespräch mit Schnitt 5. }
   training_10: { name: Sparringspartner, emoji: "🥊", text: Zehn Trainingsgespräche geführt. }
+  training_50: { name: Dauerläufer, emoji: "🏃", text: Fünfzig Trainingsgespräche geführt. }
   einwand_profi:
     { name: Einwand-Profi, emoji: "🧠", text: Zehn verschiedene Einwände gemeistert (Schnitt ab 4). }
+  # Echte Kunden (Vertriebsstatus in der Lead-Karte)
+  erster_interessent: { name: Fuß in der Tür, emoji: "🤝", text: Der erste echte Interessent. }
+  erster_kunde: { name: Erster Kunde, emoji: "🥇", text: Die erste Website ist verkauft. }
+  drei_kunden: { name: Hattrick, emoji: "🎩", text: Drei Websites verkauft. }
+  zehn_kunden: { name: Agentur-Modus, emoji: "🏢", text: Zehn Websites verkauft. }
+  # Aus der Mail-Zeit (bleiben, wer sie hat, behält sie)
+  erste_mail: { name: Erster Schuss, emoji: "📤", text: Der erste Lead ist angeschrieben. }
+  erste_antwort: { name: Eis gebrochen, emoji: "💬", text: Die erste Antwort ist da. }

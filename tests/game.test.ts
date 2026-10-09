@@ -26,11 +26,13 @@ const stats = (over: Partial<GameStats> = {}): GameStats => ({
   trainings: 0,
   trainingXp: 0,
   mastered: 0,
+  trainingYes: 0,
+  bestScore: 0,
   ...over,
 });
 
 describe("Spiel (rein)", () => {
-  it("XP: 5 je Lead, Level bei 10, 20, 30, 50, 100 Leads", () => {
+  it("XP aus Verlauf und Training, Level", () => {
     expect(xpOf(stats({ contacted: 10 }), c)).toBe(50);
     expect(xpOf(stats({ contacted: 2, replied: 1, interested: 1, won: 1, perfectDays: 1 }), c)).toBe(
       10 + 15 + 25 + 100 + 10,
@@ -39,15 +41,23 @@ describe("Spiel (rein)", () => {
     expect(levelOf(49, c).number).toBe(1);
     expect(levelOf(50, c)).toMatchObject({ number: 2, next: { at: 100 } });
     expect(levelOf(75, c).progress).toBeCloseTo(0.5);
-    expect(levelOf(500, c).name).toBe("Hunderter-Club");
+    expect(levelOf(500, c).name).toBe("Abschluss-Ass");
+    expect(xpOf(stats({ trainingXp: 37, won: 1 }), c)).toBe(137);
     expect(levelOf(99999, c)).toMatchObject({ next: null, progress: 1 });
   });
 
   it("Abzeichen und Serien", () => {
     expect(badgesOf(stats(), c)).toEqual([]);
     expect(badgesOf(stats({ contacted: 1, replied: 1, won: 3, bestStreak: 5, perfectDays: 5 }), c)).toEqual(
-      expect.arrayContaining(["erste_mail", "erste_antwort", "erster_kunde", "drei_kunden", "serie_5"]),
+      expect.arrayContaining(["erste_mail", "erste_antwort", "erster_kunde", "drei_kunden"]),
     );
+    expect(badgesOf(stats({ trainings: 10, trainingYes: 1, bestScore: 5, mastered: 10 }), c)).toEqual([
+      "erstes_training",
+      "erstes_ja",
+      "glatte_fuenf",
+      "training_10",
+      "einwand_profi",
+    ]);
     const p = (perfect: boolean) => ({ perfect });
     expect(streaks([p(true), p(true), p(false), p(true)])).toEqual({ perfectDays: 3, streak: 1, best: 2 });
     expect(streaks([])).toEqual({ perfectDays: 0, streak: 0, best: 0 });
@@ -64,11 +74,12 @@ describe("Spiel (rein)", () => {
     expect(text).toContain("Eis gebrochen");
     expect(celebrationText({ state, gained: 5, levelUp: false, newBadges: [] }, c)).toBeNull();
     const overview = levelText(state, c);
-    expect(overview).toContain("Leads angeschrieben: <b>10</b>");
-    expect(overview).toContain("🔒 Erster Kunde");
+    expect(overview).toContain("Aus der Mail-Zeit: 10 angeschrieben, 1 Antworten");
+    expect(overview).toContain("🔒 Erste Runde");
+    expect(overview).not.toMatch(/Postbote|Mails ✉️/);
     expect(overview).toContain("📤 Erster Schuss · 💬 Eis gebrochen");
-    expect(overview).toContain("ca. 7 Mails"); // 65 XP, noch 35 bis Postbote, 5 XP je Mail
-    expect(levelPath(state, c)).toBe("🌱 👉📬 " + Array(9).fill("◽").join(" "));
+    expect(overview).toContain("ca. 3 Trainingsrunden"); // 65 XP, noch 35 bis Zuhörer, ca. 12 XP je Runde
+    expect(levelPath(state, c)).toBe("🌱 👉🚪 " + Array(9).fill("◽").join(" "));
   });
 });
 
@@ -105,7 +116,7 @@ describeDb("Spiel mit Datenbank", () => {
     const first = await checkProgress(db(), NOW, c);
     expect(first.gained).toBe(50 + 15 + 10);
     expect(first.levelUp).toBe(true);
-    expect(first.newBadges).toEqual(expect.arrayContaining(["erste_mail", "erste_antwort", "perfekter_tag"]));
+    expect(first.newBadges).toEqual(expect.arrayContaining(["erste_mail", "erste_antwort"]));
     const again = await checkProgress(db(), NOW, c);
     expect(again).toMatchObject({ gained: 0, levelUp: false, newBadges: [] });
   });

@@ -65,6 +65,16 @@ angebot: >-
   Mitarbeiter ohne Einverständnis kommen nicht ins Bild. Die Sprach- und KI-Funktionen der Brille nutzt er im Laden
   nicht. Beim Bauen der Seiten helfen ihm KI-Werkzeuge; Briefing, Gestaltung, Prüfung und Betreuung macht er selbst.
 
+# Was auf der gezeigten Seite zu sehen ist (09.10.2026, Christian: "ich kann ja nicht die komplette Website erklären").
+# Der Inhaber sieht es, sobald Christian sie zeigt; Handlungen schreibt Christian in eckige Klammern.
+seite: >-
+  Die neue Seite ist für genau diesen Laden gebaut, mit seinem Namen und Logo, und sieht auf dem Handy richtig gut aus.
+  Ganz oben ein großes Foto vom Laden bzw. der Arbeit, darunter sofort Öffnungszeiten, Adresse und ein Knopf zum
+  Anrufen und zur Anfahrt. Die Leistungen bzw. das Sortiment stehen klar und kurz da, dazu ein paar Sätze über den
+  Laden und das Team, die echten Google-Bewertungen mit Sternen und Kontakt mit Karte. Lädt schnell, moderne, ruhige
+  Gestaltung, kein Baukasten-Look. Die alte Seite daneben wirkt veraltet, ist auf dem Handy schwer lesbar, und
+  Öffnungszeiten oder Telefonnummer muss man suchen.
+
 # Szenarien: `lage` sieht Christian zu Beginn, `person` und `haltung` nur der Inhaber (geheim), `tipp` auf Knopfdruck.
 # Schwierigkeit 1 bis 3.
 szenarien:

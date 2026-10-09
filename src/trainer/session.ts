@@ -10,8 +10,8 @@ import type { LlmGateway } from "../llm/gateway.js";
  * 5. Szenario-Wahl und XP rechnet Code (rein, unit-getestet), nie das LLM.
  */
 
-export const TRAINER_PROMPT = "v1";
-export const COACH_PROMPT = "v1";
+export const TRAINER_PROMPT = "v2";
+export const COACH_PROMPT = "v2";
 
 const scenarioSchema = z.object({
   titel: z.string(),
@@ -52,6 +52,8 @@ export const trainerConfigSchema = z.object({
     .default({ aktiv: false, tage: [], haeppchen: [], einladung: null, wochenbilanz: null }),
   themen: z.array(z.string()).default([]),
   angebot: z.string(),
+  /** Was auf der gezeigten Seite zu sehen ist (der Inhaber sieht es, Christian muss es nicht beschreiben). */
+  seite: z.string(),
   szenarien: z.record(z.string(), scenarioSchema),
 });
 export type TrainerConfig = z.infer<typeof trainerConfigSchema>;
@@ -230,6 +232,7 @@ async function ownerReply(deps: TrainerDeps, sc: Scenario, turns: readonly Turn[
       `<lage>${sc.lage}</lage>`,
       `<person>${sc.person}</person>`,
       `<haltung>${sc.haltung}</haltung>`,
+      `<neue_seite>${deps.config.seite}</neue_seite>`,
       `<verlauf>\n${turns.length > 0 ? transcript(turns, ownerName(sc)) : "(Das Gespräch beginnt, du eröffnest.)"}\n</verlauf>`,
     ].join("\n"),
     schema: ownerReplySchema,
@@ -300,6 +303,7 @@ export async function answer(deps: TrainerDeps, session: TrainingSession, text: 
       `<lage>${sc.lage}</lage>`,
       `<person>${sc.person}</person>`,
       `<haltung>${sc.haltung}</haltung>`,
+      `<neue_seite>${config.seite}</neue_seite>`,
       `<ergebnis>${owner.entscheidung === "offen" ? "nach der letzten Runde noch offen" : owner.entscheidung}</ergebnis>`,
       `<verlauf>\n${transcript(turns, ownerName(sc))}\n</verlauf>`,
     ].join("\n"),

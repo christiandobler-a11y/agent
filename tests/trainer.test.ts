@@ -149,7 +149,7 @@ describeDb("Sales-Trainer", () => {
 
   function setup(decisions: ("offen" | "ja" | "nein")[]) {
     let owner = 0;
-    const structured = vi.fn((req: { role: string; input: string }) => {
+    const structured = vi.fn((req: { role: string; input: string; promptVersion: string }) => {
       if (req.role === "trainer") {
         const d = owner === 0 ? "offen" : (decisions[owner - 1] ?? "offen");
         owner++;
@@ -231,6 +231,10 @@ describeDb("Sales-Trainer", () => {
     // Der Coach hat den ganzen Verlauf mit Angebot gesehen
     const coachReq = t.structured.mock.calls.find((c) => c[0].role === "trainer_coach")![0];
     expect(coachReq.input).toContain("990");
+    expect(coachReq.promptVersion).toBe("v2");
+    const ownerReq = t.structured.mock.calls.find((c) => c[0].role === "trainer")![0];
+    expect(ownerReq.input).toContain("<neue_seite>Die neue Seite ist für genau diesen Laden gebaut");
+    expect(t.texts().join("\n")).toContain("Handlungen in eckige Klammern");
     expect(coachReq.input).toContain("Christian: Passt Ihnen Dienstag um zehn?");
 
     const { rows } = await db().query<{ status: string; xp: number; hints: number; score: string }>(

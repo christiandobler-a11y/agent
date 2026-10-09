@@ -27,15 +27,16 @@ export function levelPath(s: GameState, c: GameConfig): string {
     .join(" ");
 }
 
-/** Ein Satz, der zum Stand passt (wie ein gut gelaunter Mitarbeiter). */
+/** Ein Satz, der zum Stand passt (wie ein gut gelaunter Trainer). */
 function cheer(s: GameState): string {
   const st = s.stats;
   if (st.won >= 3) return "Kunden am laufenden Band, Chef. Das wird eine Agentur 😎";
-  if (st.won > 0) return "Der erste Kunde ist an Bord. Ab jetzt wird's nur noch besser 🥂";
+  if (st.won > 0) return "Die erste Seite ist verkauft. Ab jetzt wird's nur noch besser 🥂";
   if (st.interested > 0) return "Da beißt einer an! Jetzt den Termin rocken 💪";
-  if (st.replied > 0) return "Die ersten antworten schon. Dranbleiben lohnt sich 🔥";
-  if (st.contacted > 0) return "Die Mails sind draußen, jetzt heißt's Geduld und weiter feuern 📬";
-  return "Noch alles auf Anfang. Die erste Mail bringt gleich das erste Abzeichen 🚀";
+  if (st.mastered >= 5) return "Die Einwände sitzen. Zeit, dass ein echter Laden das merkt 🏪";
+  if (st.trainings >= 10) return "Zehn Runden Sparring, du wirst richtig gut. Ab in den Laden 🚪";
+  if (st.trainings > 0) return "Jede Runde macht den echten Besuch leichter. Weiter so 🔥";
+  return "Noch alles auf Anfang. /training bringt dir gleich das erste Abzeichen 🎭";
 }
 
 /** Übersicht für /level. */
@@ -47,12 +48,14 @@ export function levelText(s: GameState, c: GameConfig): string {
   const shownOpen = open.slice(0, 3);
   const levels = [...c.level].sort((a, b) => a.ab - b.ab);
   const from = levels[l.number - 1]?.ab ?? 0;
+  const perTraining = st.trainings > 0 ? Math.max(5, Math.round(st.trainingXp / st.trainings)) : 12;
   const progress = l.next
     ? [
         `${progressBar(l.progress, 12)}  ${s.xp - from} / ${l.next.at - from} XP`,
-        `Noch <b>${l.next.at - s.xp} XP</b> bis ${l.next.emoji} ${escapeHtml(l.next.name)}, also ca. ${Math.ceil((l.next.at - s.xp) / Math.max(1, c.xp.kontaktiert))} Mails ✉️`,
+        `Noch <b>${l.next.at - s.xp} XP</b> bis ${l.next.emoji} ${escapeHtml(l.next.name)}, also ca. ${Math.ceil((l.next.at - s.xp) / perTraining)} Trainingsrunden 🎭`,
       ]
     : [`${progressBar(1, 12)}  ${s.xp} XP`, "Höchstes Level erreicht. Mehr geht nicht, Chef 👑"];
+  const mailEra = st.contacted > 0 || st.replied > 0;
   return [
     "🎮 <b>Dein Avelio-Level</b>",
     "",
@@ -62,12 +65,10 @@ export function levelText(s: GameState, c: GameConfig): string {
     `🗺️ ${levelPath(s, c)}`,
     "",
     "📊 <b>Deine Bilanz</b>",
-    `📤 Leads angeschrieben: <b>${st.contacted}</b>${st.followUps > 0 ? ` (+${st.followUps} nachgefasst)` : ""}`,
-    `💬 Antworten: <b>${st.replied}</b>`,
-    `🤝 Interessenten: <b>${st.interested}</b>`,
-    `🥇 Kunden: <b>${st.won}</b>`,
-    `✅ Perfekte Tage: <b>${st.perfectDays}</b> · ⚡ Serie: <b>${st.streak}</b> (Rekord ${st.bestStreak})`,
-    `🎭 Trainings: <b>${st.trainings}</b> (+${st.trainingXp} XP) · 🧠 Einwände gemeistert: <b>${st.mastered}</b>`,
+    `🎭 Trainings: <b>${st.trainings}</b> (+${st.trainingXp} XP) · ✅ Ja im Training: <b>${st.trainingYes}</b>`,
+    `🧠 Einwände gemeistert: <b>${st.mastered}</b>${st.bestScore > 0 ? ` · bester Schnitt ${st.bestScore.toFixed(1).replace(".", ",")}` : ""}`,
+    `🤝 Interessenten: <b>${st.interested}</b> · 🥇 Kunden: <b>${st.won}</b>`,
+    ...(mailEra ? [`<i>Aus der Mail-Zeit: ${st.contacted} angeschrieben, ${st.replied} Antworten</i>`] : []),
     "",
     `🏅 <b>Abzeichen ${earned.length}/${earned.length + open.length}</b>`,
     earned.length > 0
@@ -80,7 +81,7 @@ export function levelText(s: GameState, c: GameConfig): string {
     "",
     `💬 ${cheer(s)}`,
     "",
-    `<i>XP: Mail +${c.xp.kontaktiert} · Nachfassen +${c.xp.nachgefasst} · Antwort +${c.xp.antwort} · Interessent +${c.xp.interessiert} · Kunde +${c.xp.gewonnen} · perfekter Tag +${c.xp.perfekter_tag} · Training bis +25 (/training)</i>`,
+    `<i>XP: Training bis +25 (/training) · Interessent +${c.xp.interessiert} · Kunde +${c.xp.gewonnen}</i>`,
   ].join("\n");
 }
 
@@ -91,9 +92,7 @@ export function celebrationText(p: Progress, c: GameConfig): string | null {
   const l = p.state.level;
   if (p.levelUp) {
     lines.push(`🎉🎉🎉 <b>Level ${l.number} erreicht: ${l.emoji} ${escapeHtml(l.name)}!</b>`);
-    lines.push(
-      `Stark, Chef! ${p.state.stats.contacted} Leads angeschrieben, ${p.state.xp} XP auf dem Konto 💪`,
-    );
+    lines.push(`Stark, Chef! ${p.state.xp} XP auf dem Konto 💪`);
     if (l.next) lines.push(`Nächstes Ziel: ${l.next.emoji} ${escapeHtml(l.next.name)} bei ${l.next.at} XP.`);
   }
   for (const k of p.newBadges) {

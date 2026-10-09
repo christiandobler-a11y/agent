@@ -58,6 +58,7 @@ export function introText(sc: Scenario, rounds: number): string {
     `📍 ${escapeHtml(sc.lage)}`,
     "",
     `🎯 Kläre den Einwand und vereinbare einen konkreten nächsten Schritt. Du hast ${rounds} Antworten, schreib einfach, was du sagen würdest.`,
+    "👉 Handlungen in eckige Klammern, z. B. <i>[zeige ihm die Seite auf dem Tablet]</i>. Die Seite musst du nicht beschreiben, er sieht sie.",
   ].join("\n");
 }
 
