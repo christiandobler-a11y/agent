@@ -23,6 +23,8 @@ const scenarioSchema = z.object({
 });
 export type Scenario = z.infer<typeof scenarioSchema>;
 
+const hm = z.string().regex(/^\d{2}:\d{2}$/);
+
 export const trainerConfigSchema = z.object({
   runden: z.number().int().min(1),
   verfall_min: z.number().int().min(1),
@@ -32,6 +34,23 @@ export const trainerConfigSchema = z.object({
     tipp: z.number().min(0),
   }),
   gemeistert_ab: z.number().min(1).max(5),
+  melden: z
+    .object({
+      aktiv: z.boolean(),
+      tage: z.array(
+        z.enum(["sonntag", "montag", "dienstag", "mittwoch", "donnerstag", "freitag", "samstag"]),
+      ),
+      haeppchen: z.array(hm),
+      einladung: hm.nullable(),
+      wochenbilanz: z
+        .object({
+          tag: z.enum(["sonntag", "montag", "dienstag", "mittwoch", "donnerstag", "freitag", "samstag"]),
+          ab: hm,
+        })
+        .nullable(),
+    })
+    .default({ aktiv: false, tage: [], haeppchen: [], einladung: null, wochenbilanz: null }),
+  themen: z.array(z.string()).default([]),
   angebot: z.string(),
   szenarien: z.record(z.string(), scenarioSchema),
 });

@@ -42,7 +42,9 @@ ausprobieren kann. Nach Schritt 6 ist ein Abstimmungstermin (Kalibrierung) vorge
 - Sales-Trainer (Telegram `/training [einwand|liste]`, `src/trainer/session.ts`, `src/telegram/trainer.ts`,
   `config/trainer.yaml`, Tabelle `training_sessions`): Rolle `trainer` spielt einen Inhaber mit Einwand, Christian
   antwortet per Text (läuft ein Gespräch, gehen Textnachrichten dorthin statt an den Manager), Rolle `trainer_coach`
-  bewertet vier Punkte 1–5; Szenario-Wahl und XP rechnet Code, die XP zählen im Spiel (`/level`)
+  bewertet vier Punkte 1–5; Szenario-Wahl und XP rechnet Code, die XP zählen im Spiel (`/level`). Meldet sich von selbst (`coachTick`, `src/trainer/coach.ts`,
+  `trainer.yaml → melden`): Sales-Häppchen (Rolle `trainer_tip`, Thema reihum, schwächster Punkt aus den Trainings,
+  `/haeppchen`), Einladung mittags (nicht nach Training) und Wochenbilanz (beide ohne LLM)
 - `npm run cli -- anrede [N]`: Grußzeile der nächsten N Kandidaten fürs Morgen-Paket mit Quelle (ohne LLM)
 - `npm run cli -- chat "…"`: Manager-Agent ohne Telegram befragen (gleicher Verlauf wie der Chat)
 - `npm run cli -- calibrate [export|--file|rate <firma> <A|B|C|X>]`: Golden Set (Telegram `/kalibrieren`, standardmäßig

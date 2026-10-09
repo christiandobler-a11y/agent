@@ -4,6 +4,7 @@ import type { PlanBuildResult } from "../autopilot/plan.js";
 import type { EveningSummary } from "../autopilot/schedule.js";
 import type { AdvisorReport } from "../advisor/run.js";
 import type { ShopProposal } from "../shop/job.js";
+import type { CoachMessage } from "../trainer/coach.js";
 
 /**
  * Meldungen an Christian (ARCHITECTURE.md 5.2 Schritt 11, 11.1). In Schritt 8 per Telegram, sonst als Log.
@@ -48,6 +49,8 @@ export interface Notifier {
   advisorReport?(report: AdvisorReport): Promise<void>;
   /** Laden der Woche vorgeschlagen (src/shop/). */
   shopProposal?(proposal: ShopProposal): Promise<void>;
+  /** Der Sales-Trainer meldet sich (Häppchen, Einladung, Wochenbilanz; Text ist schon HTML). */
+  coachMessage?(message: CoachMessage): Promise<void>;
 }
 
 export type DueReminder = Interaction & { company_name: string };
@@ -126,6 +129,8 @@ export function combineNotifiers(...notifiers: Notifier[]): Notifier {
   if (has("info")) combined.info = (t) => all((n) => n.info?.(t) ?? Promise.resolve());
   if (has("shopProposal"))
     combined.shopProposal = (p) => all((n) => n.shopProposal?.(p) ?? Promise.resolve());
+  if (has("coachMessage"))
+    combined.coachMessage = (m) => all((n) => n.coachMessage?.(m) ?? Promise.resolve());
   if (has("advisorReport"))
     combined.advisorReport = (r) => all((n) => n.advisorReport?.(r) ?? Promise.resolve());
   return combined;

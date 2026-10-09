@@ -25,6 +25,16 @@ import {
   xpFor,
   type CoachFeedback,
 } from "../src/trainer/session.js";
+import {
+  coachTick,
+  criterionAverages,
+  invitationMessage,
+  nextTopic,
+  tipMessage,
+  tipSchema,
+  weakest,
+  weeklyMessage,
+} from "../src/trainer/coach.js";
 import { describeDb, useTestDb } from "./helpers/db.js";
 
 const config = loadTrainerConfig();
@@ -273,5 +283,120 @@ describeDb("Sales-Trainer", () => {
     await t.bot.handleUpdate(textUpdate("/training quatsch"));
     expect(t.texts().at(-1)).toContain("kenne ich nicht");
     expect(t.structured).not.toHaveBeenCalled();
+  });
+});
+
+describe("Trainer meldet sich (rein)", () => {
+  it("Schnitt je Punkt, schwächster und stärkster, Themen-Reihenfolge", () => {
+    const avg = criterionAverages([feedback(4), { ...feedback(4), abschluss: { punkte: 2, satz: "x" } }])!;
+    expect(avg).toEqual({ zuhoeren: 4, nutzen: 4, ruhe: 4, abschluss: 3 });
+    expect(weakest(avg)).toBe("abschluss");
+    expect(criterionAverages([])).toBeNull();
+    expect(nextTopic(["a", "b", "c"], ["a"])).toBe("b");
+    expect(nextTopic(["a", "b"], ["b", "a"])).toBe("a"); // a liegt am längsten zurück
+    expect(nextTopic([], [])).toBeNull();
+    expect(config.themen.length).toBeGreaterThanOrEqual(10);
+    expect(loadModelsConfig().roles.trainer_tip).toBeDefined();
+    expect(loadPrompt("trainer_tip", "v1")).toContain("Keine erfundenen Zahlen");
+    expect(zodOutputFormat(tipSchema).type).toBe("json_schema");
+  });
+
+  it("Häppchen mit Übungs-Knopf, escaped; unbekanntes Szenario → zufällige Runde", () => {
+    const tip = {
+      aufhaenger: "Hmm … die beste Einwandbehandlung ist die, die du nicht brauchst.",
+      erklaerung: "Sprich den Preis <selbst> an.",
+      so_klingts: "Ich sag Ihnen gleich, was es kostet.",
+      uebung: "Sag den Preis heute laut vor dem Spiegel.",
+      szenario: "preis",
+    };
+    const m = tipMessage(tip, config);
+    expect(m.text).toContain("🧠 <b>Hmm …");
+    expect(m.text).toContain("&lt;selbst&gt;");
+    expect(m.buttons[0]!.callback_data).toBe("tr:r:preis");
+    expect(parseTrainerCallback(m.buttons[0]!.callback_data)).toEqual({ kind: "again", scenario: "preis" });
+    expect(tipMessage({ ...tip, szenario: "keins" }, config).buttons[0]!.callback_data).toBe("tr:n");
+    const inv = invitationMessage(config, "neffe", 3);
+    expect(inv.text).toContain("3 Tage in Folge");
+    expect(inv.buttons.map((b) => b.callback_data)).toEqual(["tr:r:neffe", "tr:n"]);
+    const week = weeklyMessage({
+      sessions: 3,
+      xp: 40,
+      yes: 1,
+      avg: { zuhoeren: 4, nutzen: 3, ruhe: 4.5, abschluss: 2.5 },
+      prevAvg: 3,
+    });
+    expect(week.text).toContain("Schnitt <b>3,5</b> (📈 von 3,0)");
+    expect(week.text).toContain("Nächste Woche drauf achten: <b>Abschluss</b>");
+    expect(weeklyMessage({ sessions: 0, xp: 0, yes: 0, avg: null, prevAvg: null }).text).toContain(
+      "keine Runde",
+    );
+  });
+});
+
+describeDb("Trainer meldet sich", () => {
+  const db = useTestDb();
+
+  it("Häppchen morgens und abends, Einladung mittags (nicht nach Training), Wochenbilanz sonntags, je einmal", async () => {
+    const tip = {
+      aufhaenger: "Hmm … Pause nach dem Preis.",
+      erklaerung: "Wer zuerst redet, gibt nach.",
+      so_klingts: "Neunhundertneunzig Euro.",
+      uebung: "Zähl nach dem Preis still bis drei.",
+      szenario: "preis",
+    };
+    const structured = vi.fn(() =>
+      Promise.resolve({ output: tip, agentRunId: "r", costUsd: 0.01, model: "m" }),
+    );
+    const llm = { structured } as unknown as LlmGateway;
+    const sent: { text: string }[] = [];
+    let now = new Date("2026-10-11T05:00:00Z"); // Sonntag 07:00 Berlin
+    const ctx = {
+      db: db(),
+      now: () => now,
+      notifier: {
+        coachMessage: (m: { text: string }) => {
+          sent.push(m);
+          return Promise.resolve();
+        },
+      },
+      trainer: () => ({ db: db(), llm, config, now: () => now }),
+    } as unknown as PipelineContext;
+
+    await coachTick(ctx);
+    expect(sent).toHaveLength(0); // vor 08:30
+    now = new Date("2026-10-11T06:31:00Z"); // 08:31
+    await coachTick(ctx);
+    await coachTick(ctx);
+    expect(sent).toHaveLength(1);
+    expect(sent[0]!.text).toContain("Pause nach dem Preis");
+    // Das Thema rückt weiter, der letzte Aufhänger geht in die nächste Anfrage
+    now = new Date("2026-10-11T10:31:00Z"); // 12:31: Einladung
+    await coachTick(ctx);
+    expect(sent.at(-1)!.text).toContain("Mittagspause");
+    now = new Date("2026-10-11T15:31:00Z"); // 17:31: zweites Häppchen
+    await coachTick(ctx);
+    expect(sent).toHaveLength(3);
+    const second = (structured.mock.calls[1] as unknown as [{ input: string }])[0].input;
+    expect(second).toContain(config.themen[1]!);
+    expect(second).toContain("- Hmm … Pause nach dem Preis.");
+    now = new Date("2026-10-11T17:01:00Z"); // 19:01: Wochenbilanz
+    await coachTick(ctx);
+    await coachTick(ctx);
+    expect(sent).toHaveLength(4);
+    expect(sent.at(-1)!.text).toContain("Deine Trainingswoche");
+
+    // Montag: heute schon trainiert → keine Einladung; Neustart am Abend → nur ein Häppchen
+    await db().query(
+      `insert into training_sessions (chat_id, scenario, status, feedback, score, xp, finished_at)
+       values (1, 'preis', 'fertig', $1, 4, 12, '2026-10-12T09:00:00Z')`,
+      [JSON.stringify(feedback(4))],
+    );
+    now = new Date("2026-10-12T18:00:00Z"); // Montag 20:00
+    const before = sent.length;
+    await coachTick(ctx);
+    expect(sent.length - before).toBe(1);
+    expect(sent.at(-1)!.text).toContain("Pause nach dem Preis");
+    const third = (structured.mock.calls[2] as unknown as [{ input: string }])[0].input;
+    expect(third).toContain("Zuhören (Schnitt 4,0 von 5)");
   });
 });

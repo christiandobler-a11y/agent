@@ -1,4 +1,5 @@
 import { loadEnv, requireKeys } from "./config/env.js";
+import { loadTrainerConfig } from "./trainer/session.js";
 import { googleOwnerPhotos } from "./prototype/googlePhotos.js";
 import { collectCandidates, heroForCompany } from "./prototype/heroPhoto.js";
 import { createDb, type Db } from "./db/client.js";
@@ -118,6 +119,8 @@ export async function createApp(options: { notifier?: Notifier; worker?: boolean
   ctx.seedBoxes = seedBoxesFromEnv(env, mail);
   ctx.mail = mail;
   ctx.advisor = advisorContext(ctx, llm);
+  // Sales-Trainer (src/trainer/): meldet sich von selbst (config/trainer.yaml → melden).
+  ctx.trainer = () => ({ db, llm, config: loadTrainerConfig(), now: ctx.now });
   // Laden der Woche (src/shop/): Vorschlag montags, Briefing mit drei Richtungen auf Knopfdruck.
   const home = loadAutopilotConfig().neue_kontakte.heimat;
   ctx.shop = {

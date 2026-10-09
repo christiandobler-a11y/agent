@@ -97,6 +97,13 @@ export function telegramNotifier(
     async info(text) {
       await sendAll(targets(), escapeHtml(text));
     },
+    async coachMessage(m) {
+      await sendAll(
+        targets(),
+        m.text,
+        m.buttons.map((b) => [b]),
+      );
+    },
     async shopProposal(p) {
       await sendShopProposal(api, targets(), p);
     },

@@ -4,6 +4,7 @@ import { proposeShop } from "../shop/job.js";
 import { handleShopCallback, sendShopProposal } from "./shop.js";
 import { handleTrainerCallback, handleTrainerText, trainingCommand } from "./trainer.js";
 import { loadTrainerConfig, type TrainerDeps } from "../trainer/session.js";
+import { buildTip, tipMessage } from "../trainer/coach.js";
 import { ADVISOR_QUEUE } from "../queue/boss.js";
 import { DECISION_TEXT, decisionKeyboard, parseAdvisorCallback, suggestionList } from "./advisor.js";
 import { Bot, InputFile, type Context } from "grammy";
@@ -189,6 +190,7 @@ export const BOT_COMMANDS = [
   { command: "fundstueck", description: "Die Berater stöbern im Netz und erzählen was" },
   { command: "laden", description: "Laden der Woche: Vorschlag mit Design-Briefing" },
   { command: "training", description: "Sales-Trainer: Einwände üben, mit XP" },
+  { command: "haeppchen", description: "Ein Sales-Häppchen vom Trainer, sofort" },
   { command: "hilfe", description: "Was ich kann" },
 ];
 
@@ -311,6 +313,16 @@ export function createBot(options: BotOptions): AvelioBot {
   });
   bot.command(["training", "trainer", "ueben"], async (ctx) => {
     await trainingCommand(ctx, trainer(), ctx.match);
+  });
+  // Ein Sales-Häppchen sofort (sonst morgens und abends von selbst).
+  bot.command(["haeppchen", "häppchen", "tipp"], async (ctx) => {
+    await ctx.replyWithChatAction("typing").catch(() => undefined);
+    const deps = trainer();
+    const m = tipMessage(await buildTip(deps), deps.config);
+    await ctx.reply(m.text, {
+      parse_mode: "HTML",
+      reply_markup: { inline_keyboard: m.buttons.map((b) => [b]) },
+    });
   });
   // Laden der Woche jetzt vorschlagen (sonst montags von selbst).
   bot.command(["laden", "shop"], async (ctx) => {

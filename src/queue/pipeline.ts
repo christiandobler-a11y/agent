@@ -22,6 +22,8 @@ import { claimState } from "../db/appState.js";
 import { autopilotTick, mailTick, monitorTick, queueTick } from "../autopilot/schedule.js";
 import { advisorTick } from "../advisor/job.js";
 import { shopTick, type ShopContext } from "../shop/job.js";
+import { coachTick } from "../trainer/coach.js";
+import type { TrainerDeps } from "../trainer/session.js";
 import type { AdvisorConfig, AdvisorDeps } from "../advisor/run.js";
 import type { SeedBox } from "../outreach/seed.js";
 import type { AutopilotConfig, PlanDeps } from "../autopilot/plan.js";
@@ -80,6 +82,8 @@ export interface PipelineContext {
   advisor?: { config: AdvisorConfig; deps: () => AdvisorDeps };
   /** Laden der Woche (src/shop/): Vorschlag und Design-Briefing. */
   shop?: ShopContext;
+  /** Sales-Trainer (src/trainer/): meldet sich von selbst mit Häppchen, Einladung und Wochenbilanz. */
+  trainer?: () => TrainerDeps;
 }
 
 export async function enqueue(
@@ -400,6 +404,9 @@ export async function sweep(ctx: PipelineContext): Promise<void> {
     console.error(
       JSON.stringify({ level: "error", msg: "Laden-der-Woche-Takt fehlgeschlagen", error: String(err) }),
     ),
+  );
+  await coachTick(ctx).catch((err: unknown) =>
+    console.error(JSON.stringify({ level: "error", msg: "Trainer-Takt fehlgeschlagen", error: String(err) })),
   );
   await advisorTick(ctx).catch((err: unknown) =>
     console.error(JSON.stringify({ level: "error", msg: "Berater-Takt fehlgeschlagen", error: String(err) })),

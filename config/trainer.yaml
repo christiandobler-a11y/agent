@@ -18,6 +18,39 @@ xp:
 # Ab diesem Durchschnitt gilt ein Szenario als gemeistert (Abzeichen "Einwand-Profi").
 gemeistert_ab: 4
 
+# Der Trainer meldet sich von selbst (09.10.2026, Christian: "vollkommen selbstständig, regelmäßig mit Sales-Dingern
+# leicht erklärt, viele Infos, Sachen die mir allgemein helfen"). Wochentage: sonntag … samstag.
+melden:
+  aktiv: true
+  tage: [montag, dienstag, mittwoch, donnerstag, freitag, samstag, sonntag]
+  # Sales-Häppchen (Rolle `trainer_tip`): Aufhänger, kurz erklärt, wie es bei dir klingt, Mini-Übung, Knopf zum Üben.
+  haeppchen: ["08:30", "17:30"]
+  # Mittagspause: Einladung zu einer Runde (ohne LLM); entfällt, wenn heute schon trainiert wurde.
+  einladung: "12:30"
+  # Wochenbilanz (ohne LLM): Gespräche, Schnitt je Punkt, stärkster und schwächster Punkt.
+  wochenbilanz: { tag: sonntag, ab: "19:00" }
+# Themen der Häppchen, der Reihe nach (was zuletzt dran war, kommt später wieder). Der schwächste Punkt aus deinen
+# Trainings fließt jedes Mal mit ein.
+themen:
+  - Einwandbehandlung allgemein (erst verstehen, dann antworten)
+  - Fragetechnik (offene Fragen, Nachfragen statt Erklären)
+  - Preis nennen und aushalten (Pause, kein Rabatt aus Nervosität)
+  - Nutzen statt Merkmale (in der Sprache des Inhabers rechnen)
+  - Der nächste Schritt (konkreter Termin statt „melden Sie sich“)
+  - Zuhören und Zusammenfassen („Wenn ich Sie richtig verstehe …“)
+  - Die ersten zehn Sekunden im Laden (Begrüßung, Haltung, Tablet)
+  - Körpersprache und Stimme vor Ort
+  - Umgang mit einem Nein (freundlich gehen, Tür offen lassen)
+  - Nervosität und Mindset vor dem Reingehen
+  - Geschichten erzählen (eine kurze Kundengeschichte statt Argumente)
+  - Vertrauen aufbauen bei Misstrauen (offen sagen, was du davon hast)
+  - Verhandeln (Preis halten, kleine Zugaben statt Rabatt)
+  - Entscheider und Mitentscheider (Partner, Familie einbinden)
+  - Nachfassen ohne Nerven (Erinnerung, Mehrwert, Termin)
+  - Referenzen und Beispiele richtig einsetzen
+  - Psychologie im Verkauf (Gegenseitigkeit, Verlustangst, Einfachheit), fair angewendet
+  - Typische Anfängerfehler im Verkaufsgespräch
+
 # Was Christian anbietet (der Coach prüft, ob Zahlen stimmen; der Inhaber kennt sie nur, wenn Christian sie nennt).
 angebot: >-
   Christian (Avelio, Peißenberg) baut Läden aus der Gegend ungefragt eine neue Website und zeigt sie persönlich auf
