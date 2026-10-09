@@ -308,7 +308,7 @@ export function createBot(options: BotOptions): AvelioBot {
     const p = await proposeShop(pipeline.db, pipeline.shop, pipeline.now());
     if (!p) {
       await ctx.reply(
-        "Gerade finde ich keinen passenden Laden in deiner Nähe (gut bewertet, schwache Website). Die Nachtsuche legt nach.",
+        "Gerade finde ich keinen passenden Laden in deiner Nähe (gut bewertet, schwache Website).",
       );
       return;
     }

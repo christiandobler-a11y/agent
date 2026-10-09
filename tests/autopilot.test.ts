@@ -109,6 +109,7 @@ const mailConfig = (): AutopilotConfig => {
   const c = loadAutopilotConfig();
   return {
     ...c,
+    morgen_paket: true,
     erstkontakt: "mail",
     neue_kontakte: {
       ...c.neue_kontakte,
@@ -840,6 +841,24 @@ describeDb("Morgen-Paket mit Datenbank", () => {
     await autopilotTick(ctx);
     expect(planReady).toHaveBeenCalledTimes(1);
     expect(await getState(db(), "plan-sent:2026-10-05")).toBe(true);
+  });
+  it("Takt: Morgen-Paket aus, kein Plan und keine Meldung", async () => {
+    const send = vi.fn(() => Promise.resolve("job"));
+    const planReady = vi.fn(() => Promise.resolve());
+    const ctx = {
+      db: db(),
+      boss: { send },
+      now: () => new Date("2026-10-05T05:01:00Z"), // 07:01
+      notifier: { planReady },
+      autopilot: {
+        config: { ...mailConfig(), morgen_paket: false, suche: { ...mailConfig().suche, aktiv: false } },
+        planDeps: () => ({}),
+      },
+    } as unknown as PipelineContext;
+    await setState(db(), "plan-built:2026-10-05", { date: "2026-10-05" });
+    await autopilotTick(ctx);
+    expect(send).not.toHaveBeenCalled();
+    expect(planReady).not.toHaveBeenCalled();
   });
   it("Alle Mails senden: mit Rückfrage, jede einzeln übers Postfach", async () => {
     await db().query("update companies set status = 'LOST'");

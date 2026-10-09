@@ -56,6 +56,11 @@ export const autopilotConfigSchema = z.object({
     /** Brief als zweites Nachfassen: so viele Tage nach der Nachfass-Mail ohne Antwort (nur ab `ab_score`). */
     nachfassen_nach_tagen: z.number().int().min(1).default(7),
   }),
+  /**
+   * Morgen-Paket an/aus (09.10.2026, Christian: "keine Mails und Scrapes mehr notwendig"). Aus: kein Plan, keine
+   * Meldungen morgens, mittags, abends. Die Nachtsuche hat ihren eigenen Schalter (`suche.aktiv`).
+   */
+  morgen_paket: z.boolean().default(true),
   prototyp_fuer_neue: z.boolean(),
   /**
    * Erstkontakt (06.10.2026, Christian): "brief" = neue Leads bekommen einen Brief (Befund-Seite mit Vorschau-Bild und

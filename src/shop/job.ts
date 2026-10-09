@@ -46,7 +46,7 @@ export async function shopTick(ctx: PipelineContext): Promise<boolean> {
   if (proposal) await ctx.notifier.shopProposal?.(proposal);
   else
     await ctx.notifier.info?.(
-      "🏪 Diese Woche finde ich keinen passenden Laden in deiner Nähe. Die Nachtsuche sucht weiter nach Fahrradläden und Friseuren.",
+      "🏪 Diese Woche finde ich keinen passenden Laden in deiner Nähe. Mit /laden kannst du es später noch einmal versuchen.",
     );
   return true;
 }

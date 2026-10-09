@@ -115,7 +115,7 @@ ausprobieren kann. Nach Schritt 6 ist ein Abstimmungstermin (Kalibrierung) vorge
   (Freigabe!). „Nehmen“ baut das Design-Briefing (Rolle `briefing`, sieht den Screenshot, drei grundverschiedene
   Richtungen, gewählte Richtungen gehen als `schon_verwendet` in künftige Briefings) und schickt es als Markdown-Datei;
   die Seite bauen Christian und Claude von Hand (kein Vorlagen-Prototyp). `erstkontakt: aus` pausiert Anrufe und Mails.
-- **Morgen-Paket** (`src/autopilot/`, `config/autopilot.yaml`, Tabelle `outreach_plan`): Sweep stößt um `vorbereiten`
+- **Morgen-Paket** (`src/autopilot/`, `config/autopilot.yaml`, Tabelle `outreach_plan`; seit 09.10.2026 aus über `morgen_paket: false`, Nachtsuche `suche.aktiv: false`, Berater `advisor.yaml → aktiv: false`): Sweep stößt um `vorbereiten`
   den Job `daily-plan` an (Nachfassen, dann neue Leads: Prototyp und Mail; Befund-Seiten gesammelt nur am Brief-Tag `briefe.tag`, zählen nicht zum Tagesziel), meldet ab `morgens` in
   Telegram von selbst (Kopf mit Nachtbericht und gleich die erste Karte, `sendMorning`; `/heute` holt es erneut),
   abends Bilanz. Jeder Schritt einmal je Tag über `claimState`. Menge neuer Kontakte in Stufen zum Aufwärmen der

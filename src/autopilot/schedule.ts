@@ -31,6 +31,7 @@ export async function autopilotTick(ctx: PipelineContext): Promise<void> {
   const ap = ctx.autopilot;
   if (!ap) return;
   await searchTick(ctx);
+  if (!ap.config.morgen_paket) return;
   const now = ctx.now();
   const date = berlinDate(now);
   const time = berlinTime(now);

@@ -46,6 +46,8 @@ briefe:
   pro_woche: 0
   ab_score: 80
   nachfassen_nach_tagen: 7
+# 09.10.2026 (Christian: "keine Mails und Scrapes mehr notwendig"): Morgen-Paket aus. Wieder an: true.
+morgen_paket: false
 prototyp_fuer_neue: true
 
 nachfassen:
@@ -57,7 +59,7 @@ nachfassen:
 # als Komplett-Suche, höchstens `pro_nacht` je Nacht. Bricht eine Suche an der Kostenbremse ab, macht die nächste
 # Nacht dort weiter. Neue Firmen werden automatisch gecrawlt und geprüft und landen im Morgen-Paket.
 suche:
-  aktiv: true
+  aktiv: false # 09.10.2026 (Christian): Nachtsuche aus, keine neuen Scrapes. Wieder an: true
   ab: "22:00"
   # 06.10.2026 (Berater-Vorschlag, Christian: umsetzen): 4 statt 1, damit die offenen Regionen schnell durch sind.
   pro_nacht: 4 # eine Komplett-Suche kostet grob 1 bis 3 $ (Google) plus Audits

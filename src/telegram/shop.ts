@@ -161,7 +161,7 @@ export async function handleShopCallback(ctx: Context, pipeline: PipelineContext
     await ctx.editMessageReplyMarkup({ reply_markup: { inline_keyboard: [] } }).catch(() => undefined);
     const next = await proposeShop(pipeline.db, shop, now);
     if (!next) {
-      await ctx.reply("Gerade finde ich keinen weiteren passenden Laden. Die Nachtsuche legt nach.");
+      await ctx.reply("Gerade finde ich keinen weiteren passenden Laden in deiner Nähe.");
       return true;
     }
     const card = shopCard(next.candidate, next.pick.id, branchName(next.candidate.branch_key));
