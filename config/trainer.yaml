@@ -1,0 +1,170 @@
+# Sales-Trainer (09.10.2026, Christian: "mein persönlicher Sales-Trainer, Einwandbehandlung wie ein Lernspiel mit XP,
+# Dialoge, die mich beim Website-Verkaufen treffen könnten"). /training startet ein Gespräch: Avelio spielt den
+# Inhaber (Rolle `trainer`), Christian antwortet per Text. Nach `runden` Antworten oder einer Entscheidung bewertet
+# der Coach (Rolle `trainer_coach`) vier Punkte von 1 bis 5; die XP rechnet Code (src/trainer/session.ts).
+
+# So viele Antworten von Christian je Gespräch (danach Bewertung).
+runden: 4
+# Ein offenes Gespräch verfällt nach so vielen Minuten ohne Antwort (dann geht Text wieder an den Chat).
+verfall_min: 120
+
+xp:
+  # Grund-XP je Schwierigkeit bei voller Punktzahl (Durchschnitt 5); weniger Punkte = anteilig weniger.
+  basis: { 1: 10, 2: 15, 3: 20 }
+  # Extra, wenn der Inhaber am Ende Ja sagt (nächster Schritt vereinbart).
+  ja_bonus: 5
+  # Abzug je genutztem Tipp.
+  tipp: 3
+# Ab diesem Durchschnitt gilt ein Szenario als gemeistert (Abzeichen "Einwand-Profi").
+gemeistert_ab: 4
+
+# Was Christian anbietet (der Coach prüft, ob Zahlen stimmen; der Inhaber kennt sie nur, wenn Christian sie nennt).
+angebot: >-
+  Christian (Avelio, Peißenberg) baut Läden aus der Gegend ungefragt eine neue Website und zeigt sie persönlich auf
+  dem Tablet. Onepager 990 € brutto, mehrseitig 1.290 € brutto, Hosting und Pflege 29,90 € im Monat (erster Monat
+  frei, monatlich kündbar, Änderungen tagesaktuell). 50 % bei Auftrag, 50 % beim Livegang, Lieferzeit 2 bis 3 Wochen.
+  Die gezeigte Seite ist schon fertig gebaut; ohne Auftrag geht sie nicht online. Christian filmt Besuche für
+  TikTok/Instagram nur mit Einverständnis.
+
+# Szenarien: `lage` sieht Christian zu Beginn, `person` und `haltung` nur der Inhaber (geheim), `tipp` auf Knopfdruck.
+# Schwierigkeit 1 bis 3.
+szenarien:
+  preis:
+    titel: „Was kostet der Spaß?“
+    schwierigkeit: 2
+    lage: Du hast Sepp im Fahrradladen die neue Seite auf dem Tablet gezeigt. Er nickt, dann fragt er nach dem Preis.
+    person: Sepp Huber, 58, Inhaber eines Fahrradladens in Weilheim, bodenständig, rechnet alles in Fahrrädern.
+    haltung: >-
+      Findet die Seite gut, aber 990 € sind für ihn erst mal viel Geld für „ein bisserl Internet“. Überzeugt ihn, wenn
+      Christian den Preis ruhig nennt, nicht sofort Rabatt gibt und vorrechnet, was ein einziger neuer Kunde bringt.
+      Ein schneller Rabatt macht ihn misstrauisch.
+    tipp: Preis ruhig nennen, dann schweigen. Danach in Rädern rechnen statt in Euro, kein Rabatt aus Nervosität.
+  neffe:
+    titel: „Das macht mein Neffe“
+    schwierigkeit: 1
+    lage: Friseursalon in Schongau. Die Inhaberin schaut kurz aufs Tablet und winkt freundlich ab.
+    person: Andrea, 45, Inhaberin eines Friseursalons, herzlich, aber loyal zur Familie.
+    haltung: >-
+      Ihr Neffe (19) „macht das irgendwann“, seit zwei Jahren. Sie will ihn nicht übergehen. Überzeugt sie, wenn Christian
+      den Neffen nicht schlechtmacht und einen Weg zeigt, wie beide gewinnen (z. B. der Neffe pflegt Fotos, Christian baut).
+    tipp: Den Neffen loben, nicht gegen ihn arbeiten. Frag, seit wann er's vorhat, und biete eine Lösung mit ihm an.
+  mundpropaganda:
+    titel: „Bei uns läuft alles über Mundpropaganda“
+    schwierigkeit: 2
+    lage: Radwerkstatt in Peißenberg, der Chef wischt sich die Hände ab und hört kurz zu.
+    person: Toni, 50, Zweiradmechaniker, stolz auf seine Stammkunden.
+    haltung: >-
+      Hat genug zu tun und hält eine Website für Eitelkeit. Wird nachdenklich, wenn Christian fragt, was Neukunden machen,
+      die ihn empfohlen bekommen: Sie googeln ihn und sehen die alte Seite. Mag keine Fachbegriffe.
+    tipp: Mundpropaganda bestätigen und weiterdenken – wer empfohlen wird, wird gegoogelt. Frag, was die dann sehen.
+  instagram:
+    titel: „Wir haben Instagram, das reicht“
+    schwierigkeit: 2
+    lage: Kosmetikstudio in Murnau, die Inhaberin zeigt stolz ihr Instagram auf dem Handy.
+    person: Melanie, 34, Kosmetikerin, 2.000 Follower, postet selbst.
+    haltung: >-
+      Glaubt, Instagram ersetzt die Website. Überzeugt sie, wenn Christian Instagram lobt und zeigt, dass Google-Suchende
+      und ältere Kundinnen dort nicht landen, und dass die Seite ihr Instagram einbinden kann. Mag kein Belehren.
+    tipp: Instagram ernst nehmen. Website = Schaufenster für alle, die sie noch nicht kennen und bei Google suchen.
+  keine_zeit:
+    titel: „Grad ganz schlecht“
+    schwierigkeit: 1
+    lage: Samstag, 10 Uhr, im Fahrradladen stehen drei Kunden. Der Inhaber schaut gestresst rüber.
+    person: Markus, 41, Inhaber, freundlich aber unter Strom.
+    haltung: >-
+      Hat jetzt wirklich keine Zeit. Reagiert gut, wenn Christian das sofort respektiert, sich kurz fasst und einen
+      konkreten Zeitpunkt vorschlägt. Wird ungeduldig, wenn Christian trotzdem anfängt zu präsentieren.
+    tipp: Sofort respektieren, ein Satz Neugier wecken, konkreten Termin vorschlagen (Tag und Uhrzeit).
+  per_mail:
+    titel: „Schicken Sie mir was per Mail“
+    schwierigkeit: 1
+    lage: Friseurladen in Weilheim, die Inhaberin hat sich die Seite angeschaut und will das Gespräch beenden.
+    person: Sabine, 52, höflich, sagt ungern direkt Nein.
+    haltung: >-
+      „Per Mail“ ist ihr höfliches Nein. Überzeugt sie, wenn Christian nachfragt, was sie sich genau anschauen möchte, und
+      einen festen nächsten Schritt vereinbart (Link schicken UND kurzer Anruf am Tag X). Bei bloßem „Okay, mach ich“
+      bleibt es beim Nein.
+    tipp: Freundlich nachfragen, was sie prüfen will. Mail ja, aber mit festem Termin für die Rückmeldung.
+  nachdenken:
+    titel: „Ich überleg's mir“
+    schwierigkeit: 2
+    lage: Fahrradladen in Landsberg. Der Inhaber fand die Seite gut, sagt dann aber „Ich überleg's mir mal“.
+    person: Florian, 39, analytisch, will nichts überstürzen.
+    haltung: >-
+      Hat eigentlich einen konkreten Zweifel (ob er die Seite selbst ändern kann), sagt ihn aber nicht. Rückt damit raus,
+      wenn Christian ruhig fragt, was ihm noch fehlt. Wird zu, wenn Christian Druck macht.
+    tipp: Frag „Was müssten Sie noch wissen, damit es eine leichte Entscheidung wird?“ und hör zu.
+  baukasten:
+    titel: „Wix kostet 15 Euro im Monat“
+    schwierigkeit: 3
+    lage: Kosmetikstudio in Starnberg. Die Inhaberin hat sich schon informiert und vergleicht.
+    person: Julia, 37, preisbewusst, hat einen Wix-Testaccount angelegt und nie fertig gemacht.
+    haltung: >-
+      Vergleicht Christian mit einem Baukasten. Überzeugt sie, wenn Christian Wix nicht schlechtredet, sondern auf ihre
+      Zeit und das Ergebnis lenkt (sie hat es ja selbst nicht fertig bekommen), und wenn er die laufenden Kosten ehrlich
+      nennt. Billige Sprüche über Baukästen nerven sie.
+    tipp: Baukasten nicht schlechtreden. Frag, wie weit sie mit ihrem Wix gekommen ist – Zeit ist das Argument.
+  schon_website:
+    titel: „Unsere Seite hat mein Mann gemacht“
+    schwierigkeit: 3
+    lage: Familien-Fahrradladen in Murnau. Die Inhaberin sieht das Tablet und wird spürbar kühl.
+    person: Gabi, 60, die alte Seite hat ihr Mann vor 12 Jahren selbst gebaut.
+    haltung: >-
+      Fühlt die neue Seite als Kritik an ihrem Mann. Taut auf, wenn Christian die alte Seite würdigt (sie hat 12 Jahre
+      gehalten) und Gefühle ernst nimmt. Jede Kritik an der alten Seite beendet das Gespräch.
+    tipp: Die alte Seite würdigen („12 Jahre, Respekt“), nichts kritisieren, nach der Geschichte des Ladens fragen.
+  kamera:
+    titel: „Filmen? Auf keinen Fall“
+    schwierigkeit: 2
+    lage: Du fragst vor dem Zeigen, ob du mit der Brille filmen darfst. Der Inhaber schaut skeptisch.
+    person: Herbert, 63, Inhaber, mag Social Media nicht.
+    haltung: >-
+      Will nicht ins Internet. Ist aber neugierig auf die Seite. Reagiert gut, wenn Christian das Nein sofort akzeptiert
+      und die Seite trotzdem zeigt. Ein zweiter Überredungsversuch zum Filmen beendet das Gespräch.
+    tipp: Nein sofort akzeptieren, ohne Zögern. Kamera aus, Seite trotzdem zeigen.
+  haken:
+    titel: „Wo ist der Haken?“
+    schwierigkeit: 2
+    lage: Friseursalon in Bad Tölz. Die Inhaberin ist misstrauisch, weil jemand ungefragt eine Seite gebaut hat.
+    person: Nicole, 44, ist schon mal auf eine Abofalle für einen Branchenbuch-Eintrag reingefallen.
+    haltung: >-
+      Vermutet Abzocke. Wird ruhiger, wenn Christian offen sagt, warum er das macht (eigene Werbung, sie muss nichts),
+      Preise und Kündbarkeit klar nennt und nichts zum Unterschreiben hinlegt.
+    tipp: Offen sagen, was du davon hast. Klare Zahlen, monatlich kündbar, nichts unterschreiben lassen.
+  partner:
+    titel: „Muss ich mit meiner Frau besprechen“
+    schwierigkeit: 2
+    lage: Fahrradladen in Schongau, der Inhaber ist angetan, entscheidet aber nicht allein.
+    person: Stefan, 47, führt den Laden mit seiner Frau, die die Buchhaltung macht.
+    haltung: >-
+      Ist ehrlich interessiert. Freut sich, wenn Christian anbietet, die Seite beiden zu zeigen, und ihm etwas mitgibt
+      (Link, Preis auf einen Blick). Druck („Das Angebot gilt nur heute“) verärgert ihn.
+    tipp: "Beide an den Tisch: anbieten, die Seite nochmal gemeinsam zu zeigen, und einen Termin dafür ausmachen."
+  agentur:
+    titel: „Mit Agenturen hatten wir nur Ärger“
+    schwierigkeit: 3
+    lage: Kosmetikstudio in Garmisch. Die Inhaberin erzählt sofort von der letzten Agentur.
+    person: Claudia, 49, hat 3.000 € gezahlt, die Seite kam nie fertig, niemand ging mehr ans Telefon.
+    haltung: >-
+      Ist verbrannt. Braucht erst das Gefühl, gehört zu werden. Überzeugt sie, wenn Christian zuhört, nachfragt, was
+      schiefging, und dann konkret zeigt, was anders ist (Seite schon fertig, Zahlung erst zur Hälfte, Person vor Ort).
+    tipp: "Erst zuhören und nachfragen, dann zeigen, was anders ist: Die Seite ist schon fertig, du bist vor Ort."
+  rabatt:
+    titel: „Für 500 mach ich's sofort“
+    schwierigkeit: 3
+    lage: Fahrradladen in Penzberg. Der Inhaber will die Seite, handelt aber gern.
+    person: Ralf, 55, Händler durch und durch, testet, ob der Preis hält.
+    haltung: >-
+      Kauft eigentlich, will aber gewinnen. Respektiert Christian, wenn er den Preis hält und statt Rabatt etwas
+      anbietet, das wenig kostet (z. B. zweiter Monat Hosting frei). Halbiert Christian den Preis, verliert er Respekt
+      und fragt, was die Seite dann wirklich wert ist.
+    tipp: Preis halten. Statt Rabatt eine kleine Zugabe, die dich wenig kostet. Frag, ob es nur am Preis liegt.
+  google_maps:
+    titel: „Uns finden die Leute eh über Google Maps“
+    schwierigkeit: 2
+    lage: Friseur in Peißenberg mit 4,8 Sternen. Der Inhaber ist stolz auf seine Bewertungen.
+    person: Ali, 36, Barber, 300 Google-Bewertungen.
+    haltung: >-
+      Hält Google Maps für genug. Wird neugierig, wenn Christian die Bewertungen ehrlich lobt und zeigt, dass im Profil
+      ein Link zur Website steht, auf dem die alte Seite den guten Eindruck kaputt macht. Mag kurze, direkte Sätze.
+    tipp: "Bewertungen loben. Dann: Wer im Maps-Profil auf „Website“ tippt, landet auf der alten Seite."

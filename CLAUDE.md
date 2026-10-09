@@ -39,6 +39,10 @@ ausprobieren kann. Nach Schritt 6 ist ein Abstimmungstermin (Kalibrierung) vorge
   Rolle `advisor_research`), Entwürfe (Rolle `advisor`), Gegenprüfung (Rolle `advisor_critic`); nur Behaltenes als
   Karte mit Knöpfen (Tabelle `advisor_suggestions`, `/vorschlaege`). Die Berater ändern nichts selbst. Dazu
   dienstags/donnerstags ein Fundstück aus dem Netz (`/fundstueck`, `src/advisor/finds.ts`)
+- Sales-Trainer (Telegram `/training [einwand|liste]`, `src/trainer/session.ts`, `src/telegram/trainer.ts`,
+  `config/trainer.yaml`, Tabelle `training_sessions`): Rolle `trainer` spielt einen Inhaber mit Einwand, Christian
+  antwortet per Text (läuft ein Gespräch, gehen Textnachrichten dorthin statt an den Manager), Rolle `trainer_coach`
+  bewertet vier Punkte 1–5; Szenario-Wahl und XP rechnet Code, die XP zählen im Spiel (`/level`)
 - `npm run cli -- anrede [N]`: Grußzeile der nächsten N Kandidaten fürs Morgen-Paket mit Quelle (ohne LLM)
 - `npm run cli -- chat "…"`: Manager-Agent ohne Telegram befragen (gleicher Verlauf wie der Chat)
 - `npm run cli -- calibrate [export|--file|rate <firma> <A|B|C|X>]`: Golden Set (Telegram `/kalibrieren`, standardmäßig

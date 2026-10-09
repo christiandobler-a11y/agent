@@ -68,6 +68,17 @@ roles:
     max_tokens: 16000 # inkl. Denkphase
     effort: high
 
+  # Sales-Trainer (09.10.2026, src/trainer/): spielt den Inhaber (schnell, kurze Antworten) und bewertet am Ende.
+  trainer:
+    model: claude-sonnet-5-5
+    max_tokens: 2000 # inkl. Denkphase
+    effort: low
+    cache_system: true
+  trainer_coach:
+    model: claude-opus-5-5
+    max_tokens: 6000 # inkl. Denkphase
+    effort: medium
+
 # Budget-Wächter: gilt für LLM-Aufrufe UND bezahlte APIs (Places) zusammen. Tag/Monat nach deutscher Zeit.
 # Ist ein Limit erreicht, startet kein neuer kostenpflichtiger Aufruf mehr (laufende werden fertig).
 budget:

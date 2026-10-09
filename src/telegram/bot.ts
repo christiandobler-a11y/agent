@@ -2,6 +2,8 @@ import { decideSuggestion, suggestionsByStatus } from "../advisor/run.js";
 import { FIND_TRIGGER, startAdvisor } from "../advisor/job.js";
 import { proposeShop } from "../shop/job.js";
 import { handleShopCallback, sendShopProposal } from "./shop.js";
+import { handleTrainerCallback, handleTrainerText, trainingCommand } from "./trainer.js";
+import { loadTrainerConfig, type TrainerDeps } from "../trainer/session.js";
 import { ADVISOR_QUEUE } from "../queue/boss.js";
 import { DECISION_TEXT, decisionKeyboard, parseAdvisorCallback, suggestionList } from "./advisor.js";
 import { Bot, InputFile, type Context } from "grammy";
@@ -186,6 +188,7 @@ export const BOT_COMMANDS = [
   { command: "vorschlaege", description: "Vorschläge der Berater, die umgesetzt werden sollen" },
   { command: "fundstueck", description: "Die Berater stöbern im Netz und erzählen was" },
   { command: "laden", description: "Laden der Woche: Vorschlag mit Design-Briefing" },
+  { command: "training", description: "Sales-Trainer: Einwände üben, mit XP" },
   { command: "hilfe", description: "Was ich kann" },
 ];
 
@@ -298,6 +301,16 @@ export function createBot(options: BotOptions): AvelioBot {
         ? `🧠 Die Berater legen los${focus ? " mit deiner Frage" : ""}: Zahlen ansehen, im Netz recherchieren, Vorschläge entwerfen und gegenprüfen. Dauert ein paar Minuten, ich melde mich ☕`
         : "🧠 Die Berater sitzen schon dran, der Bericht kommt gleich.",
     );
+  });
+  // Sales-Trainer (09.10.2026): Rollenspiel zur Einwandbehandlung, "/training liste" zeigt alle Einwände.
+  const trainer = (): TrainerDeps => ({
+    db: pipeline.db,
+    llm: options.manager.llm,
+    config: loadTrainerConfig(),
+    now: pipeline.now,
+  });
+  bot.command(["training", "trainer", "ueben"], async (ctx) => {
+    await trainingCommand(ctx, trainer(), ctx.match);
   });
   // Laden der Woche jetzt vorschlagen (sonst montags von selbst).
   bot.command(["laden", "shop"], async (ctx) => {
@@ -641,6 +654,7 @@ export function createBot(options: BotOptions): AvelioBot {
 
   bot.on("callback_query:data", async (ctx) => {
     if (await handleShopCallback(ctx, pipeline)) return;
+    if (await handleTrainerCallback(ctx, trainer())) return;
     const plan = planDeps();
     if (plan && (await handlePlanCallback(ctx, plan, by(ctx.chat?.id)))) return;
     const crm = parseCrmCallback(ctx.callbackQuery.data);
@@ -970,6 +984,8 @@ export function createBot(options: BotOptions): AvelioBot {
     // Nach "✏️ Andere Adresse" auf einer Anruf-Karte: Adresse und Name für die Mail mit Einwilligung.
     const plan = planDeps();
     if (plan && (await handleCallText(ctx, plan, by(ctx.chat.id)))) return;
+    // Läuft ein Trainingsgespräch, ist jede Nachricht Christians Antwort darin.
+    if (await handleTrainerText(ctx, trainer(), ctx.message.text)) return;
     const pending = await getState<{ companyId: string; at: string } | null>(
       pipeline.db,
       inspoKey(ctx.chat.id),

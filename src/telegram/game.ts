@@ -67,6 +67,7 @@ export function levelText(s: GameState, c: GameConfig): string {
     `🤝 Interessenten: <b>${st.interested}</b>`,
     `🥇 Kunden: <b>${st.won}</b>`,
     `✅ Perfekte Tage: <b>${st.perfectDays}</b> · ⚡ Serie: <b>${st.streak}</b> (Rekord ${st.bestStreak})`,
+    `🎭 Trainings: <b>${st.trainings}</b> (+${st.trainingXp} XP) · 🧠 Einwände gemeistert: <b>${st.mastered}</b>`,
     "",
     `🏅 <b>Abzeichen ${earned.length}/${earned.length + open.length}</b>`,
     earned.length > 0
@@ -79,7 +80,7 @@ export function levelText(s: GameState, c: GameConfig): string {
     "",
     `💬 ${cheer(s)}`,
     "",
-    `<i>XP: Mail +${c.xp.kontaktiert} · Nachfassen +${c.xp.nachgefasst} · Antwort +${c.xp.antwort} · Interessent +${c.xp.interessiert} · Kunde +${c.xp.gewonnen} · perfekter Tag +${c.xp.perfekter_tag}</i>`,
+    `<i>XP: Mail +${c.xp.kontaktiert} · Nachfassen +${c.xp.nachgefasst} · Antwort +${c.xp.antwort} · Interessent +${c.xp.interessiert} · Kunde +${c.xp.gewonnen} · perfekter Tag +${c.xp.perfekter_tag} · Training bis +25 (/training)</i>`,
   ].join("\n");
 }
 

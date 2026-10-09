@@ -33,3 +33,8 @@ abzeichen:
   perfekter_tag: { name: Perfekter Tag, emoji: "✅", text: Ein Morgen-Paket komplett abgearbeitet. }
   serie_5: { name: Am Ball, emoji: "⚡", text: Fünf Pakete in Folge komplett. }
   serie_20: { name: Maschine, emoji: "🤖", text: Zwanzig Pakete in Folge komplett. }
+  # Sales-Trainer (09.10.2026): XP je Gespräch rechnet src/trainer/session.ts (config/trainer.yaml → xp).
+  erstes_training: { name: Erste Runde, emoji: "🎭", text: Das erste Trainingsgespräch geführt. }
+  training_10: { name: Sparringspartner, emoji: "🥊", text: Zehn Trainingsgespräche geführt. }
+  einwand_profi:
+    { name: Einwand-Profi, emoji: "🧠", text: Zehn verschiedene Einwände gemeistert (Schnitt ab 4). }

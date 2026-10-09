@@ -23,6 +23,9 @@ const stats = (over: Partial<GameStats> = {}): GameStats => ({
   perfectDays: 0,
   streak: 0,
   bestStreak: 0,
+  trainings: 0,
+  trainingXp: 0,
+  mastered: 0,
   ...over,
 });
 

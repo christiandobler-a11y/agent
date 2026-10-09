@@ -2,6 +2,7 @@ import { z } from "zod";
 import { loadYamlConfig } from "../config/files.js";
 import { getState, setState } from "../db/appState.js";
 import type { DbClient } from "../db/client.js";
+import { loadTrainerConfig } from "../trainer/session.js";
 
 /**
  * Fortschritt als kleines Spiel (04.10.2026, Christians Idee): XP, Level und Abzeichen. Alles wird aus dem Verlauf
@@ -34,6 +35,10 @@ export interface GameStats {
   /** Komplett abgearbeitete Pakete in Folge bis zum letzten abgeschlossenen Tag. */
   streak: number;
   bestStreak: number;
+  /** Sales-Trainer (09.10.2026): fertige Gespräche, ihre XP (von Code berechnet) und gemeisterte Szenarien. */
+  trainings: number;
+  trainingXp: number;
+  mastered: number;
 }
 
 /** Bedingungen der Abzeichen (Schlüssel wie in config/game.yaml). */
@@ -47,6 +52,9 @@ const BADGES: Record<string, (s: GameStats) => boolean> = {
   perfekter_tag: (s) => s.perfectDays >= 1,
   serie_5: (s) => s.bestStreak >= 5,
   serie_20: (s) => s.bestStreak >= 20,
+  erstes_training: (s) => s.trainings >= 1,
+  training_10: (s) => s.trainings >= 10,
+  einwand_profi: (s) => s.mastered >= 10,
 };
 
 export function xpOf(s: GameStats, c: GameConfig): number {
@@ -57,7 +65,8 @@ export function xpOf(s: GameStats, c: GameConfig): number {
     s.replied * x.antwort +
     s.interested * x.interessiert +
     s.won * x.gewonnen +
-    s.perfectDays * x.perfekter_tag
+    s.perfectDays * x.perfekter_tag +
+    s.trainingXp
   );
 }
 
@@ -102,7 +111,12 @@ export function streaks(days: { perfect: boolean }[]): { perfectDays: number; st
 }
 
 /** Kennzahlen aus der Datenbank, optional nur bis `until` (z. B. Tagesanfang für "heute +X XP"). */
-export async function gameStats(db: DbClient, now: Date, until: Date = now): Promise<GameStats> {
+export async function gameStats(
+  db: DbClient,
+  now: Date,
+  until: Date = now,
+  masteredFrom = 4,
+): Promise<GameStats> {
   const { rows } = await db.query<{ to_status: string; n: number }>(
     `select to_status, count(distinct company_id)::int as n from interactions
       where type = 'status' and to_status in ('CONTACTED', 'REPLIED', 'INTERESTED', 'WON') and created_at <= $1
@@ -129,6 +143,12 @@ export async function gameStats(db: DbClient, now: Date, until: Date = now): Pro
   // Bis `until` vor jetzt (z. B. Tagesanfang) zählt der heutige Tag nicht mit.
   const counted = days.filter((d) => !d.today || (until >= now && d.perfect));
   const s = streaks(counted);
+  const { rows: t } = await db.query<{ n: number; xp: number; mastered: number }>(
+    `select count(*)::int as n, coalesce(sum(xp), 0)::int as xp,
+            count(distinct scenario) filter (where score >= $2)::int as mastered
+       from training_sessions where status = 'fertig' and finished_at <= $1`,
+    [until, masteredFrom],
+  );
   return {
     contacted: n("CONTACTED"),
     followUps: f[0]?.n ?? 0,
@@ -138,7 +158,19 @@ export async function gameStats(db: DbClient, now: Date, until: Date = now): Pro
     perfectDays: s.perfectDays,
     streak: s.streak,
     bestStreak: s.best,
+    trainings: t[0]?.n ?? 0,
+    trainingXp: t[0]?.xp ?? 0,
+    mastered: t[0]?.mastered ?? 0,
   };
+}
+
+/** Ab diesem Schnitt gilt ein Trainings-Szenario als gemeistert (config/trainer.yaml → gemeistert_ab). */
+function masteredFrom(): number {
+  try {
+    return loadTrainerConfig().gemeistert_ab;
+  } catch {
+    return 4;
+  }
 }
 
 export interface GameState {
@@ -153,7 +185,7 @@ export async function gameState(
   now: Date,
   c: GameConfig = loadGameConfig(),
 ): Promise<GameState> {
-  const stats = await gameStats(db, now);
+  const stats = await gameStats(db, now, now, masteredFrom());
   const xp = xpOf(stats, c);
   return { stats, xp, level: levelOf(xp, c), badges: badgesOf(stats, c) };
 }
