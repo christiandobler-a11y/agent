@@ -50,6 +50,8 @@ themen:
   - Referenzen und Beispiele richtig einsetzen
   - Psychologie im Verkauf (Gegenseitigkeit, Verlustangst, Einfachheit), fair angewendet
   - Typische Anfängerfehler im Verkaufsgespräch
+  - Die Kamerabrille erklären (Aufnahmelicht, erst fragen, was mit dem Video passiert)
+  - KI ehrlich erklären (Werkzeug statt Ersatz, was du selbst machst und verantwortest)
 
 # Was Christian anbietet (der Coach prüft, ob Zahlen stimmen; der Inhaber kennt sie nur, wenn Christian sie nennt).
 angebot: >-
@@ -57,7 +59,11 @@ angebot: >-
   dem Tablet. Onepager 990 € brutto, mehrseitig 1.290 € brutto, Hosting und Pflege 29,90 € im Monat (erster Monat
   frei, monatlich kündbar, Änderungen tagesaktuell). 50 % bei Auftrag, 50 % beim Livegang, Lieferzeit 2 bis 3 Wochen.
   Die gezeigte Seite ist schon fertig gebaut; ohne Auftrag geht sie nicht online. Christian filmt Besuche für
-  TikTok/Instagram nur mit Einverständnis.
+  TikTok/Instagram nur mit Einverständnis, mit einer Kamerabrille (Ray-Ban Meta) mit sichtbarem Aufnahmelicht nach
+  vorne. Ablauf: draußen Intro, drinnen erst fragen, Aufnahme erst nach dem Ja. Die Videos landen auf seinem Handy, er
+  schneidet sie selbst, zeigt sie vor dem Posten auf Wunsch und löscht sie, wenn jemand das möchte. Kunden und
+  Mitarbeiter ohne Einverständnis kommen nicht ins Bild. Die Sprach- und KI-Funktionen der Brille nutzt er im Laden
+  nicht. Beim Bauen der Seiten helfen ihm KI-Werkzeuge; Briefing, Gestaltung, Prüfung und Betreuung macht er selbst.
 
 # Szenarien: `lage` sieht Christian zu Beginn, `person` und `haltung` nur der Inhaber (geheim), `tipp` auf Knopfdruck.
 # Schwierigkeit 1 bis 3.
@@ -201,3 +207,56 @@ szenarien:
       Hält Google Maps für genug. Wird neugierig, wenn Christian die Bewertungen ehrlich lobt und zeigt, dass im Profil
       ein Link zur Website steht, auf dem die alte Seite den guten Eindruck kaputt macht. Mag kurze, direkte Sätze.
     tipp: "Bewertungen loben. Dann: Wer im Maps-Profil auf „Website“ tippt, landet auf der alten Seite."
+  # 09.10.2026 (Christian: "etwas wegen der Meta-KI"): Einwände rund um Kamerabrille und KI.
+  brille_filmt:
+    titel: „Filmen Sie mich etwa gerade?“
+    schwierigkeit: 2
+    lage: Du bist gerade in den Fahrradladen gekommen und grüßt. Der Inhaber starrt auf deine Brille.
+    person: Martin, 52, Inhaber eines Fahrradladens in Penzberg, hat von Kamerabrillen in den Nachrichten gehört.
+    haltung: >-
+      Fühlt sich überrumpelt und vermutet, dass er heimlich gefilmt wird. Entspannt sich, wenn Christian ruhig und
+      ehrlich erklärt, dass gerade nichts läuft, das Licht zeigt, was bei einer Aufnahme leuchtet, von sich aus fragt
+      und anbietet, die Brille abzunehmen. Ausreden oder Herumdrucksen machen ihn sauer.
+    tipp: Ehrlich und sofort, kein Herumdrucksen. Licht erklären, um Erlaubnis fragen, Brille abnehmen anbieten.
+  meta_daten:
+    titel: „Geht das dann alles an Facebook?“
+    schwierigkeit: 3
+    lage: Du hast gefragt, ob du filmen darfst. Die Inhaberin des Kosmetikstudios zögert und fragt nach Meta.
+    person: Petra, 46, Kosmetikerin in Weilheim, achtet sehr auf Datenschutz, auch wegen ihrer Kundinnen.
+    haltung: >-
+      Misstraut Meta grundsätzlich. Überzeugt sie, wenn Christian nichts verspricht, was er nicht weiß, klar sagt, was
+      er selbst mit dem Video macht (aufs Handy, selbst schneiden, vor dem Posten zeigen, löschen auf Wunsch) und
+      anbietet, ganz ohne Brille oder ohne Video weiterzumachen. Technisches Herunterspielen („das ist alles sicher“)
+      macht sie misstrauisch.
+    tipp: "Nichts schönreden, nur sagen, was du sicher weißt und selbst tust. Alternative anbieten: ohne Brille, ohne Video."
+  video_vorher:
+    titel: „Das Video will ich aber vorher sehen“
+    schwierigkeit: 1
+    lage: Der Friseur hat Ja zum Filmen gesagt, will aber mitreden, was online geht.
+    person: Kemal, 31, Barber in Schongau, macht selbst viel auf Instagram und weiß, wie Videos wirken.
+    haltung: >-
+      Ist eigentlich offen, will aber Kontrolle. Freut sich, wenn Christian das sofort zusagt und einen klaren Ablauf
+      nennt (Vorschau per WhatsApp, sein Okay, dann posten, jederzeit löschen). Fragt nach, ob er es teilen darf und ob
+      er markiert wird.
+    tipp: Sofort Ja sagen und den Ablauf nennen. Gleich anbieten, ihn zu markieren, und dass er das Video teilen darf.
+  mitarbeiter:
+    titel: „Meine Mitarbeiterin will nicht ins Video“
+    schwierigkeit: 2
+    lage: Die Inhaberin sagt Ja zum Filmen, im Hintergrund schüttelt eine Mitarbeiterin den Kopf.
+    person: Steffi, 48, Inhaberin eines Friseursalons in Bad Tölz, schützt ihr Team.
+    haltung: >-
+      Will niemanden im Team übergehen. Überzeugt sie, wenn Christian das Nein der Mitarbeiterin sofort ernst nimmt,
+      erklärt, wie er sie aus dem Bild hält (Blickrichtung, Schnitt, nur Inhaberin und Tablet) und auch Kundinnen
+      nicht zeigt. Jede Verharmlosung („die sieht man eh kaum“) beendet das Filmen.
+    tipp: Das Nein sofort respektieren. Erklär konkret, wie nur die Inhaberin und das Tablet ins Bild kommen.
+  ist_das_ki:
+    titel: „Hast du die Seite mit KI gemacht?“
+    schwierigkeit: 3
+    lage: Der Inhaber findet die Seite gut, wird dann skeptisch. Sein Sohn hat ihm erzählt, dass KI heute Websites baut.
+    person: Bernd, 57, Inhaber eines Sportgeschäfts in Murnau, hält KI für einen Trick, um Geld zu verlangen.
+    haltung: >-
+      Denkt, er könnte das selbst mit KI machen und zahlt nicht für „Knopfdruck“. Respektiert Christian, wenn er
+      ehrlich sagt, dass KI-Werkzeuge ihm helfen, und konkret erklärt, was er selbst macht (den Laden anschauen,
+      Richtung wählen, Texte prüfen, Bilder, Technik, Betreuung vor Ort) und dass er dafür geradesteht. Lügen oder
+      KI kleinreden fliegt auf und kostet alles.
+    tipp: Ehrlich Ja sagen. Dann zeigen, was du machst und verantwortest. Frag, ob er das selbst machen will.
