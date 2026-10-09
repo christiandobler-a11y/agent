@@ -32,7 +32,12 @@ export const trainerConfigSchema = z.object({
     basis: z.object({ 1: z.number(), 2: z.number(), 3: z.number() }),
     ja_bonus: z.number().min(0),
     tipp: z.number().min(0),
+    /** Je richtigem Satz in den Stufen leicht (Lückentext) und mittel (aus dem Kopf). */
+    leicht: z.number().min(0).default(2),
+    mittel: z.number().min(0).default(3),
   }),
+  /** Sätze je Runde in den Stufen leicht und mittel. */
+  saetze_runde: z.number().int().min(1).default(5),
   gemeistert_ab: z.number().min(1).max(5),
   melden: z
     .object({
@@ -98,6 +103,19 @@ export interface TrainingSession {
   score: string | null;
   xp: number;
   updated_at: Date;
+  /** Stufe: leicht (Lückentext), mittel (Satz aus dem Kopf), schwer (Rollenspiel). */
+  mode: Mode;
+  drill: DrillState | null;
+}
+
+export type Mode = "leicht" | "mittel" | "schwer";
+export const MODES: readonly Mode[] = ["leicht", "mittel", "schwer"];
+
+/** Ablauf einer Runde leicht/mittel: Sätze der Runde, Position, Ergebnisse. */
+export interface DrillState {
+  items: string[];
+  index: number;
+  results: boolean[];
 }
 
 // ---------------------------------------------------------------------------------------------------------------
@@ -208,7 +226,7 @@ export async function useHint(db: Db, id: string, now: Date): Promise<void> {
 export async function playedScenarios(db: Db): Promise<PlayedScenario[]> {
   const { rows } = await db.query<{ scenario: string; best: string; plays: number }>(
     `select scenario, max(score) as best, count(*)::int as plays from training_sessions
-      where status = 'fertig' group by scenario`,
+      where status = 'fertig' and mode = 'schwer' group by scenario`,
   );
   return rows.map((r) => ({ scenario: r.scenario, best: Number(r.best), plays: r.plays }));
 }
@@ -241,6 +259,52 @@ async function ownerReply(deps: TrainerDeps, sc: Scenario, turns: readonly Turn[
   return r.output;
 }
 
+/** Offene Runden dieses Chats abbrechen (vor jeder neuen Runde). */
+export async function closeOpen(db: Db, chatId: number, now: Date): Promise<void> {
+  await db.query(
+    `update training_sessions set status = 'abgebrochen', finished_at = $2, updated_at = $2
+      where chat_id = $1 and status = 'offen'`,
+    [chatId, now],
+  );
+}
+
+export const HINT_PROMPT = "v1";
+export const hintSchema = z.object({
+  hinweis: z.string().min(1).max(400),
+  satz: z.string().min(1).max(300),
+});
+export type Hint = z.infer<typeof hintSchema>;
+
+/**
+ * Tipp mitten im Gespräch (Rolle `trainer_hint`): passt zum bisherigen Verlauf, jedes Mal neu, mit einem Satz zum
+ * Übernehmen. Die universellen Sätze aus config/saetze.yaml gehen als Vorrat mit.
+ */
+export async function liveHint(
+  deps: TrainerDeps,
+  session: TrainingSession,
+  phrases: readonly { einwand: string; satz: string }[],
+): Promise<Hint> {
+  const sc = deps.config.szenarien[session.scenario];
+  if (!sc) throw new Error(`Unbekanntes Szenario: ${session.scenario}`);
+  const r = await deps.llm.structured({
+    role: "trainer_hint",
+    promptVersion: HINT_PROMPT,
+    system: loadPrompt("trainer_hint", HINT_PROMPT),
+    input: [
+      `<lage>${sc.lage}</lage>`,
+      `<person>${sc.person}</person>`,
+      `<haltung>${sc.haltung}</haltung>`,
+      `<grundtipp>${sc.tipp}</grundtipp>`,
+      `<saetze>\n${phrases.map((p) => `- ${p.einwand} → ${p.satz.replace(/\[\[|\]\]/g, "")}`).join("\n")}\n</saetze>`,
+      `<bisherige_tipps>${session.hints}</bisherige_tipps>`,
+      `<verlauf>\n${transcript(session.turns, ownerName(sc))}\n</verlauf>`,
+    ].join("\n"),
+    schema: hintSchema,
+    inputSummary: `Training-Tipp ${sc.titel}`,
+  });
+  return r.output;
+}
+
 /** Neues Gespräch: ein offenes wird abgebrochen, der Inhaber eröffnet. */
 export async function startSession(
   deps: TrainerDeps,
@@ -255,11 +319,7 @@ export async function startSession(
       : pickScenario(config, await playedScenarios(db));
   const sc = config.szenarien[key]!;
   const first = await ownerReply(deps, sc, []);
-  await db.query(
-    `update training_sessions set status = 'abgebrochen', finished_at = $2, updated_at = $2
-      where chat_id = $1 and status = 'offen'`,
-    [chatId, now],
-  );
+  await closeOpen(db, chatId, now);
   const turns: Turn[] = [{ who: "inhaber", text: first.antwort, mood: first.stimmung }];
   const { rows } = await db.query<TrainingSession>(
     `insert into training_sessions (chat_id, scenario, turns, created_at, updated_at)

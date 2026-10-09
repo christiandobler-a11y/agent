@@ -35,6 +35,18 @@ import {
   weakest,
   weeklyMessage,
 } from "../src/trainer/coach.js";
+import {
+  checkGap,
+  checkRecall,
+  fullSentence,
+  gapAnswers,
+  loadPhrases,
+  normalize,
+  pickPhrases,
+  withGap,
+} from "../src/trainer/phrases.js";
+import { hintSchema } from "../src/trainer/session.js";
+import { drillPrompt, phraseList } from "../src/telegram/trainer.js";
 import { describeDb, useTestDb } from "./helpers/db.js";
 
 const config = loadTrainerConfig();
@@ -80,7 +92,7 @@ describe("Sales-Trainer (rein)", () => {
   });
 
   it("XP: anteilig zur Punktzahl, Ja-Bonus, Tipp-Abzug, mindestens 1", () => {
-    const c = { ...config, xp: { basis: { 1: 10, 2: 15, 3: 20 }, ja_bonus: 5, tipp: 3 } };
+    const c = { ...config, xp: { ...config.xp, basis: { 1: 10, 2: 15, 3: 20 }, ja_bonus: 5, tipp: 3 } };
     expect(xpFor(c, 3, 5, "ja", 0)).toBe(25);
     expect(xpFor(c, 2, 3, "offen", 0)).toBe(9);
     expect(xpFor(c, 2, 3, "offen", 1)).toBe(6);
@@ -160,6 +172,13 @@ describeDb("Sales-Trainer", () => {
           model: "m",
         });
       }
+      if (req.role === "trainer_hint")
+        return Promise.resolve({
+          output: { hinweis: "Frag nach, was ihn wirklich stört.", satz: "Zu teuer im Vergleich wozu?" },
+          agentRunId: "r",
+          costUsd: 0.001,
+          model: "m",
+        });
       return Promise.resolve({ output: feedback(4), agentRunId: "r", costUsd: 0.01, model: "m" });
     });
     const toolStep = vi.fn();
@@ -217,7 +236,11 @@ describeDb("Sales-Trainer", () => {
     // Tipp kostet XP
     const hint = t.lastButtons().find((b) => b.text.startsWith("💡"))!.callback_data!;
     await t.bot.handleUpdate(callbackUpdate(hint));
-    expect(t.texts().at(-1)).toContain("Preis ruhig nennen");
+    expect(t.texts().at(-1)).toContain("Frag nach, was ihn wirklich stört.");
+    expect(t.texts().at(-1)).toContain("„Zu teuer im Vergleich wozu?“");
+    const hintReq = t.structured.mock.calls.find((c) => c[0].role === "trainer_hint")![0];
+    expect(hintReq.input).toContain("<saetze>");
+    expect(hintReq.input).toContain("Zu teuer im Vergleich wozu?");
 
     for (let i = 1; i <= 3; i++) {
       await t.bot.handleUpdate(textUpdate(`Meine Antwort ${i}`));
@@ -321,7 +344,7 @@ describe("Trainer meldet sich (rein)", () => {
     expect(tipMessage({ ...tip, szenario: "keins" }, config).buttons[0]!.callback_data).toBe("tr:n");
     const inv = invitationMessage(config, "neffe", 3);
     expect(inv.text).toContain("3 Tage in Folge");
-    expect(inv.buttons.map((b) => b.callback_data)).toEqual(["tr:r:neffe", "tr:n"]);
+    expect(inv.buttons.map((b) => b.callback_data)).toEqual(["tr:r:neffe", "tr:m:leicht", "tr:m:mittel"]);
     const week = weeklyMessage({
       sessions: 3,
       xp: 40,
@@ -402,5 +425,159 @@ describeDb("Trainer meldet sich", () => {
     expect(sent.at(-1)!.text).toContain("Pause nach dem Preis");
     const third = (structured.mock.calls[2] as unknown as [{ input: string }])[0].input;
     expect(third).toContain("Zuhören (Schnitt 4,0 von 5)");
+  });
+});
+
+describe("Sätze und Stufen (rein)", () => {
+  const phrases = loadPhrases();
+  it("Sätze laden, Lücke, ganzer Satz", () => {
+    expect(Object.keys(phrases).length).toBeGreaterThanOrEqual(20);
+    const p = phrases.preis_vergleich!;
+    expect(withGap(p)).toBe("Zu teuer im ____ wozu?");
+    expect(fullSentence(p)).toBe("Zu teuer im Vergleich wozu?");
+    expect(gapAnswers(phrases.nachfragen!)).toEqual(["genau", "konkret"]);
+    expect(loadModelsConfig().roles.trainer_hint).toBeDefined();
+    expect(loadPrompt("trainer_hint", "v1")).toContain("wiederhol dich nicht");
+    expect(zodOutputFormat(hintSchema).type).toBe("json_schema");
+  });
+
+  it("Lückentext: groß/klein, Satzzeichen, Umlaute, ein Tippfehler ab fünf Buchstaben", () => {
+    const p = phrases.preis_vergleich!;
+    expect(checkGap(p, "vergleich")).toBe(true);
+    expect(checkGap(p, " Vergleich. ")).toBe(true);
+    expect(checkGap(p, "Vergleih")).toBe(true);
+    expect(checkGap(p, "Preis")).toBe(false);
+    expect(checkGap(p, "")).toBe(false);
+    expect(checkGap(phrases.nachfragen!, "konkret")).toBe(true);
+    expect(checkGap(phrases.mundpropaganda!, "googlet")).toBe(true); // Tippfehler
+    expect(checkGap(phrases.ja_und!, "aber")).toBe(false);
+    expect(normalize("Grüß Gott!")).toBe("gruess gott");
+  });
+
+  it("Aus dem Kopf: Kernwörter mit Endungen, mehrteilige Kernwörter, 60 %", () => {
+    const p = phrases.nachfragen!; // kern: verstehen, fragen, hängt
+    expect(checkRecall(p, "Versteh ich. Darf ich fragen, woran es hängt?").passed).toBe(true);
+    const half = checkRecall(p, "Okay, woran hängt's denn?");
+    expect(half.passed).toBe(false);
+    expect(half.missed).toEqual(["verstehen", "fragen"]);
+    expect(
+      checkRecall(phrases.zusammenfassen!, "Wenn ich Sie richtig verstehe, geht es vor allem um Zeit?")
+        .passed,
+    ).toBe(true);
+  });
+
+  it("Auswahl: erst neue und schwache Sätze, für mittel zuerst die im Lückentext gelernten", () => {
+    const ps = { a: phrases.ja_und!, b: phrases.nachfragen!, c: phrases.preis_vergleich! };
+    const old = new Date("2026-10-01T00:00:00Z");
+    const progress = [
+      { phrase: "a", box: 2, last_at: old },
+      { phrase: "b", box: 0, last_at: old },
+    ];
+    expect(pickPhrases(ps, progress, 2, "leicht", () => 0)).toEqual(["c", "b"]);
+    expect(pickPhrases(ps, progress, 1, "mittel", () => 0)).toEqual(["a"]);
+  });
+
+  it("Knöpfe für Stufen und Weiß-nicht, Texte", () => {
+    const id = "11111111-2222-3333-4444-555555555555";
+    for (const c of [
+      { kind: "skip" as const, id },
+      { kind: "mode" as const, mode: "mittel" as const },
+    ])
+      expect(parseTrainerCallback(trainerCallback(c))).toEqual(c);
+    expect(parseTrainerCallback("tr:m:extrem")).toBeNull();
+    const p = phrases.preis_vergleich!;
+    expect(drillPrompt("leicht", p, 2, 5)).toContain("Du: „Zu teuer im ____ wozu?“");
+    expect(drillPrompt("mittel", p, 2, 5)).toContain("Du: „Zu teuer …“");
+    const list = phraseList(phrases, new Map([["preis_vergleich", 3]]));
+    expect(list).toContain("1/");
+    expect(list).toContain("🧠 „Zu teuer im Vergleich wozu?“");
+  });
+});
+
+describeDb("Sales-Trainer: Stufen leicht und mittel", () => {
+  const db = useTestDb();
+
+  it("Lückentext-Runde: richtig, falsch, weiß nicht; XP, Lernstand, Stufe gemerkt, dann mittel", async () => {
+    const structured = vi.fn();
+    const llm = { structured, toolStep: vi.fn(), research: vi.fn() } as unknown as LlmGateway;
+    const pipeline = {
+      db: db(),
+      now: () => new Date("2026-10-09T10:00:00Z"),
+      crm: { follow_up_days: 5, quiet_hours: { start: "21:00", end: "08:00" } },
+      lead: { branches: {} },
+    } as unknown as PipelineContext;
+    const calls: { method: string; payload: Record<string, unknown> }[] = [];
+    const bot = createBot({
+      token: "123:test",
+      allowedChatIds: [ALLOWED],
+      manager: { ctx: pipeline, llm },
+      botInfo: { id: 1, is_bot: true, first_name: "Avelio", username: "avelio_test_bot" } as UserFromGetMe,
+      outreach: { config: loadOutreachConfig(), contact: { whatsapp: null, phone: null } },
+      mail: { mailbox: null, config: loadMailConfig() },
+    });
+    bot.api.config.use((_prev, method, payload) => {
+      calls.push({ method, payload });
+      return Promise.resolve({
+        ok: true,
+        result: method.startsWith("send")
+          ? { message_id: calls.length, date: 0, chat: { id: ALLOWED, type: "private" } }
+          : true,
+      } as never);
+    });
+    const texts = () =>
+      calls.filter((x) => x.method === "sendMessage").map((x) => (x.payload.text as string) ?? "");
+    const phrases = loadPhrases();
+    const current = async () => {
+      const { rows } = await db().query<{ id: string; drill: { items: string[]; index: number } }>(
+        "select id, drill from training_sessions where status = 'offen'",
+      );
+      return { id: rows[0]!.id, key: rows[0]!.drill.items[rows[0]!.drill.index]! };
+    };
+
+    // Ohne Angabe startet die leichte Stufe
+    await bot.handleUpdate(textUpdate("/training"));
+    expect(texts().join("\n")).toContain("Lückentext");
+    expect(texts().at(-1)).toContain("Satz 1/5");
+
+    let c = await current();
+    await bot.handleUpdate(textUpdate(gapAnswers(phrases[c.key]!)[0]!));
+    expect(texts().at(-2)).toContain("✅");
+    c = await current();
+    await bot.handleUpdate(textUpdate("quatsch"));
+    expect(texts().at(-2)).toContain("❌");
+    expect(texts().at(-2)).toContain(fullSentence(phrases[c.key]!).slice(0, 10));
+    c = await current();
+    await bot.handleUpdate(callbackUpdate(`tr:k:${c.id}`)); // weiß nicht
+    expect(texts().at(-2)).toContain("❌");
+    for (let i = 0; i < 2; i++) {
+      c = await current();
+      await bot.handleUpdate(textUpdate(gapAnswers(phrases[c.key]!)[0]!));
+    }
+    const done = texts().find((x) => x.includes("Runde fertig"))!;
+    expect(done).toContain("3/5 richtig");
+    expect(done).toContain("+6 XP");
+    expect(structured).not.toHaveBeenCalled(); // ohne LLM
+
+    const { rows } = await db().query<{ box: number }>("select box from training_phrases");
+    expect(rows.length).toBe(5);
+    expect(rows.filter((r) => r.box === 1).length).toBe(3);
+    expect((await gameStats(db(), new Date("2026-10-09T11:00:00Z"))).trainingXp).toBe(6);
+
+    // Stufe gemerkt; Knopf "Mittel" wechselt
+    await bot.handleUpdate(callbackUpdate("tr:m:mittel"));
+    expect(texts().join("\n")).toContain("Aus dem Kopf");
+    c = await current();
+    // Für mittel kommen zuerst die gelernten Sätze
+    expect(rows.length).toBeGreaterThan(0);
+    await bot.handleUpdate(textUpdate(fullSentence(phrases[c.key]!)));
+    expect(texts().at(-2)).toContain("✅");
+    const { rows: modes } = await db().query<{ value: string }>(
+      "select value #>> '{}' as value from app_state where key = $1",
+      [`trainer:mode:${ALLOWED}`],
+    );
+    expect(modes[0]!.value).toBe("mittel");
+
+    await bot.handleUpdate(textUpdate("/saetze"));
+    expect(texts().at(-1)).toContain("Deine Sätze");
   });
 });

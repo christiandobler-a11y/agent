@@ -80,6 +80,12 @@ roles:
     max_tokens: 3000 # inkl. Denkphase
     effort: low
     cache_system: true
+  # Tipp mitten im Rollenspiel (passt zum Verlauf, jedes Mal neu).
+  trainer_hint:
+    model: claude-sonnet-5-5
+    max_tokens: 2000 # inkl. Denkphase
+    effort: low
+    cache_system: true
   trainer_coach:
     model: claude-opus-5-5
     max_tokens: 6000 # inkl. Denkphase

@@ -39,7 +39,10 @@ ausprobieren kann. Nach Schritt 6 ist ein Abstimmungstermin (Kalibrierung) vorge
   Rolle `advisor_research`), Entwürfe (Rolle `advisor`), Gegenprüfung (Rolle `advisor_critic`); nur Behaltenes als
   Karte mit Knöpfen (Tabelle `advisor_suggestions`, `/vorschlaege`). Die Berater ändern nichts selbst. Dazu
   dienstags/donnerstags ein Fundstück aus dem Netz (`/fundstueck`, `src/advisor/finds.ts`)
-- Sales-Trainer (Telegram `/training [einwand|liste]`, `src/trainer/session.ts`, `src/telegram/trainer.ts`,
+- Sales-Trainer in drei Stufen (09.10.2026): leicht = Lückentext, mittel = Satz aus dem Kopf (beide ohne LLM, Sätze in
+  `config/saetze.yaml`, Prüfung rein in `src/trainer/phrases.ts`, Ablauf `src/trainer/drill.ts`, Lernstand
+  `training_phrases`, `/saetze`), schwer = Rollenspiel mit Tipp passend zum Verlauf (Rolle `trainer_hint`); Stufe gemerkt
+  in `app_state` (`trainer:mode:<chat>`). Rollenspiel (Telegram `/training [leicht|mittel|schwer] [einwand]`, `/training liste`, `src/trainer/session.ts`, `src/telegram/trainer.ts`,
   `config/trainer.yaml`, Tabelle `training_sessions`): Rolle `trainer` spielt einen Inhaber mit Einwand, Christian
   antwortet per Text (läuft ein Gespräch, gehen Textnachrichten dorthin statt an den Manager), Rolle `trainer_coach`
   bewertet vier Punkte 1–5; Szenario-Wahl und XP rechnet Code, die XP zählen im Spiel (`/level`). Meldet sich von selbst (`coachTick`, `src/trainer/coach.ts`,

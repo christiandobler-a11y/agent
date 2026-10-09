@@ -2,7 +2,7 @@ import { decideSuggestion, suggestionsByStatus } from "../advisor/run.js";
 import { FIND_TRIGGER, startAdvisor } from "../advisor/job.js";
 import { proposeShop } from "../shop/job.js";
 import { handleShopCallback, sendShopProposal } from "./shop.js";
-import { handleTrainerCallback, handleTrainerText, trainingCommand } from "./trainer.js";
+import { handleTrainerCallback, handleTrainerText, phrasesCommand, trainingCommand } from "./trainer.js";
 import { loadTrainerConfig, type TrainerDeps } from "../trainer/session.js";
 import { buildTip, tipMessage } from "../trainer/coach.js";
 import { ADVISOR_QUEUE } from "../queue/boss.js";
@@ -189,7 +189,8 @@ export const BOT_COMMANDS = [
   { command: "vorschlaege", description: "Vorschläge der Berater, die umgesetzt werden sollen" },
   { command: "fundstueck", description: "Die Berater stöbern im Netz und erzählen was" },
   { command: "laden", description: "Laden der Woche: Vorschlag mit Design-Briefing" },
-  { command: "training", description: "Sales-Trainer: Einwände üben, mit XP" },
+  { command: "training", description: "Sales-Trainer: leicht, mittel oder schwer, mit XP" },
+  { command: "saetze", description: "Deine Sätze für Einwände (Spickzettel)" },
   { command: "haeppchen", description: "Ein Sales-Häppchen vom Trainer, sofort" },
   { command: "hilfe", description: "Was ich kann" },
 ];
@@ -313,6 +314,9 @@ export function createBot(options: BotOptions): AvelioBot {
   });
   bot.command(["training", "trainer", "ueben"], async (ctx) => {
     await trainingCommand(ctx, trainer(), ctx.match);
+  });
+  bot.command(["saetze", "sätze", "spickzettel"], async (ctx) => {
+    await phrasesCommand(ctx, trainer());
   });
   // Ein Sales-Häppchen sofort (sonst morgens und abends von selbst).
   bot.command(["haeppchen", "häppchen", "tipp"], async (ctx) => {

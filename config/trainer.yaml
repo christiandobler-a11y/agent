@@ -15,6 +15,11 @@ xp:
   ja_bonus: 5
   # Abzug je genutztem Tipp.
   tipp: 3
+  # Stufen leicht (Lückentext) und mittel (Satz aus dem Kopf): XP je richtigem Satz (Sätze in config/saetze.yaml).
+  leicht: 2
+  mittel: 3
+# Sätze je Runde in den Stufen leicht und mittel.
+saetze_runde: 5
 # Ab diesem Durchschnitt gilt ein Szenario als gemeistert (Abzeichen "Einwand-Profi").
 gemeistert_ab: 4
 

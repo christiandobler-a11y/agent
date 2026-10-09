@@ -213,7 +213,7 @@ export const HELP_TEXT = [
   "Schnellbefehle: /heute · /nachlegen · /zahlen · /probelauf (/probelauf3) · /level · /status · /pipeline · /abdeckung · /kosten · /fehler · /budget (z. B. /budget +5)",
   "Kalibrierung: /kalibrieren (Firmen mit A/B/C bewerten, 💡 Vorbild merken) · /vorbilder · /auswertung",
   "Laden der Woche: /laden (sonst montags von selbst, mit Design-Briefing und drei Richtungen)",
-  "Sales-Trainer: /training (ein Inhaber mit Einwand, du antwortest, am Ende Bewertung und XP) · /training liste · /haeppchen (Sales-Tipp sofort; sonst meldet sich der Trainer morgens, mittags und abends von selbst)",
+  "Sales-Trainer: /training leicht (Lückentext) · /training mittel (Satz aus dem Kopf) · /training schwer (Rollenspiel mit Bewertung) · /training liste · /saetze (Spickzettel) · /haeppchen (Sales-Tipp sofort; sonst meldet sich der Trainer morgens, mittags und abends von selbst)",
   "Berater: /berater (Runde jetzt starten, sonst sonntags von selbst) · /vorschlaege (was umgesetzt werden soll) · /fundstueck (was Lustiges oder Spannendes aus dem Netz, sonst dienstags und donnerstags)",
 ].join("\n");
 

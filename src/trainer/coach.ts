@@ -115,8 +115,9 @@ export function invitationMessage(
       ...(streakDays > 1 ? ["", `⚡ ${streakDays} Tage in Folge trainiert, nicht abreißen lassen!`] : []),
     ].join("\n"),
     buttons: [
-      { text: "▶️ Los geht's", callback_data: `tr:r:${scenarioKey}` },
-      { text: "🎲 Anderer Einwand", callback_data: "tr:n" },
+      { text: "🔴 Rollenspiel: los geht's", callback_data: `tr:r:${scenarioKey}` },
+      { text: "🟢 Lieber Sätze üben (leicht)", callback_data: "tr:m:leicht" },
+      { text: "🟡 Sätze aus dem Kopf (mittel)", callback_data: "tr:m:mittel" },
     ],
   };
 }

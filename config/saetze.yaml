@@ -1,0 +1,151 @@
+# Universelle Sätze für Einwände (09.10.2026, Christian: "erstmal mehr Sätze einbrennen, dann selbst wiedergeben").
+# Training in drei Stufen: leicht = Lückentext (das Wort in [[…]] fehlt, Alternativen mit |), mittel = Satz aus dem
+# Kopf wiedergeben (geprüft über die `kern`-Wörter, Code ohne LLM), schwer = Rollenspiel (config/trainer.yaml).
+# `einwand` ist der Auslöser, den du im Training siehst; `wann` erklärt, wofür der Satz gut ist.
+# Neue Sätze einfach dazuschreiben; der Schlüssel (a–z, 0–9, _) darf sich später nicht mehr ändern.
+
+saetze:
+  ja_und:
+    kategorie: Grundhaltung
+    einwand: „Brauch ich nicht, läuft auch so.“
+    satz: "Das stimmt, [[und]] gerade deshalb lohnt sich ein zweiter Blick."
+    kern: [stimmt, und, deshalb]
+    wann: „Ja, und“ statt „ja, aber“. Mit „aber“ nimmst du ihm sein Recht wieder weg, mit „und“ baust du darauf auf.
+  nachfragen:
+    kategorie: Grundhaltung
+    einwand: „Ne, eher nicht.“
+    satz: "Das kann ich verstehen. Darf ich fragen, woran es [[genau|konkret]] hängt?"
+    kern: [verstehen, fragen, hängt]
+    wann: Bei jedem Einwand zuerst. Der erste Einwand ist selten der echte, die Frage holt den echten raus.
+  zusammenfassen:
+    kategorie: Grundhaltung
+    einwand: „Ich weiß nicht, die Zeit, das Geld, und wer pflegt das dann …“
+    satz: "Wenn ich Sie richtig [[verstehe]], geht's Ihnen vor allem darum, dass es keine Arbeit macht?"
+    kern: [richtig, verstehe, vor allem]
+    wann: Zeigt, dass du zuhörst, und macht aus drei Sorgen die eine, um die es wirklich geht.
+  bewertungen:
+    kategorie: Grundhaltung
+    einwand: „Uns kennen die Leute doch eh, wir haben super Bewertungen.“
+    satz: "Das stimmt schon, und genau Ihre [[Bewertungen]] sprechen doch dafür, dass das online auch jeder sieht."
+    kern: [stimmt, bewertungen, sprechen, dafür]
+    wann: Wenn der Laden stolz ist. Du nimmst seinen Stolz auf und machst ihn zum Argument.
+  bumerang:
+    kategorie: Grundhaltung
+    einwand: „Ich hab so viel zu tun, ich hab für sowas keinen Kopf.“
+    satz: "Gerade weil Sie so viel zu [[tun]] haben, sollte die Seite die Fragen beantworten und nicht Sie am Telefon."
+    kern: [gerade weil, tun, fragen, telefon]
+    wann: Bumerang. Der Grund gegen dich wird zum Grund für dich.
+  preis_vergleich:
+    kategorie: Preis
+    einwand: „Das ist mir zu teuer.“
+    satz: "Zu teuer im [[Vergleich]] wozu?"
+    kern: [teuer, vergleich, wozu]
+    wann: Erst den Maßstab klären. Vergleicht er mit Wix, mit einer Agentur oder mit gar nichts?
+  preis_ruhig:
+    kategorie: Preis
+    einwand: „Was kostet mich der Spaß?“
+    satz: "Einmalig neunhundertneunzig Euro, das Hosting ist [[monatlich]] kündbar."
+    kern: [einmalig, neunhundertneunzig, monatlich, kündbar]
+    wann: Preis ruhig und klar nennen, dann schweigen. Wer zuerst redet, gibt nach.
+  preis_nutzen:
+    kategorie: Preis
+    einwand: „Ob sich das rechnet …“
+    satz: "Wenn über die Seite im Monat nur ein [[Kunde]] mehr kommt, hat sie sich schnell bezahlt."
+    kern: [monat, kunde, mehr, bezahlt]
+    wann: Den Preis in seine Währung umrechnen (Räder, Haarschnitte, Behandlungen).
+  nur_preis:
+    kategorie: Preis
+    einwand: „Für die Hälfte würd ich's machen.“
+    satz: "Mal angenommen, der Preis passt: Wäre die Seite [[sonst]] genau das, was Sie sich vorstellen?"
+    kern: [angenommen, preis, passt, sonst]
+    wann: Prüft, ob es wirklich nur am Preis liegt. Statt Rabatt lieber eine kleine Zugabe.
+  ueberlegen:
+    kategorie: Zögern
+    einwand: „Ich überleg's mir mal.“
+    satz: "Klar. Was müsste [[passieren]], damit es für Sie eine leichte Entscheidung wird?"
+    kern: [müsste, passieren, leichte, entscheidung]
+    wann: "„Ich überleg's mir“ heißt meistens: Da ist noch ein Zweifel. Die Frage holt ihn raus."
+  per_mail:
+    kategorie: Zögern
+    einwand: „Schicken Sie mir einfach was per Mail.“
+    satz: "Mach ich gern. Was genau wollen Sie sich [[anschauen]], dann schick ich genau das."
+    kern: [gern, genau, anschauen, schick]
+    wann: Aus dem höflichen Nein wird ein Gespräch. Danach gleich einen Anruf-Termin ausmachen.
+  keine_zeit:
+    kategorie: Zögern
+    einwand: „Grad ganz schlecht, ich hab Kundschaft.“
+    satz: "Dann halt ich Sie nicht auf. Wann passt's Ihnen [[besser]], fünf Minuten?"
+    kern: [nicht auf, wann, besser, fünf minuten]
+    wann: Sofort Respekt zeigen und trotzdem einen konkreten Zeitpunkt holen.
+  partner:
+    kategorie: Zögern
+    einwand: „Das muss ich mit meiner Frau besprechen.“
+    satz: "Unbedingt. Wollen wir's uns dann zu [[dritt]] anschauen, ich bring's nochmal mit?"
+    kern: [unbedingt, dritt, anschauen]
+    wann: Mitentscheider einbinden statt auf eine Rückmeldung zu warten, die nie kommt.
+  mundpropaganda:
+    kategorie: Wir brauchen das nicht
+    einwand: „Bei uns läuft alles über Mundpropaganda.“
+    satz: "Das ist das Beste, was es gibt. Und wer Sie empfohlen bekommt, [[googelt]] Sie meistens zuerst."
+    kern: [empfohlen, googelt, zuerst]
+    wann: Mundpropaganda bestätigen und weiterdenken. Was sieht der Empfohlene?
+  instagram:
+    kategorie: Wir brauchen das nicht
+    einwand: „Wir haben Instagram, das reicht.“
+    satz: "Instagram ist super für Ihre Stammkunden, die Website ist für die, die Sie noch nicht [[kennen]]."
+    kern: [instagram, stammkunden, website, kennen]
+    wann: Instagram nicht schlechtmachen, sondern die Rollen trennen. Die Seite kann Instagram sogar einbinden.
+  familie:
+    kategorie: Wir brauchen das nicht
+    einwand: „Das macht mein Neffe irgendwann.“
+    satz: "Super, dass Sie da jemanden haben. Was hat er [[bisher]] schon gemacht?"
+    kern: [super, jemanden, bisher, gemacht]
+    wann: Nie gegen die Familie arbeiten. Die Frage zeigt meist von selbst, dass seit Jahren nichts passiert ist.
+  agentur:
+    kategorie: Misstrauen
+    einwand: „Mit Agenturen hatten wir nur Ärger.“
+    satz: "Das tut mir leid. Was ist damals genau [[schiefgelaufen]]?"
+    kern: [leid, genau, schiefgelaufen]
+    wann: Erst zuhören, dann zeigen, was bei dir anders ist (Seite schon fertig, du bist vor Ort).
+  haken:
+    kategorie: Misstrauen
+    einwand: „Wo ist da der Haken?“
+    satz: "Ehrlich gesagt: Ich zeig meine Arbeit lieber, als sie zu [[erklären]]. Unterschreiben müssen Sie heute nichts."
+    kern: [ehrlich, zeig, erklären, unterschreiben]
+    wann: Offen sagen, was du davon hast. Nichts hinlegen, keinen Druck.
+  brille:
+    kategorie: Brille und KI
+    einwand: „Filmen Sie mich etwa gerade?“
+    satz: "Gerade läuft nichts. Wenn das [[Licht]] leuchtet, nimmt sie auf, und das nur, wenn Sie Ja sagen."
+    kern: [läuft nichts, licht, leuchtet, ja sagen]
+    wann: Ehrlich und sofort. Anbieten, die Brille abzunehmen.
+  ki:
+    kategorie: Brille und KI
+    einwand: „Das macht doch heute alles die KI, oder?“
+    satz: "Mir helfen KI-Werkzeuge, ja. Angeschaut, entschieden und [[geprüft]] hab ich aber alles selbst."
+    kern: [helfen, werkzeuge, entschieden, geprüft, selbst]
+    wann: Nie lügen, nie kleinreden. Sag, was du machst und wofür du geradestehst.
+  nein_ok:
+    kategorie: Gehen können
+    einwand: „Nein, wirklich nicht, danke.“
+    satz: "Völlig in Ordnung. Darf ich Ihnen meine [[Karte]] dalassen, falls es mal passt?"
+    kern: [ordnung, karte, dalassen]
+    wann: Freundlich gehen und die Tür offen lassen. Wer gut geht, darf wiederkommen.
+  abschluss_termin:
+    kategorie: Abschluss
+    einwand: „Klingt eigentlich gut.“
+    satz: "Was halten Sie davon, wenn wir uns die Seite am Dienstag um zehn nochmal [[gemeinsam]] anschauen?"
+    kern: [halten, dienstag, gemeinsam, anschauen]
+    wann: "Immer mit einem konkreten nächsten Schritt enden: Tag, Uhrzeit, was passiert."
+  alternativfrage:
+    kategorie: Abschluss
+    einwand: „Ja, können wir mal machen.“
+    satz: "Passt's Ihnen eher Dienstag früh [[oder]] Donnerstag am Nachmittag?"
+    kern: [eher, dienstag, oder, donnerstag]
+    wann: Alternativfrage. Zwei Termine zur Wahl statt „Wann passt's Ihnen?“.
+  zugabe:
+    kategorie: Abschluss
+    einwand: „Und was ist, wenn's nix bringt?“
+    satz: "Das Hosting ist monatlich kündbar, und der erste Monat ist [[frei]]. Sie gehen also kein Risiko ein."
+    kern: [monatlich, kündbar, frei, risiko]
+    wann: Risiko kleiner machen statt Preis senken.
